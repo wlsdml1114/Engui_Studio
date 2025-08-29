@@ -27,7 +27,7 @@ EnguiStudio는 RunPod Serverless 인프라를 활용하여 다양한 오픈소�
 
 ### 1. 프로젝트 클론
 ```bash
-git clone https://github.com/wlsdml1114/enguistudio.git
+git clone https://github.com/wlsdml1114/Engui_Studio.git
 cd enguistudio
 ```
 
