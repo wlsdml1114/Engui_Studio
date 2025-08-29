@@ -45,6 +45,7 @@ next-env.d.ts
 /prisma/db/*.db-journal
 /prisma/db/*.sqlite
 /prisma/db/*.sqlite3
+/prisma/migrations/
 
 # Generated results and uploads
 /public/results/
