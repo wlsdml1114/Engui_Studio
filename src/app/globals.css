@@ -1,0 +1,121 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background-start-rgb: 20, 20, 30;
+  --background-end-rgb: 10, 10, 20;
+  --foreground-rgb: 230, 230, 240;
+
+  --primary-rgb: 79, 70, 229;
+  --secondary-rgb: 30, 30, 45;
+  --border-rgb: 45, 45, 65;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+  min-height: 100vh;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* 커스텀 스크롤바 스타일 */
+@layer components {
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(79, 70, 229, 0.6) transparent;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 5px;
+    margin: 2px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.8), rgba(99, 102, 241, 0.8));
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.9), rgba(129, 140, 248, 0.9));
+    transform: scale(1.05);
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  
+  /* 라이브러리 그리드용 스크롤바 */
+  .library-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(79, 70, 229, 0.4) transparent;
+  }
+  
+  .library-scrollbar::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .library-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 4px;
+    margin: 1px;
+  }
+  
+  .library-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.5), rgba(99, 102, 241, 0.5));
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: all 0.2s ease;
+  }
+  
+  .library-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.7), rgba(129, 140, 248, 0.7));
+    transform: scale(1.1);
+  }
+  
+  /* 다크 테마에 최적화된 스크롤바 */
+  .dark-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(79, 70, 229, 0.3) rgba(0, 0, 0, 0.2);
+  }
+  
+  .dark-scrollbar::-webkit-scrollbar {
+    width: 12px;
+  }
+  
+  .dark-scrollbar::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    margin: 2px;
+  }
+  
+  .dark-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(79, 70, 229, 0.6), rgba(99, 102, 241, 0.6));
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+  }
+  
+  .dark-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.8), rgba(129, 140, 248, 0.8));
+    box-shadow: 0 0 10px rgba(79, 70, 229, 0.3);
+  }
+}

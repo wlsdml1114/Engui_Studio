@@ -1,0 +1,94 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Job {
+  id            String    @id @default(uuid())
+  userId        String
+  status        String
+  type          String
+  prompt        String?
+  runpodJobId   String?   // RunPod job ID 추가
+  options       String?
+  resultUrl     String?
+  isFavorite    Boolean   @default(false) // 즐겨찾기 상태
+  createdAt     DateTime  @default(now())
+  completedAt   DateTime?
+
+  @@map("jobs") // Map model name to table name
+}
+
+model Preset {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  type      String
+  options   String
+  createdAt DateTime @default(now())
+
+  @@map("presets")
+}
+
+model CreditActivity {
+  id        String   @id @default(uuid())
+  userId    String
+  activity  String
+  amount    Int
+  createdAt DateTime @default(now())
+
+  @@map("credit_activities")
+}
+
+model UserSetting {
+  id           String   @id @default(uuid())
+  userId       String
+  serviceName  String
+  configKey    String
+  configValue  String
+  isEncrypted  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, serviceName, configKey])
+  @@map("user_settings")
+}
+
+model ApiLog {
+  id             String   @id @default(uuid())
+  userId         String
+  service        String
+  endpoint       String
+  method         String
+  requestBody    String?
+  responseStatus Int?
+  responseBody   String?
+  errorMessage   String?
+  durationMs     Int?
+  createdAt      DateTime @default(now())
+
+  @@map("api_logs")
+}
+
+model UsageStats {
+  id              String   @id @default(uuid())
+  userId          String
+  service         String
+  endpoint        String?
+  callCount       Int      @default(0)
+  successCount    Int      @default(0)
+  errorCount      Int      @default(0)
+  totalDurationMs Int      @default(0)
+  date            DateTime
+  createdAt       DateTime @default(now())
+
+  @@unique([userId, service, endpoint, date])
+  @@map("usage_stats")
+}
