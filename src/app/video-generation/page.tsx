@@ -3,61 +3,19 @@
 import { useState, useRef } from 'react';
 import { PhotoIcon, SparklesIcon, Cog6ToothIcon, PlayIcon } from '@heroicons/react/24/outline';
 
-interface Wan22Settings {
-  width: number;
-  height: number;
-  seed: number;
-  cfg: number;
-}
-
 export default function Wan22Page() {
   const [prompt, setPrompt] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
-  const [settings, setSettings] = useState<Wan22Settings>({
-    width: 512,
-    height: 512,
-    seed: -1,
-    cfg: 7.5
-  });
+  const [width, setWidth] = useState(720);
+  const [height, setHeight] = useState(480);
+  const [seed, setSeed] = useState(-1);
+  const [cfg, setCfg] = useState(2.5);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [resultVideo, setResultVideo] = useState<string>('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [currentJobId, setCurrentJobId] = useState<string>('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // 작업 상태 확인 함수
-  const checkJobStatus = async (jobId: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`/api/jobs?jobId=${jobId}`);
-      const data = await response.json();
-      
-      if (data.success && data.job) {
-        const job = data.job;
-        
-        if (job.status === 'completed') {
-          setResultVideo(job.resultUrl || '');
-          setMessage({ type: 'success', text: '비디오 생성이 완료되었습니다!' });
-          setIsGenerating(false);
-          return true;
-        } else if (job.status === 'failed') {
-          setMessage({ type: 'error', text: '비디오 생성에 실패했습니다.' });
-          setIsGenerating(false);
-          return true;
-        } else if (job.status === 'processing') {
-          // 진행 중인 상태 표시 (사용자에게 진행 상황 알림)
-          setMessage({ type: 'success', text: '비디오 생성 중입니다. 잠시만 기다려주세요...' });
-          return false; // 아직 완료되지 않음
-        }
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Job status check failed:', error);
-      return false;
-    }
-  };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -76,17 +34,16 @@ export default function Wan22Page() {
 
     setIsGenerating(true);
     setMessage(null);
-    setResultVideo('');
 
     try {
       const formData = new FormData();
       formData.append('userId', 'user-with-settings');
       formData.append('image', imageFile);
       formData.append('prompt', prompt);
-      formData.append('width', settings.width.toString());
-      formData.append('height', settings.height.toString());
-      formData.append('seed', settings.seed === -1 ? '42' : settings.seed.toString());
-      formData.append('cfg', settings.cfg.toString());
+      formData.append('width', width.toString());
+      formData.append('height', height.toString());
+      formData.append('seed', seed === -1 ? '42' : seed.toString());
+      formData.append('cfg', cfg.toString());
 
       const response = await fetch('/api/wan22', {
         method: 'POST',
@@ -97,25 +54,13 @@ export default function Wan22Page() {
 
       if (response.ok && data.success && data.jobId) {
         setCurrentJobId(data.jobId);
-        setMessage({ type: 'success', text: '비디오 생성을 시작했습니다. 잠시만 기다려주세요...' });
+        setMessage({ type: 'success', text: data.message || 'WAN 2.2 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.' });
         
-        // 작업 상태 주기적 확인
-        const checkInterval = setInterval(async () => {
-          const isCompleted = await checkJobStatus(data.jobId);
-          if (isCompleted) {
-            clearInterval(checkInterval);
-          }
-        }, 5000); // 5초마다 확인
+        // 백그라운드 처리이므로 즉시 완료 상태로 변경
+        setIsGenerating(false);
         
-        // 10분 후 자동으로 인터벌 정리
-        setTimeout(() => {
-          clearInterval(checkInterval);
-          if (isGenerating) {
-            setMessage({ type: 'success', text: '비디오 생성이 진행 중입니다. 라이브러리에서 진행 상황을 확인하세요.' });
-            setIsGenerating(false);
-          }
-        }, 600000); // 10분
-        
+        // 작업 정보는 유지하되 생성 중 상태는 해제
+        // 사용자는 다른 작업을 할 수 있음
       } else {
         throw new Error(data.error || '비디오 생성 요청에 실패했습니다.');
       }
@@ -130,7 +75,6 @@ export default function Wan22Page() {
     setPrompt('');
     setImageFile(null);
     setPreviewUrl('');
-    setResultVideo('');
     setMessage(null);
     setCurrentJobId('');
     setIsGenerating(false);
@@ -228,14 +172,14 @@ export default function Wan22Page() {
                   <label className="block text-sm font-medium text-foreground mb-2">너비 (px)</label>
                   <input
                     type="number"
-                    value={settings.width}
-                    onChange={(e) => setSettings(prev => ({ ...prev, width: parseInt(e.target.value) || 512 }))}
+                    value={width}
+                    onChange={(e) => setWidth(parseInt(e.target.value) || 720)}
                     min="256"
                     max="2048"
                     step="64"
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     disabled={isGenerating}
-                    placeholder="512"
+                    placeholder="720"
                   />
                 </div>
                 
@@ -243,14 +187,14 @@ export default function Wan22Page() {
                   <label className="block text-sm font-medium text-foreground mb-2">높이 (px)</label>
                   <input
                     type="number"
-                    value={settings.height}
-                    onChange={(e) => setSettings(prev => ({ ...prev, height: parseInt(e.target.value) || 512 }))}
+                    value={height}
+                    onChange={(e) => setHeight(parseInt(e.target.value) || 480)}
                     min="256"
                     max="2048"
                     step="64"
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     disabled={isGenerating}
-                    placeholder="512"
+                    placeholder="480"
                   />
                 </div>
                 
@@ -258,8 +202,8 @@ export default function Wan22Page() {
                   <label className="block text-sm font-medium text-foreground mb-2">Seed</label>
                   <input
                     type="number"
-                    value={settings.seed === -1 ? '' : settings.seed}
-                    onChange={(e) => setSettings(prev => ({ ...prev, seed: e.target.value === '' ? -1 : parseInt(e.target.value) }))}
+                    value={seed === -1 ? '' : seed}
+                    onChange={(e) => setSeed(e.target.value === '' ? -1 : parseInt(e.target.value) )}
                     placeholder="랜덤"
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     disabled={isGenerating}
@@ -273,8 +217,8 @@ export default function Wan22Page() {
                     step="0.1"
                     min="1"
                     max="20"
-                    value={settings.cfg}
-                    onChange={(e) => setSettings(prev => ({ ...prev, cfg: parseFloat(e.target.value) }))}
+                    value={cfg}
+                    onChange={(e) => setCfg(parseFloat(e.target.value) )}
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     disabled={isGenerating}
                   />
@@ -315,33 +259,27 @@ export default function Wan22Page() {
               </div>
             )}
 
-            {/* 결과 비디오 */}
-            {resultVideo && (
-              <div className="bg-secondary p-6 rounded-lg border border-border">
-                <h3 className="text-xl font-semibold mb-4">생성된 비디오</h3>
-                <video
-                  src={resultVideo}
-                  controls
-                  className="w-full rounded-lg bg-background"
-                  onError={(e) => console.error('Video error:', e)}
-                >
-                  Your browser does not support the video tag.
-                </video>
-              </div>
-            )}
-
             {/* 작업 정보 */}
             {currentJobId && (
               <div className="bg-secondary p-6 rounded-lg border border-border">
                 <h3 className="text-xl font-semibold mb-4">작업 정보</h3>
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <p><span className="font-medium">Job ID:</span> {currentJobId}</p>
-                  <p><span className="font-medium">상태:</span> {isGenerating ? '처리 중' : '완료'}</p>
-                  {!isGenerating && (
-                    <p className="text-green-400">
-                      ✅ 비디오 생성이 완료되었습니다! 라이브러리에서 확인하세요.
+                  <p><span className="font-medium">상태:</span> 백그라운드 처리 중</p>
+                  <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                    <p className="text-blue-300 text-sm">
+                      ✅ WAN 2.2 작업이 백그라운드에서 처리되고 있습니다.
                     </p>
-                  )}
+                    <p className="text-blue-200 text-xs mt-2">
+                      • 다른 작업을 자유롭게 수행할 수 있습니다
+                    </p>
+                    <p className="text-blue-200 text-xs">
+                      • Library에서 진행 상황을 확인하세요
+                    </p>
+                    <p className="text-blue-200 text-xs">
+                      • 작업 완료 시 자동으로 상태가 업데이트됩니다
+                    </p>
+                  </div>
                 </div>
               </div>
             )}

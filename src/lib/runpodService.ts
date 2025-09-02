@@ -26,7 +26,16 @@ interface FluxKontextInput {
   guidance: number; // cfg를 guidance로 변경
 }
 
-type RunPodInput = MultiTalkInput | FluxKontextInput;
+interface Wan22Input {
+  prompt: string;
+  image_path: string; // base64 인코딩된 이미지 데이터 (키는 image_path)
+  width: number;
+  height: number;
+  seed: number;
+  cfg: number;
+}
+
+type RunPodInput = MultiTalkInput | FluxKontextInput | Wan22Input;
 
 class RunPodService {
   private apiKey: string;
@@ -81,6 +90,25 @@ class RunPodService {
       console.log('  - image_path:', payload.input.image_path);
       console.log('  - audio_paths:', payload.input.audio_paths);
       console.log('  - audio_type:', payload.input.audio_type || 'not set');
+    } else if ('cfg' in input) {
+      // Wan22 input
+      payload = {
+        input: {
+          prompt: input.prompt,
+          image_path: input.image_path,
+          width: input.width,
+          height: input.height,
+          seed: input.seed,
+          cfg: input.cfg
+        }
+      };
+      console.log('🎭 Wan22 payload created:');
+      console.log('  - prompt:', payload.input.prompt);
+      console.log('  - image_path:', `${payload.input.image_path.substring(0, 50)}... (${payload.input.image_path.length} characters)`);
+      console.log('  - width:', payload.input.width);
+      console.log('  - height:', payload.input.height);
+      console.log('  - seed:', payload.input.seed);
+      console.log('  - cfg:', payload.input.cfg);
     } else {
       // FluxKontext input
       payload = {

@@ -18,46 +18,13 @@ export default function FluxKontextPage() {
     width: 512,
     height: 512,
     seed: -1,
-    cfg: 7.5
+    cfg: 2.5
   });
   const [isGenerating, setIsGenerating] = useState(false);
-  const [resultImage, setResultImage] = useState<string>('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [currentJobId, setCurrentJobId] = useState<string>('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // 작업 상태 확인 함수
-  const checkJobStatus = async (jobId: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`/api/jobs?jobId=${jobId}`);
-      const data = await response.json();
-      
-      if (data.success && data.job) {
-        const job = data.job;
-        
-        if (job.status === 'completed') {
-          setResultImage(job.resultUrl || '');
-          setMessage({ type: 'success', text: '이미지 생성이 완료되었습니다!' });
-          setIsGenerating(false);
-          return true;
-        } else if (job.status === 'failed') {
-          setMessage({ type: 'error', text: '이미지 생성에 실패했습니다.' });
-          setIsGenerating(false);
-          return true;
-        } else if (job.status === 'processing') {
-          // 진행 중인 상태 표시 (사용자에게 진행 상황 알림)
-          setMessage({ type: 'success', text: '이미지 생성 중입니다. 잠시만 기다려주세요...' });
-          return false; // 아직 완료되지 않음
-        }
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Job status check failed:', error);
-      return false;
-    }
-  };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -76,7 +43,6 @@ export default function FluxKontextPage() {
 
     setIsGenerating(true);
     setMessage(null);
-    setResultImage('');
 
     try {
       const formData = new FormData();
@@ -97,20 +63,13 @@ export default function FluxKontextPage() {
 
       if (response.ok && data.success && data.jobId) {
         setCurrentJobId(data.jobId);
-        setMessage({ type: 'success', text: '이미지 생성을 시작했습니다. 잠시만 기다려주세요...' });
+        setMessage({ type: 'success', text: 'FLUX KONTEXT 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.' });
         
-        // 백그라운드에서 작업 상태 확인 (더 자주 체크)
-        const checkStatus = async () => {
-          const isCompleted = await checkJobStatus(data.jobId);
-          if (!isCompleted) {
-            // 3초 후 다시 확인 (더 빠른 응답)
-            setTimeout(checkStatus, 3000);
-          }
-        };
+        // 백그라운드 처리이므로 즉시 완료 상태로 변경
+        setIsGenerating(false);
         
-        // 첫 번째 상태 확인 시작 (즉시 시작)
-        checkStatus();
-        
+        // 작업 정보는 유지하되 생성 중 상태는 해제
+        // 사용자는 다른 작업을 할 수 있음
       } else {
         const errorMessage = data.error || '이미지 생성에 실패했습니다.';
         console.error('FLUX KONTEXT API error:', { response: response.status, data });
@@ -302,7 +261,7 @@ export default function FluxKontextPage() {
                     className="w-full px-3 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                   <p className="text-xs text-foreground/60 mt-1">
-                    💡 높을수록 프롬프트를 더 엄격하게 따름 (7.5 권장)
+                    💡 높을수록 프롬프트를 더 엄격하게 따름 (2.5 권장)
                   </p>
                 </div>
               </div>
@@ -336,34 +295,26 @@ export default function FluxKontextPage() {
         </div>
 
         {/* Result Display */}
-        {resultImage && (
+        {currentJobId && (
           <div className="mt-8 bg-secondary p-6 rounded-lg border border-border">
-            <h2 className="text-xl font-semibold mb-4">생성된 이미지</h2>
-            <div className="flex justify-center">
-              <img 
-                src={resultImage} 
-                alt="Generated" 
-                className="max-w-full max-h-96 rounded-lg shadow-lg"
-              />
-            </div>
-            <div className="mt-4 flex justify-center gap-4">
-              <button
-                onClick={() => window.open(resultImage, '_blank')}
-                className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors"
-              >
-                새 탭에서 보기
-              </button>
-              <button
-                onClick={() => {
-                  const link = document.createElement('a');
-                  link.href = resultImage;
-                  link.download = `flux-kontext-${Date.now()}.png`;
-                  link.click();
-                }}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors"
-              >
-                다운로드
-              </button>
+            <h2 className="text-xl font-semibold mb-4">작업 정보</h2>
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <p><span className="font-medium">Job ID:</span> {currentJobId}</p>
+              <p><span className="font-medium">상태:</span> 백그라운드 처리 중</p>
+              <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                <p className="text-blue-300 text-sm">
+                  ✅ FLUX KONTEXT 작업이 백그라운드에서 처리되고 있습니다.
+                </p>
+                <p className="text-blue-200 text-xs mt-2">
+                  • 다른 작업을 자유롭게 수행할 수 있습니다
+                </p>
+                <p className="text-blue-200 text-xs">
+                  • Library에서 진행 상황을 확인하세요
+                </p>
+                <p className="text-blue-200 text-xs">
+                  • 작업 완료 시 자동으로 상태가 업데이트됩니다
+                </p>
+              </div>
             </div>
           </div>
         )}

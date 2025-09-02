@@ -63,16 +63,24 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
           return item.resultUrl;
         }
         
-        // 입력 이미지 경로가 있으면 사용
+        // 입력 이미지 경로가 있으면 웹 경로로 변환하여 사용
         if (options.inputImagePath) {
-          console.log('🖼️ Using input image path for FLUX KONTEXT thumbnail');
+          console.log('🖼️ Using input image path for FLUX KONTEXT thumbnail:', options.inputImagePath);
+          // 로컬 파일 경로를 웹 경로로 변환
+          const fileName = options.inputImageName || options.inputImagePath.split('/').pop();
+          if (fileName) {
+            const webPath = `/results/${fileName}`;
+            console.log('🔄 Converted to web path:', webPath);
+            return webPath;
+          }
           return options.inputImagePath;
         }
         
-        // 입력 이미지 S3 URL이 있으면 사용
-        if (options.inputImageS3Url) {
-          console.log('🖼️ Using input image S3 URL for FLUX KONTEXT thumbnail');
-          return options.inputImageS3Url;
+        // inputImageName이 직접 있는 경우 웹 경로로 사용
+        if (options.inputImageName) {
+          const webPath = `/results/${options.inputImageName}`;
+          console.log('🖼️ Using input image name for FLUX KONTEXT thumbnail:', webPath);
+          return webPath;
         }
       } catch (e) {
         console.warn('Failed to parse FLUX KONTEXT options:', e);
@@ -109,6 +117,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
   };
 
   const thumbnailUrl = getThumbnailUrl();
+  console.log(`🎬 Thumbnail URL for ${item.type} (${item.id}):`, thumbnailUrl);
   const createdTime = new Date(item.createdAt).toLocaleTimeString();
   const completedTime = item.completedAt ? new Date(item.completedAt).toLocaleTimeString() : null;
 
@@ -149,13 +158,18 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
             alt="Thumbnail" 
             className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
             onError={(e) => {
-              console.error('❌ Thumbnail error:', e);
+              console.error('❌ Thumbnail error for', item.type, item.id, ':', e);
+              console.error('❌ Failed URL:', thumbnailUrl);
               e.currentTarget.style.display = 'none';
+            }}
+            onLoad={() => {
+              console.log('✅ Thumbnail loaded successfully for', item.type, item.id, ':', thumbnailUrl);
             }}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-foreground/30">
             <PhotoIcon className="w-12 h-12" />
+            <span className="ml-2 text-xs">No thumbnail</span>
           </div>
         )}
         
