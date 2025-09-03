@@ -116,7 +116,7 @@ export default function MultiTalkPage() {
     };
 
     return (
-        <div className="min-h-screen bg-background p-6">
+        <div className="min-h-screen bg-background p-6 overflow-y-auto custom-scrollbar">
             <div className="max-w-6xl mx-auto">
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-8">

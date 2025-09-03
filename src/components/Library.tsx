@@ -91,18 +91,30 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
     if (item.type === 'wan22' && item.options) {
       try {
         const options = JSON.parse(item.options);
+        console.log('🔍 WAN 2.2 options for thumbnail:', options);
         
-        // base64 이미지가 있으면 사용 (FLUX KONTEXT와 동일)
-        if (options.imageBase64) {
-          console.log('🖼️ Using base64 image for WAN 2.2 thumbnail');
-          return `data:image/jpeg;base64,${options.imageBase64}`;
+        // 로컬 웹 경로가 있으면 우선 사용 (가장 안정적)
+        if (options.imageWebPath) {
+          console.log('🖼️ Using local web path for WAN 2.2 thumbnail:', options.imageWebPath);
+          return options.imageWebPath;
         }
         
-        // 입력 이미지 경로가 있으면 사용 (폴백)
+        // 입력 이미지 경로가 있으면 다양한 패턴으로 시도
         if (options.inputImagePath) {
           console.log('🖼️ Using input image path for WAN 2.2 thumbnail');
-          return `/results/${options.inputImageName}`;
+          
+          // 기존 파일명이 있으면 사용
+          if (options.inputImageName) {
+            const webPath = `/results/${options.inputImageName}`;
+            console.log('🔄 Using existing file name:', webPath);
+            return webPath;
+          }
+          
+          // 폴백: 기본 패턴
+          return `/results/input_${item.id}.jpg`;
         }
+        
+        console.log('⚠️ No suitable thumbnail found for WAN 2.2');
       } catch (e) {
         console.warn('Failed to parse WAN 2.2 options:', e);
       }
@@ -160,6 +172,13 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
             onError={(e) => {
               console.error('❌ Thumbnail error for', item.type, item.id, ':', e);
               console.error('❌ Failed URL:', thumbnailUrl);
+              console.error('❌ Item details:', {
+                type: item.type,
+                id: item.id,
+                status: item.status,
+                resultUrl: item.resultUrl,
+                options: item.options
+              });
               e.currentTarget.style.display = 'none';
             }}
             onLoad={() => {
@@ -500,7 +519,54 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                 try {
                   const options = JSON.parse(item.options || '{}');
                   
-                  // base64 이미지가 있으면 우선 표시 (FLUX KONTEXT와 동일)
+                  // 로컬 웹 경로가 있으면 우선 사용 (가장 안정적)
+                  if (options.imageWebPath) {
+                    return (
+                      <div className="space-y-4">
+                        <div className="bg-background/50 p-4 rounded-lg">
+                          <h5 className="font-medium mb-2">Local Web Path</h5>
+                          <div className="text-sm text-foreground/80 space-y-1">
+                            <p><strong>Web Path:</strong> {options.imageWebPath}</p>
+                            <p><strong>Status:</strong> Available</p>
+                          </div>
+                        </div>
+                        
+                        {/* 웹 경로 이미지 표시 */}
+                        <div className="relative">
+                          <img 
+                            src={options.imageWebPath}
+                            alt="Input image" 
+                            className="w-full max-h-64 object-contain rounded-lg bg-background"
+                            onError={(e) => {
+                              console.error('❌ WAN 2.2 input image error:', e);
+                              console.error('❌ Web path:', options.imageWebPath);
+                              
+                              // 에러 발생 시 이미지 요소를 숨기고 에러 메시지 표시
+                              const imgElement = e.currentTarget;
+                              imgElement.style.display = 'none';
+                              
+                              // 에러 메시지 표시
+                              const errorDiv = document.createElement('div');
+                              errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
+                              errorDiv.innerHTML = `
+                                <div class="mb-2">⚠️ WAN 2.2 입력 이미지를 불러올 수 없습니다</div>
+                                <div class="text-xs text-red-300">
+                                  <p>웹 경로: ${options.imageWebPath}</p>
+                                  <p>💡 파일이 public/results 폴더에 있는지 확인하세요</p>
+                                </div>
+                              `;
+                              imgElement.parentNode?.appendChild(errorDiv);
+                            }}
+                            onLoad={() => {
+                              console.log('✅ WAN 2.2 input image loaded successfully:', options.imageWebPath);
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  // base64 이미지가 있으면 표시 (FLUX KONTEXT와 동일)
                   if (options.imageBase64) {
                     return (
                       <div className="space-y-4">
@@ -583,6 +649,9 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                     <div className="text-center py-8 text-foreground/50">
                       <PhotoIcon className="w-16 h-16 mx-auto mb-2" />
                       <p>입력 이미지 정보를 찾을 수 없습니다.</p>
+                      <div className="text-xs text-foreground/40 mt-2">
+                        <p>Options: {JSON.stringify(options, null, 2)}</p>
+                      </div>
                     </div>
                   );
                 } catch (e) {
@@ -590,6 +659,9 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                     <div className="text-center py-8 text-foreground/50">
                       <PhotoIcon className="w-16 h-16 mx-auto mb-2" />
                       <p>입력 이미지 정보를 파싱할 수 없습니다.</p>
+                      <div className="text-xs text-foreground/40 mt-2">
+                        <p>Error: {e instanceof Error ? e.message : String(e)}</p>
+                      </div>
                     </div>
                   );
                 }

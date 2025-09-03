@@ -95,6 +95,18 @@ export async function POST(request: NextRequest) {
             // 로컬 저장 실패해도 계속 진행
         }
 
+        // 실제 저장된 파일명으로 웹 경로 설정
+        const actualFileName = `input_${job.id}_${imageFile.name}`;
+        const actualImagePath = join(LOCAL_STORAGE_DIR, actualFileName);
+        
+        // 실제 파일명으로 다시 저장 (웹 접근용)
+        try {
+            writeFileSync(actualImagePath, imageBuffer);
+            console.log('✅ Image saved with actual filename:', actualImagePath);
+        } catch (saveError) {
+            console.error('❌ Failed to save image with actual filename:', saveError);
+        }
+
         // Prepare RunPod input with base64 image data
         const runpodInput = {
             prompt: prompt,
@@ -162,7 +174,7 @@ export async function POST(request: NextRequest) {
                     // 로컬 파일 경로들 (백업용)
                     imagePath,
                     // 로컬 이미지 웹 경로 (이미지 표시용)
-                    imageWebPath: `/results/${safeFileName}`,
+                    imageWebPath: `/results/${actualFileName}`,
                 }),
             },
         });
