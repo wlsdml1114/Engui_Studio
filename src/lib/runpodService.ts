@@ -35,7 +35,15 @@ interface Wan22Input {
   cfg: number;
 }
 
-type RunPodInput = MultiTalkInput | FluxKontextInput | Wan22Input;
+interface InfiniteTalkInput {
+  prompt: string;
+  image_path: string; // S3 경로 또는 로컬 경로
+  wav_path: string; // S3 경로 또는 로컬 경로
+  width: number;
+  height: number;
+}
+
+type RunPodInput = MultiTalkInput | FluxKontextInput | Wan22Input | InfiniteTalkInput;
 
 class RunPodService {
   private apiKey: string;
@@ -102,6 +110,7 @@ class RunPodService {
           cfg: input.cfg
         }
       };
+      
       console.log('🎭 Wan22 payload created:');
       console.log('  - prompt:', payload.input.prompt);
       console.log('  - image_path:', `${payload.input.image_path.substring(0, 50)}... (${payload.input.image_path.length} characters)`);
@@ -109,6 +118,24 @@ class RunPodService {
       console.log('  - height:', payload.input.height);
       console.log('  - seed:', payload.input.seed);
       console.log('  - cfg:', payload.input.cfg);
+    } else if ('wav_path' in input) {
+      // InfiniteTalk input
+      payload = {
+        input: {
+          prompt: input.prompt,
+          image_path: input.image_path,
+          wav_path: input.wav_path,
+          width: input.width,
+          height: input.height
+        }
+      };
+      
+      console.log('🎭 InfiniteTalk payload created:');
+      console.log('  - prompt:', payload.input.prompt);
+      console.log('  - image_path:', payload.input.image_path);
+      console.log('  - wav_path:', payload.input.wav_path);
+      console.log('  - width:', payload.input.width);
+      console.log('  - height:', payload.input.height);
     } else {
       // FluxKontext input
       payload = {

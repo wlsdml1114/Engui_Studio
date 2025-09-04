@@ -3,12 +3,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { VideoCameraIcon, ChatBubbleLeftRightIcon, CogIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { VideoCameraIcon, ChatBubbleLeftRightIcon, CogIcon, SparklesIcon, MicrophoneIcon } from '@heroicons/react/24/outline';
 
 const menuItems = [
   { href: '/video-generation', label: 'WAN 2.2', icon: VideoCameraIcon },
   { href: '/flux-kontext', label: 'FLUX KONTEXT', icon: SparklesIcon },
   { href: '/multitalk', label: 'MultiTalk', icon: ChatBubbleLeftRightIcon },
+  { href: '/infinite-talk', label: 'Infinite Talk', icon: MicrophoneIcon },
   { href: '/settings', label: 'Settings', icon: CogIcon },
 ];
 

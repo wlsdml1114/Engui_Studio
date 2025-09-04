@@ -28,6 +28,7 @@ interface RunPodConfig {
     multitalk: string;
     'flux-kontext': string; // FLUX KONTEXT endpoint 추가
     wan22: string; // WAN 2.2 endpoint 추가
+    'infinite-talk': string; // Infinite Talk endpoint 추가
   };
 }
 
@@ -97,7 +98,8 @@ class SettingsService {
             video: '',
             multitalk: '',
             'flux-kontext': '', // FLUX KONTEXT endpoint 추가
-            wan22: '' // WAN 2.2 endpoint 추가
+            wan22: '', // WAN 2.2 endpoint 추가
+            'infinite-talk': '' // Infinite Talk endpoint 추가
           },
           generateTimeout: 3600 // 기본값 3600초 (1시간)
         },
@@ -131,7 +133,7 @@ class SettingsService {
               settings.runpod.apiKey = value;
             } else             if (setting.configKey.startsWith('endpoints.')) {
               const endpointType = setting.configKey.split('.')[1];
-              if (endpointType && ['image', 'video', 'multitalk', 'flux-kontext', 'wan22'].includes(endpointType)) {
+              if (endpointType && ['image', 'video', 'multitalk', 'flux-kontext', 'wan22', 'infinite-talk'].includes(endpointType)) {
                 settings.runpod.endpoints[endpointType as keyof typeof settings.runpod.endpoints] = value;
               }
             } else if (setting.configKey === 'generateTimeout') {
@@ -332,7 +334,8 @@ class SettingsService {
       'endpoints.image',
       'endpoints.video', 
       'endpoints.multitalk',
-      'endpoints.wan22'
+      'endpoints.wan22',
+      'endpoints.infinite-talk'
       // generateTimeout은 선택적 설정이므로 상태 계산에서 제외
     ]);
 

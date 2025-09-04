@@ -9,7 +9,7 @@ export async function POST() {
     
     // Create a simple test payload matching your Python code
     const testInput = {
-      prompt: "a man talking",
+      prompt: "a person talking naturally",
       image_path: "/runpod-volume/input/multitalk/test_image.jpg",
       audio_paths: {
         person1: "/runpod-volume/input/multitalk/test_audio.wav"

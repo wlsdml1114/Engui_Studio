@@ -11,6 +11,7 @@ EnguiStudio는 RunPod Serverless 인프라를 활용하여 다양한 오픈소�
 - **🎬 Video Generation**: WAN 2.2 비디오 생성 모델
 - **✨ FLUX KONTEXT**: 이미지 변환 및 스타일링 모델
 - **🎤 MultiTalk**: Audio 2 Video 모델
+- **🎭 Infinite Talk**: 이미지와 오디오를 결합한 말하는 영상 생성 모델
 - **⚙️ Unified Settings**: RunPod 엔드포인트를 한 곳에서 관리
 - **📚 Library**: 생성된 결과물을 관리
 
@@ -68,6 +69,7 @@ http://localhost:3000
 - **Video Generation**: WAN 2.2, AnimateDiff 등
 - **FLUX KONTEXT**: 이미지 변환 모델
 - **MultiTalk**: Audio 2 Video 모델
+- **Infinite Talk**: 이미지와 오디오를 결합한 말하는 영상 생성 모델
 - **기타 커스텀 모델**: 원하는 오픈소스 모델 추가 가능
 
 ### 설정 방법

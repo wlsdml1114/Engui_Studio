@@ -1,21 +1,22 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { PhotoIcon, SparklesIcon, Cog6ToothIcon, PlayIcon } from '@heroicons/react/24/outline';
+import { MicrophoneIcon, PhotoIcon, MusicalNoteIcon } from '@heroicons/react/24/outline';
 
-export default function Wan22Page() {
+export default function InfiniteTalkPage() {
   const [prompt, setPrompt] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [audioFile, setAudioFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
-  const [width, setWidth] = useState(720);
-  const [height, setHeight] = useState(480);
-  const [seed, setSeed] = useState(-1);
-  const [cfg, setCfg] = useState(2.5);
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string>('');
+  const [width, setWidth] = useState(640);
+  const [height, setHeight] = useState(640);
   const [isGenerating, setIsGenerating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [currentJobId, setCurrentJobId] = useState<string>('');
   
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -26,9 +27,18 @@ export default function Wan22Page() {
     }
   };
 
+  const handleAudioUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setAudioFile(file);
+      const url = URL.createObjectURL(file);
+      setAudioPreviewUrl(url);
+    }
+  };
+
   const handleGenerate = async () => {
-    if (!imageFile || !prompt.trim()) {
-      setMessage({ type: 'error', text: '이미지와 프롬프트를 모두 입력해주세요.' });
+    if (!imageFile || !audioFile || !prompt.trim()) {
+      setMessage({ type: 'error', text: '이미지, 오디오 파일, 프롬프트를 모두 입력해주세요.' });
       return;
     }
 
@@ -39,13 +49,12 @@ export default function Wan22Page() {
       const formData = new FormData();
       formData.append('userId', 'user-with-settings');
       formData.append('image', imageFile);
+      formData.append('audio', audioFile);
       formData.append('prompt', prompt);
       formData.append('width', width.toString());
       formData.append('height', height.toString());
-      formData.append('seed', seed === -1 ? '42' : seed.toString());
-      formData.append('cfg', cfg.toString());
 
-      const response = await fetch('/api/wan22', {
+      const response = await fetch('/api/infinite-talk', {
         method: 'POST',
         body: formData,
       });
@@ -54,35 +63,41 @@ export default function Wan22Page() {
 
       if (response.ok && data.success && data.jobId) {
         setCurrentJobId(data.jobId);
-        setMessage({ type: 'success', text: data.message || 'WAN 2.2 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.' });
+        setMessage({ type: 'success', text: data.message || 'Infinite Talk 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.' });
         
         // 백그라운드 처리이므로 즉시 완료 상태로 변경
         setIsGenerating(false);
         
-        // 작업 정보는 유지하되 생성 중 상태는 해제
-        // 사용자는 다른 작업을 할 수 있음
+        // 입력 초기화
+        setPrompt('');
+        setImageFile(null);
+        setAudioFile(null);
+        setPreviewUrl('');
+        setAudioPreviewUrl('');
+        if (imageInputRef.current) imageInputRef.current.value = '';
+        if (audioInputRef.current) audioInputRef.current.value = '';
       } else {
-        throw new Error(data.error || '비디오 생성 요청에 실패했습니다.');
+        const errorMessage = data.error || 'Infinite Talk 생성에 실패했습니다.';
+        throw new Error(errorMessage);
       }
-    } catch (error: any) {
-      console.error('Video generation error:', error);
-      setMessage({ type: 'error', text: error.message || '비디오 생성 중 오류가 발생했습니다.' });
+    } catch (error) {
+      console.error('Generation error:', error);
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.' });
+    } finally {
       setIsGenerating(false);
     }
   };
 
-  const handleReset = () => {
+  const clearInputs = () => {
     setPrompt('');
     setImageFile(null);
+    setAudioFile(null);
     setPreviewUrl('');
+    setAudioPreviewUrl('');
+    if (imageInputRef.current) imageInputRef.current.value = '';
+    if (audioInputRef.current) audioInputRef.current.value = '';
     setMessage(null);
     setCurrentJobId('');
-    setIsGenerating(false);
-    
-    // 파일 입력 초기화
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
   };
 
   return (
@@ -90,8 +105,8 @@ export default function Wan22Page() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
-          <PlayIcon className="w-8 h-8 text-purple-500" />
-          <h1 className="text-3xl font-bold text-foreground">WAN 2.2</h1>
+          <MicrophoneIcon className="w-8 h-8 text-primary" />
+          <h1 className="text-3xl font-bold">Infinite Talk</h1>
         </div>
 
         {/* Message Display */}
@@ -116,20 +131,20 @@ export default function Wan22Page() {
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="예: A person walking in a beautiful garden..."
+                placeholder="예: A person is talking about technology..."
                 className="w-full h-32 px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                 disabled={isGenerating}
               />
             </div>
 
-            {/* 이미지 업로드 */}
+            {/* Image Upload */}
             <div>
               <label className="block text-sm font-medium mb-2">
                 이미지 파일 <span className="text-red-400">*</span>
               </label>
               <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors">
                 <input
-                  ref={fileInputRef}
+                  ref={imageInputRef}
                   type="file"
                   accept="image/*"
                   onChange={handleImageUpload}
@@ -148,7 +163,7 @@ export default function Wan22Page() {
                       onClick={() => {
                         setImageFile(null);
                         setPreviewUrl('');
-                        if (fileInputRef.current) fileInputRef.current.value = '';
+                        if (imageInputRef.current) imageInputRef.current.value = '';
                       }}
                       className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
                     >
@@ -163,11 +178,64 @@ export default function Wan22Page() {
                     </p>
                     <button
                       type="button"
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={() => imageInputRef.current?.click()}
                       disabled={isGenerating}
                       className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors disabled:opacity-50"
                     >
                       이미지 선택
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Audio Upload */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                오디오 파일 <span className="text-red-400">*</span>
+              </label>
+              <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors">
+                <input
+                  ref={audioInputRef}
+                  type="file"
+                  accept="audio/*"
+                  onChange={handleAudioUpload}
+                  className="hidden"
+                  disabled={isGenerating}
+                />
+                {audioPreviewUrl ? (
+                  <div className="space-y-4">
+                    <audio controls className="w-full">
+                      <source src={audioPreviewUrl} type="audio/wav" />
+                      <source src={audioPreviewUrl} type="audio/mpeg" />
+                      <source src={audioPreviewUrl} type="audio/ogg" />
+                      브라우저가 오디오를 지원하지 않습니다.
+                    </audio>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAudioFile(null);
+                        setAudioPreviewUrl('');
+                        if (audioInputRef.current) audioInputRef.current.value = '';
+                      }}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
+                    >
+                      오디오 제거
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <MusicalNoteIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground mb-2">
+                      오디오 파일을 선택하거나 드래그하세요 (WAV 권장)
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => audioInputRef.current?.click()}
+                      disabled={isGenerating}
+                      className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors disabled:opacity-50"
+                    >
+                      오디오 선택
                     </button>
                   </>
                 )}
@@ -189,13 +257,13 @@ export default function Wan22Page() {
                   <input
                     type="number"
                     value={width}
-                    onChange={(e) => setWidth(parseInt(e.target.value) || 720)}
+                    onChange={(e) => setWidth(parseInt(e.target.value) || 640)}
                     min="256"
                     max="2048"
                     step="64"
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     disabled={isGenerating}
-                    placeholder="720"
+                    placeholder="640"
                   />
                 </div>
                 <div>
@@ -205,56 +273,13 @@ export default function Wan22Page() {
                   <input
                     type="number"
                     value={height}
-                    onChange={(e) => setHeight(parseInt(e.target.value) || 480)}
+                    onChange={(e) => setHeight(parseInt(e.target.value) || 640)}
                     min="256"
                     max="2048"
                     step="64"
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     disabled={isGenerating}
-                    placeholder="480"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Seed</label>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSeed(-1)}
-                      className={`px-3 py-1 rounded text-sm ${
-                        seed === -1 
-                          ? 'bg-primary text-white' 
-                          : 'bg-background border border-border text-foreground hover:bg-background/80'
-                      }`}
-                      disabled={isGenerating}
-                    >
-                      랜덤
-                    </button>
-                  </div>
-                  <input
-                    type="number"
-                    value={seed === -1 ? '' : seed}
-                    onChange={(e) => setSeed(e.target.value === '' ? -1 : parseInt(e.target.value) )}
-                    placeholder="랜덤"
-                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    disabled={isGenerating}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Guidance (cfg)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="20"
-                    value={cfg}
-                    onChange={(e) => setCfg(parseFloat(e.target.value) )}
-                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    disabled={isGenerating}
+                    placeholder="640"
                   />
                 </div>
               </div>
@@ -263,7 +288,7 @@ export default function Wan22Page() {
             {/* Action Buttons */}
             <div className="flex gap-4">
               <button
-                onClick={handleReset}
+                onClick={clearInputs}
                 disabled={isGenerating}
                 className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
               >
@@ -271,7 +296,7 @@ export default function Wan22Page() {
               </button>
               <button
                 onClick={handleGenerate}
-                disabled={isGenerating || !imageFile || !prompt.trim()}
+                disabled={isGenerating || !imageFile || !audioFile || !prompt.trim()}
                 className="flex-1 px-6 py-3 bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
               >
                 {isGenerating ? (
@@ -281,8 +306,8 @@ export default function Wan22Page() {
                   </>
                 ) : (
                   <>
-                    <PlayIcon className="w-5 h-5" />
-                    WAN 2.2 생성
+                    <MicrophoneIcon className="w-5 h-5" />
+                    Infinite Talk 생성
                   </>
                 )}
               </button>
@@ -297,7 +322,7 @@ export default function Wan22Page() {
                   <p><span className="font-medium">상태:</span> 백그라운드 처리 중</p>
                   <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
                     <p className="text-blue-300 text-sm">
-                      ✅ WAN 2.2 작업이 백그라운드에서 처리되고 있습니다.
+                      ✅ Infinite Talk 작업이 백그라운드에서 처리되고 있습니다.
                     </p>
                     <p className="text-blue-200 text-xs mt-2">
                       • 다른 작업을 자유롭게 수행할 수 있습니다

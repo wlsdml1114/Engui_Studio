@@ -178,6 +178,7 @@ export async function POST(request: NextRequest) {
         console.log('  - audio2Upload exists:', !!audio2Upload);
         console.log('  - Will set audio_type to "para":', audioMode === 'dual');
         
+        // S3 경로 사용 (runpod-volume 형식)
         const runpodInput = {
             prompt: prompt || "a man talking",
             image_path: imageUpload.filePath, // S3 경로 (/runpod-volume/...)

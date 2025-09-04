@@ -22,11 +22,8 @@ export default function MultiTalkPage() {
         const file = e.target.files?.[0];
         if (file) {
             setImage(file);
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                setImagePreview(e.target?.result as string);
-            };
-            reader.readAsDataURL(file);
+            const url = URL.createObjectURL(file);
+            setImagePreview(url);
         }
     };
 
@@ -115,209 +112,273 @@ export default function MultiTalkPage() {
         }
     };
 
+    const handleReset = () => {
+        setImage(null);
+        setImagePreview(null);
+        setAudio1(null);
+        setAudio2(null);
+        setPrompt('a person talking naturally');
+        if (imageInputRef.current) imageInputRef.current.value = '';
+        if (audio1InputRef.current) audio1InputRef.current.value = '';
+        if (audio2InputRef.current) audio2InputRef.current.value = '';
+        setError(null);
+        setSuccess(null);
+    };
+
     return (
         <div className="min-h-screen bg-background p-6 overflow-y-auto custom-scrollbar">
             <div className="max-w-6xl mx-auto">
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-8">
-                    <ChatBubbleLeftRightIcon className="w-8 h-8 text-blue-500" />
-                    <h1 className="text-3xl font-bold text-foreground">MultiTalk</h1>
+                    <ChatBubbleLeftRightIcon className="w-8 h-8 text-primary" />
+                    <h1 className="text-3xl font-bold">MultiTalk</h1>
                 </div>
 
                 {/* Message Display */}
-                {success && (
-                    <div className="mb-6 p-4 rounded-lg bg-green-900/50 border border-green-500 text-green-200">
-                        <p className="text-sm">{success}</p>
-                    </div>
-                )}
-
                 {error && (
                     <div className="mb-6 p-4 rounded-lg bg-red-900/50 border border-red-500 text-red-200">
-                        <p className="text-sm">오류: {error}</p>
+                        {error}
+                    </div>
+                )}
+                {success && (
+                    <div className="mb-6 p-4 rounded-lg bg-green-900/50 border border-green-500 text-green-200">
+                        {success}
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     {/* Left Column - Input */}
-                    <div className="lg:col-span-2 space-y-6">
-                        {/* Image Upload */}
-                        <div className="bg-secondary p-6 rounded-lg border border-border">
-                            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                                <PhotoIcon className="w-5 h-5" />
-                                입력 이미지
-                            </h2>
-                            
-                            <div className="space-y-4">
+                    <div className="space-y-6">
+                        {/* Prompt Input */}
+                        <div>
+                            <label className="block text-sm font-medium mb-2">
+                                프롬프트 <span className="text-red-400">*</span>
+                            </label>
+                            <textarea
+                                value={prompt}
+                                onChange={(e) => setPrompt(e.target.value)}
+                                placeholder="예: a person talking naturally..."
+                                className="w-full h-32 px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                                disabled={loading}
+                            />
+                            {audioMode === 'dual' && (
+                                <p className="text-xs text-blue-300 mt-1">
+                                    💡 듀얼 오디오 모드에서는 audio_type이 자동으로 'para'로 설정됩니다.
+                                </p>
+                            )}
+                        </div>
+
+                        {/* 이미지 업로드 */}
+                        <div>
+                            <label className="block text-sm font-medium mb-2">
+                                이미지 파일 <span className="text-red-400">*</span>
+                            </label>
+                            <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors">
                                 <input
                                     ref={imageInputRef}
                                     type="file"
                                     accept="image/*"
                                     onChange={handleImageChange}
                                     className="hidden"
+                                    disabled={loading}
                                 />
-                                
-                                <button
-                                    onClick={() => imageInputRef.current?.click()}
-                                    className="w-full p-8 border-2 border-dashed border-border rounded-lg hover:border-primary transition-colors"
-                                >
-                                    {imagePreview ? (
+                                {imagePreview ? (
+                                    <div className="space-y-4">
                                         <img 
                                             src={imagePreview} 
                                             alt="Preview" 
-                                            className="max-w-full max-h-64 mx-auto rounded-lg"
+                                            className="max-w-full max-h-48 mx-auto rounded-lg"
                                         />
-                                    ) : (
-                                        <div className="text-center text-foreground/60">
-                                            <PhotoIcon className="w-12 h-12 mx-auto mb-2" />
-                                            <p>이미지를 클릭하여 업로드하세요</p>
-                                            <p className="text-sm">PNG, JPG, WEBP 지원</p>
-                                        </div>
-                                    )}
-                                </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setImage(null);
+                                                setImagePreview(null);
+                                                if (imageInputRef.current) imageInputRef.current.value = '';
+                                            }}
+                                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
+                                        >
+                                            이미지 제거
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <PhotoIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                                        <p className="text-sm text-muted-foreground mb-2">
+                                            이미지 파일을 선택하거나 드래그하세요
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => imageInputRef.current?.click()}
+                                            disabled={loading}
+                                            className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors disabled:opacity-50"
+                                        >
+                                            이미지 선택
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         </div>
 
-                        {/* Prompt Input */}
-                        <div className="bg-secondary p-6 rounded-lg border border-border">
-                            <h2 className="text-xl font-semibold mb-4">프롬프트</h2>
-                            <textarea
-                                value={prompt}
-                                onChange={(e) => setPrompt(e.target.value)}
-                                placeholder="예: a person talking naturally, professional speaker, casual conversation..."
-                                className="w-full h-32 p-3 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                                required
-                            />
-                            <p className="text-sm text-foreground/60 mt-2">
-                                💡 프롬프트는 AI가 이미지와 오디오를 결합할 때 참고하는 가이드라인입니다.
-                            </p>
-                        </div>
-
-                        {/* Audio Upload */}
-                        <div className="bg-secondary p-6 rounded-lg border border-border">
-                            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                                <MicrophoneIcon className="w-5 h-5" />
-                                오디오 업로드
-                            </h2>
-                            
+                        {/* 오디오 업로드 */}
+                        <div>
+                            <label className="block text-sm font-medium mb-2">
+                                오디오 파일 <span className="text-red-400">*</span>
+                            </label>
                             <div className="space-y-4">
-                                {/* Audio 1 */}
-                                <div>
-                                    <label className="block text-sm font-medium text-foreground/80 mb-2">
-                                        {audioMode === 'single' ? '오디오 파일' : '첫 번째 화자 오디오'}
-                                    </label>
+                                {/* 오디오 1 */}
+                                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors">
                                     <input
                                         ref={audio1InputRef}
                                         type="file"
                                         accept="audio/*"
                                         onChange={handleAudio1Change}
                                         className="hidden"
-                                        required
+                                        disabled={loading}
                                     />
-                                    <button
-                                        onClick={() => audio1InputRef.current?.click()}
-                                        className="w-full p-4 border-2 border-dashed border-border rounded-lg hover:border-primary transition-colors text-center"
-                                    >
-                                        {audio1 ? (
+                                    {audio1 ? (
+                                        <div className="space-y-4">
                                             <div className="flex items-center justify-center gap-2 text-green-400">
-                                                <SpeakerWaveIcon className="w-5 h-5" />
+                                                <MicrophoneIcon className="w-5 h-5" />
                                                 <span>{audio1.name}</span>
                                             </div>
-                                        ) : (
-                                            <div className="text-foreground/60">
-                                                <MicrophoneIcon className="w-8 h-8 mx-auto mb-2" />
-                                                <p>오디오 파일을 클릭하여 업로드하세요</p>
-                                                <p className="text-sm">MP3, WAV, M4A 지원</p>
-                                            </div>
-                                        )}
-                                    </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setAudio1(null);
+                                                    if (audio1InputRef.current) audio1InputRef.current.value = '';
+                                                }}
+                                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
+                                            >
+                                                오디오 1 제거
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <MicrophoneIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                                            <p className="text-sm text-muted-foreground mb-2">
+                                                첫 번째 오디오 파일을 선택하세요
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={() => audio1InputRef.current?.click()}
+                                                disabled={loading}
+                                                className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors disabled:opacity-50"
+                                            >
+                                                오디오 1 선택
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
 
-                                {/* Audio 2 - Only show in dual mode */}
+                                {/* 오디오 2 (듀얼 모드) */}
                                 {audioMode === 'dual' && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-foreground/80 mb-2">
-                                            두 번째 화자 오디오
-                                        </label>
+                                    <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors">
                                         <input
                                             ref={audio2InputRef}
                                             type="file"
                                             accept="audio/*"
                                             onChange={handleAudio2Change}
                                             className="hidden"
-                                            required={audioMode === 'dual'}
+                                            disabled={loading}
                                         />
-                                        <button
-                                            onClick={() => audio2InputRef.current?.click()}
-                                            className="w-full p-4 border-2 border-dashed border-border rounded-lg hover:border-primary transition-colors text-center"
-                                        >
-                                            {audio2 ? (
+                                        {audio2 ? (
+                                            <div className="space-y-4">
                                                 <div className="flex items-center justify-center gap-2 text-purple-400">
                                                     <SpeakerWaveIcon className="w-5 h-5" />
                                                     <span>{audio2.name}</span>
                                                 </div>
-                                            ) : (
-                                                <div className="text-foreground/60">
-                                                    <MicrophoneIcon className="w-8 h-8 mx-auto mb-2" />
-                                                    <p>두 번째 오디오 파일을 클릭하여 업로드하세요</p>
-                                                    <p className="text-sm">MP3, WAV, M4A 지원</p>
-                                                </div>
-                                            )}
-                                        </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setAudio2(null);
+                                                        if (audio2InputRef.current) audio2InputRef.current.value = '';
+                                                    }}
+                                                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
+                                                >
+                                                    오디오 2 제거
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <SpeakerWaveIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                                                <p className="text-sm text-muted-foreground mb-2">
+                                                    두 번째 오디오 파일을 선택하세요
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => audio2InputRef.current?.click()}
+                                                    disabled={loading}
+                                                    className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors disabled:opacity-50"
+                                                >
+                                                    오디오 2 선택
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                 )}
                             </div>
                         </div>
                     </div>
 
-                    {/* Right Column - Settings & Generate */}
+                    {/* Right Column - Settings & Preview */}
                     <div className="space-y-6">
-                        {/* Audio Mode Selection */}
+                        {/* Settings */}
                         <div className="bg-secondary p-6 rounded-lg border border-border">
-                            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                                <Cog6ToothIcon className="w-5 h-5" />
-                                오디오 모드
-                            </h2>
+                            <h3 className="text-lg font-semibold mb-4">설정</h3>
                             
-                            <div className="space-y-3">
-                                <label className="flex items-center p-3 border border-border rounded-lg hover:bg-background/50 transition-colors cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="audioMode"
-                                        value="single"
-                                        checked={audioMode === 'single'}
-                                        onChange={(e) => setAudioMode(e.target.value as 'single' | 'dual')}
-                                        className="mr-3 text-primary focus:ring-primary"
-                                    />
-                                    <div>
-                                        <span className="font-medium">단일 오디오</span>
-                                        <p className="text-sm text-foreground/60">하나의 오디오로 자연스러운 발화</p>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">오디오 모드</label>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setAudioMode('single')}
+                                            className={`px-4 py-2 rounded text-sm ${
+                                                audioMode === 'single' 
+                                                    ? 'bg-primary text-white' 
+                                                    : 'bg-background border border-border text-foreground hover:bg-background/80'
+                                            }`}
+                                            disabled={loading}
+                                        >
+                                            싱글 모드
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setAudioMode('dual')}
+                                            className={`px-4 py-2 rounded text-sm ${
+                                                audioMode === 'dual' 
+                                                    ? 'bg-primary text-white' 
+                                                    : 'bg-background border border-border text-foreground hover:bg-background/80'
+                                            }`}
+                                            disabled={loading}
+                                        >
+                                            듀얼 모드
+                                        </button>
                                     </div>
-                                </label>
-                                
-                                <label className="flex items-center p-3 border border-border rounded-lg hover:bg-background/50 transition-colors cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="audioMode"
-                                        value="dual"
-                                        checked={audioMode === 'dual'}
-                                        onChange={(e) => setAudioMode(e.target.value as 'single' | 'dual')}
-                                        className="mr-3 text-primary focus:ring-primary"
-                                    />
-                                    <div>
-                                        <span className="font-medium">듀얼 오디오</span>
-                                        <p className="text-sm text-foreground/60">두 화자의 대화형 콘텐츠</p>
-                                        <p className="text-xs text-foreground/40 mt-1">💡 듀얼 모드에서는 audio_type이 'para'로 자동 설정됩니다</p>
-                                    </div>
-                                </label>
+                                    <p className="text-xs text-foreground/60 mt-1">
+                                        {audioMode === 'single' 
+                                            ? '💡 하나의 오디오 파일로 비디오 생성' 
+                                            : '💡 두 개의 오디오 파일로 대화형 비디오 생성'
+                                        }
+                                    </p>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Generate Button */}
-                        <div className="bg-secondary p-6 rounded-lg border border-border">
+                        {/* Action Buttons */}
+                        <div className="flex gap-4">
+                            <button
+                                onClick={handleReset}
+                                disabled={loading}
+                                className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+                            >
+                                초기화
+                            </button>
                             <button
                                 onClick={handleSubmit}
-                                disabled={!image || !audio1 || (audioMode === 'dual' && !audio2) || loading}
-                                className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all transform hover:scale-105 flex items-center justify-center gap-2"
+                                disabled={loading || !image || !audio1 || (audioMode === 'dual' && !audio2)}
+                                className="flex-1 px-6 py-3 bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
                             >
                                 {loading ? (
                                     <>
@@ -327,14 +388,10 @@ export default function MultiTalkPage() {
                                 ) : (
                                     <>
                                         <ChatBubbleLeftRightIcon className="w-5 h-5" />
-                                        MultiTalk 생성하기
+                                        MultiTalk 생성
                                     </>
                                 )}
                             </button>
-                            
-                            <p className="text-xs text-foreground/60 mt-3 text-center">
-                                MultiTalk 생성에는 몇 분 정도 소요될 수 있습니다.
-                            </p>
                         </div>
                     </div>
                 </div>

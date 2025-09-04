@@ -213,7 +213,7 @@ export default function SettingsPage() {
   };
 
   // Endpoint 테스트 함수
-  const testEndpoint = async (endpointType: 'multitalk' | 'flux-kontext' | 'wan22') => {
+  const testEndpoint = async (endpointType: 'multitalk' | 'flux-kontext' | 'wan22' | 'infinite-talk') => {
     if (!settings.runpod?.apiKey || !settings.runpod?.endpoints?.[endpointType]) {
       return;
     }
@@ -495,6 +495,42 @@ export default function SettingsPage() {
                   )}
                   {testResults['wan22'].statusCode && (
                     <span className="ml-2">Status: {testResults['wan22'].statusCode}</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Infinite Talk Endpoint ID */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Infinite Talk Endpoint ID</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={settings.runpod?.endpoints?.['infinite-talk'] || ''}
+                  onChange={(e) => updateSetting('runpod', 'endpoints', e.target.value, 'infinite-talk')}
+                  placeholder="Enter Infinite Talk endpoint ID"
+                  className="flex-1 p-2 border rounded-md bg-background"
+                />
+                <button
+                  onClick={() => testEndpoint('infinite-talk')}
+                  disabled={!settings.runpod?.apiKey || !settings.runpod?.endpoints?.['infinite-talk'] || testing['infinite-talk']}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {testing['infinite-talk'] ? 'Testing...' : 'Test'}
+                </button>
+              </div>
+              {testResults['infinite-talk'] && (
+                <div className={`mt-2 p-2 rounded-md text-sm ${
+                  testResults['infinite-talk'].success 
+                    ? 'bg-green-100 text-green-800 border border-green-200' 
+                    : 'bg-red-100 text-red-800 border border-red-200'
+                }`}>
+                  {testResults['infinite-talk'].message}
+                  {testResults['infinite-talk'].responseTime && (
+                    <span className="ml-2">({testResults['infinite-talk'].responseTime}ms)</span>
+                  )}
+                  {testResults['infinite-talk'].statusCode && (
+                    <span className="ml-2">Status: {testResults['infinite-talk'].statusCode}</span>
                   )}
                 </div>
               )}

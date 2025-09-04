@@ -9,7 +9,7 @@ interface JobItem {
   id: string;
   userId: string;
   status: 'processing' | 'completed' | 'failed';
-  type: 'video' | 'multitalk' | 'flux-kontext' | 'wan22';
+  type: 'video' | 'multitalk' | 'flux-kontext' | 'wan22' | 'infinitetalk';
   prompt?: string;
   options?: string;
   resultUrl?: string;
@@ -117,6 +117,33 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
         console.log('⚠️ No suitable thumbnail found for WAN 2.2');
       } catch (e) {
         console.warn('Failed to parse WAN 2.2 options:', e);
+      }
+    }
+    
+    // Infinite Talk의 경우 입력 이미지를 썸네일로 사용
+    if (item.type === 'infinitetalk' && item.options) {
+      try {
+        const options = JSON.parse(item.options);
+        console.log('🔍 Infinite Talk options for thumbnail:', options);
+        
+        // 로컬 웹 경로가 있으면 우선 사용 (가장 안정적)
+        if (options.imageWebPath) {
+          console.log('🖼️ Using local web path for Infinite Talk thumbnail:', options.imageWebPath);
+          return options.imageWebPath;
+        }
+        
+        // 입력 이미지 파일명이 있으면 웹 경로로 변환
+        if (options.imageFileName) {
+          // 실제 저장된 파일명으로 변환 (input/infinitetalk/input_${jobId}_${originalName})
+          const actualFileName = `input/infinitetalk/input_${item.id}_${options.imageFileName}`;
+          const webPath = `/results/${actualFileName}`;
+          console.log('🖼️ Using actual image file name for Infinite Talk thumbnail:', webPath);
+          return webPath;
+        }
+        
+        console.log('⚠️ No suitable thumbnail found for Infinite Talk');
+      } catch (e) {
+        console.warn('Failed to parse Infinite Talk options:', e);
       }
     }
     
@@ -669,6 +696,106 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
             </div>
           )}
 
+          {/* Infinite Talk 입력 이미지 */}
+          {item.type === 'infinitetalk' && (
+            <div>
+              <h4 className="font-medium mb-2">Input Image</h4>
+              {(() => {
+                try {
+                  const options = JSON.parse(item.options || '{}');
+                  
+                  // 입력 이미지 웹 경로가 있으면 표시
+                  if (options.imageWebPath) {
+                    return (
+                      <div className="relative">
+                        <img 
+                          src={options.imageWebPath} 
+                          alt="Input image" 
+                          className="w-full max-h-64 object-contain rounded-lg bg-background"
+                          onError={(e) => {
+                            console.error('❌ Infinite Talk input image error:', e);
+                            console.error('❌ Image path:', options.imageWebPath);
+                            
+                            // 에러 발생 시 이미지 요소를 숨기고 에러 메시지 표시
+                            const imgElement = e.currentTarget;
+                            imgElement.style.display = 'none';
+                            
+                            // 에러 메시지 표시
+                            const errorDiv = document.createElement('div');
+                            errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
+                            errorDiv.innerHTML = `
+                              <div class="mb-2">⚠️ Infinite Talk 입력 이미지를 불러올 수 없습니다</div>
+                              <div class="text-xs text-red-300">
+                                <p>웹 경로: ${options.imageWebPath}</p>
+                                <p>💡 파일이 public/results 폴더에 있는지 확인하세요</p>
+                              </div>
+                            `;
+                            imgElement.parentNode?.appendChild(errorDiv);
+                          }}
+                          onLoad={() => {
+                            console.log('✅ Infinite Talk input image loaded successfully:', options.imageWebPath);
+                          }}
+                        />
+                      </div>
+                    );
+                  }
+                  
+                  // 기존 경로 구조 fallback (imageFileName만 있는 경우)
+                  if (options.imageFileName) {
+                    const fallbackPath = `/results/input/infinitetalk/input_${item.id}_${options.imageFileName}`;
+                    return (
+                      <div className="relative">
+                        <img 
+                          src={fallbackPath} 
+                          alt="Input image" 
+                          className="w-full max-h-64 object-contain rounded-lg bg-background"
+                          onError={(e) => {
+                            console.error('❌ Infinite Talk fallback image error:', e);
+                            console.error('❌ Fallback path:', fallbackPath);
+                            
+                            // 에러 발생 시 이미지 요소를 숨기고 에러 메시지 표시
+                            const imgElement = e.currentTarget;
+                            imgElement.style.display = 'none';
+                            
+                            // 에러 메시지 표시
+                            const errorDiv = document.createElement('div');
+                            errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
+                            errorDiv.innerHTML = `
+                              <div class="mb-2">⚠️ Infinite Talk 입력 이미지를 불러올 수 없습니다</div>
+                              <div class="text-xs text-red-300">
+                                <p>Fallback 경로: ${fallbackPath}</p>
+                                <p>💡 파일이 public/results 폴더에 있는지 확인하세요</p>
+                              </div>
+                            `;
+                            imgElement.parentNode?.appendChild(errorDiv);
+                          }}
+                          onLoad={() => {
+                            console.log('✅ Infinite Talk fallback image loaded successfully:', fallbackPath);
+                          }}
+                        />
+                      </div>
+                    );
+                  }
+                  
+                  return (
+                    <div className="text-center py-8 text-foreground/50">
+                      <PhotoIcon className="w-16 h-16 mx-auto mb-2" />
+                      <p>Infinite Talk 입력 이미지 정보를 찾을 수 없습니다.</p>
+                    </div>
+                  );
+                } catch (e) {
+                  console.error('❌ Failed to parse Infinite Talk options:', e);
+                  return (
+                    <div className="text-center py-8 text-foreground/50">
+                      <PhotoIcon className="w-16 h-16 mx-auto mb-2" />
+                      <p>Infinite Talk 옵션을 파싱할 수 없습니다.</p>
+                    </div>
+                  );
+                }
+              })()}
+            </div>
+          )}
+          
 
         </div>
       </div>
