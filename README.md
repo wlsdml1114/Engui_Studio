@@ -1,148 +1,152 @@
 # 🚀 EnguiStudio
 
 <div align="center">
+  <img src="assets/banner.png" alt="EnguiStudio Banner" width="800" height="280">
   
-  <img src="assets/banner.png" alt="EnguiStudio Banner" width="800" height="200">
-  
-  **다양한 오픈소스 AI 모델을 RunPod Serverless로 쉽게 사용할 수 있는 통합 플랫폼**
+  **A unified platform for easily using various open-source AI models with RunPod Serverless**
 </div>
 
-## 🎯 프로젝트 소개
+## 🎯 Project Overview
 
-EnguiStudio는 RunPod Serverless 인프라를 활용하여 다양한 오픈소스 AI 모델들을 웹 인터페이스로 쉽게 사용할 수 있게 해주는 플랫폼입니다. 복잡한 설정 없이도 최신 AI 기술을 바로 체험해볼 수 있습니다.
+EnguiStudio is a platform that enables easy access to various open-source AI models through a web interface using RunPod Serverless infrastructure. Experience cutting-edge AI technology without complex setup.
 
-## ✨ 주요 기능
+## ✨ Key Features
 
-- **🎬 Video Generation**: WAN 2.2 비디오 생성 모델
-- **✨ FLUX KONTEXT**: 이미지 변환 및 스타일링 모델
-- **🎤 MultiTalk**: Audio 2 Video 모델
-- **🎭 Infinite Talk**: 이미지와 오디오를 결합한 말하는 영상 생성 모델
-- **⚙️ Unified Settings**: RunPod 엔드포인트를 한 곳에서 관리
-- **📚 Library**: 생성된 결과물을 관리
+- **🎬 Video Generation**: WAN 2.2 video generation model
+- **✨ FLUX KONTEXT**: Image transformation and styling model
+- **🎤 MultiTalk**: Audio 2 Video model
+- **🎭 Infinite Talk**: Talking video generation model combining images and audio
+- **⚙️ Unified Settings**: Manage RunPod endpoints in one place
+- **📚 Library**: Manage generated results
 
-## 🛠️ 기술 스택
+## 🛠️ Tech Stack
 
 - **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
 - **Backend**: Next.js API Routes, Prisma ORM
-- **Database**: SQLite (개발용)
+- **Database**: SQLite (development)
 - **AI Infrastructure**: RunPod Serverless API
-- **Storage**: S3-compatible storage (선택사항)
-- **Authentication**: NextAuth.js (준비됨)
+- **Storage**: S3-compatible storage (optional)
+- **Authentication**: NextAuth.js (ready)
 
-## 🚀 빠른 시작
+## 🚀 Quick Start
 
-### 1. 프로젝트 클론
+### 1. Clone the Project
 ```bash
 git clone https://github.com/wlsdml1114/Engui_Studio.git
 cd Engui_Studio
 ```
 
-### 2. 의존성 설치
+### 2. Install Dependencies
 ```bash
 npm install
-# 또는
+# or
 yarn install
-# 또는
+# or
 pnpm install
 ```
 
-### 3. 데이터베이스 초기화
+### 3. Initialize Database
 ```bash
 npx prisma generate
 npx prisma db push
 ```
 
-### 4. 개발 서버 시작
+### 4. Start Development Server
 ```bash
 npm run dev
 ```
 
-### 5. 브라우저에서 접속
+### 5. Access in Browser
 ```
 http://localhost:3000
 ```
 
-### 6. 초기 설정
-1. **설정 페이지 접속**: `/settings` 경로로 이동
-2. **RunPod 설정**: API 키와 각 모델별 엔드포인트 ID 입력
-3. **S3 설정**: 파일 저장을 위한 S3 호환 스토리지 설정 (선택사항)
-4. **설정 저장**: 모든 설정을 저장하고 연결 테스트
+### 6. Initial Setup
+1. **Access Settings Page**: Navigate to `/settings`
+2. **Configure RunPod**: Enter API key and endpoint IDs for each model
+3. **Configure S3**: Set up S3-compatible storage for file storage (optional)
+4. **Save Settings**: Save all settings and test connections
 
-## 🔧 RunPod Serverless 설정
+## 🔧 RunPod Serverless Configuration
 
-### 필요한 엔드포인트들
-- **Video Generation**: WAN 2.2, AnimateDiff 등
-- **FLUX KONTEXT**: 이미지 변환 모델
-- **MultiTalk**: Audio 2 Video 모델
-- **Infinite Talk**: 이미지와 오디오를 결합한 말하는 영상 생성 모델
-- **기타 커스텀 모델**: 원하는 오픈소스 모델 추가 가능
+### Required Endpoints
+- **Video Generation**: WAN 2.2, AnimateDiff, etc.
+- **FLUX KONTEXT**: Image transformation model
+- **MultiTalk**: Audio 2 Video model
+- **Infinite Talk**: Talking video generation model combining images and audio
+- **Other Custom Models**: Add any open-source model you want
 
-### 설정 방법
-1. [RunPod](https://runpod.io/)에서 원하는 모델의 Serverless 엔드포인트 생성
-2. 각 엔드포인트의 ID를 설정 페이지에 입력
-3. 연결 테스트로 정상 작동 확인
+### Setup Method
+1. Create Serverless endpoints for desired models on [RunPod](https://runpod.io/)
+2. Enter each endpoint ID in the settings page
+3. Verify normal operation with connection tests
 
-## 🛠️ 문제 해결
+## 🛠️ Troubleshooting
 
-### 설정이 로드되지 않는 경우
-1. **데이터베이스 초기화**: 설정 페이지에서 "🗑️ 데이터베이스 초기화" 버튼 클릭
-2. **서버 재시작**: `npm run dev` 다시 실행
-3. **설정 재입력**: RunPod 및 S3 설정을 다시 입력
+### Settings Not Loading
+1. **Initialize Database**: Click "🗑️ Database Reset" button on settings page
+2. **Restart Server**: Run `npm run dev` again
+3. **Re-enter Settings**: Enter RunPod and S3 settings again
 
-### RunPod 연결 실패
-1. **API 키 확인**: RunPod 대시보드에서 API 키가 올바른지 확인
-2. **엔드포인트 ID 확인**: 각 서비스별 엔드포인트 ID가 정확한지 확인
-3. **연결 테스트**: 설정 페이지에서 "테스트" 버튼으로 연결 상태 확인
+### RunPod Connection Failure
+1. **Verify API Key**: Check if API key is correct in RunPod dashboard
+2. **Verify Endpoint IDs**: Ensure endpoint IDs for each service are accurate
+3. **Test Connection**: Check connection status with "Test" button on settings page
 
-### 암호화 에러가 발생하는 경우
-1. **데이터베이스 초기화**: 기존 암호화된 데이터 정리
-2. **서버 재시작**: 환경변수 변경 후 서버 재시작
-3. **설정 재입력**: 모든 설정을 새로 입력
+### Encryption Error
+1. **Initialize Database**: Clean up existing encrypted data
+2. **Restart Server**: Restart server after changing environment variables
+3. **Re-enter Settings**: Enter all settings again
 
-## 📋 요구사항
+## 📋 Requirements
 
-- **Node.js**: 18.x 이상
-- **npm**: 8.x 이상
-- **RunPod 계정**: AI 모델 사용을 위해 필요
-- **S3 호환 스토리지**: 파일 저장을 위해 필요 (선택사항)
+- **Node.js**: 18.x or higher
+- **npm**: 8.x or higher
+- **RunPod Account**: Required for AI model usage
+- **S3-compatible Storage**: Required for file storage (optional)
 
-## 🔒 보안 주의사항
+## 🔒 Security Notes
 
-- API 키와 시크릿은 웹 인터페이스에서만 입력하고 안전하게 보관
-- 로컬에서만 실행하여 개인정보를 보호
-- 프로덕션 환경에서는 환경변수를 통한 설정 권장
+- Enter API keys and secrets only through web interface and store safely
+- Run locally only to protect personal information
+- Recommend environment variable configuration for production
 
-## 🚀 프로덕션 배포
+## 🚀 Production Deployment
 
-로컬에서 프로덕션 모드로 실행하려면:
+To run in production mode locally:
 ```bash
 npm run build
 npm start
 ```
 
-## 🤝 기여하기
+## 🤝 Contributing
 
-1. **Fork** 이 프로젝트
-2. **Feature branch** 생성 (`git checkout -b feature/AmazingFeature`)
-3. **Commit** 변경사항 (`git commit -m 'Add some AmazingFeature'`)
-4. **Push** 브랜치 (`git push origin feature/AmazingFeature`)
-5. **Pull Request** 생성
+1. **Fork** this project
+2. **Create Feature Branch** (`git checkout -b feature/AmazingFeature`)
+3. **Commit** changes (`git commit -m 'Add some AmazingFeature'`)
+4. **Push** branch (`git push origin feature/AmazingFeature`)
+5. **Create Pull Request**
 
-## 📞 지원
+## 📞 Support
 
-문제가 발생하면:
-1. 설정 페이지의 "🗑️ 데이터베이스 초기화" 버튼 사용
-2. 개발 서버 재시작
-3. 설정 재입력 및 연결 테스트
+If issues occur:
+1. Use "🗑️ Database Reset" button on settings page
+2. Restart development server
+3. Re-enter settings and test connections
 
-## 📄 라이선스
+## 📄 License
 
-이 프로젝트는 MIT 라이선스 하에 배포됩니다. 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
+This project is distributed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-## 🙏 감사의 말
+## 🙏 Acknowledgments
 
-- [Next.js](https://nextjs.org/) - React 프레임워크
-- [RunPod](https://runpod.io/) - AI 인프라 서비스
-- [Prisma](https://www.prisma.io/) - 데이터베이스 ORM
-- [Tailwind CSS](https://tailwindcss.com/) - CSS 프레임워크
-- **오픈소스 AI 모델 커뮤니티** - 다양한 AI 모델 제공
+- [Next.js](https://nextjs.org/) - React framework
+- [RunPod](https://runpod.io/) - AI infrastructure service
+- [Prisma](https://www.prisma.io/) - Database ORM
+- [Tailwind CSS](https://tailwindcss.com/) - CSS framework
+- **Open Source AI Model Community** - Providing various AI models
+
+## 🌐 Language Support
+
+- [English](README.md) (Current)
+- [한국어](README.kr.md)
