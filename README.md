@@ -150,3 +150,16 @@ This project is distributed under the MIT License. See the [LICENSE](LICENSE) fi
 
 - [English](README.md) (Current)
 - [한국어](README.kr.md)
+
+## 🔗 Use Our Banner
+
+Want to link to EnguiStudio from your project? Use our banner:
+
+```markdown
+[![EnguiStudio](https://raw.githubusercontent.com/wlsdml1114/Engui_Studio/main/assets/banner.png)](https://github.com/wlsdml1114/Engui_Studio)
+```
+
+### Different Sizes:
+- **Small**: `width="400" height="140"`
+- **Medium**: `width="600" height="210"`
+- **Large**: `width="800" height="280"` (original)

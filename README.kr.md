@@ -151,3 +151,16 @@ npm start
 
 - [English](README.md)
 - [한국어](README.kr.md) (현재)
+
+## 🔗 배너 사용하기
+
+다른 프로젝트에서 EnguiStudio로 링크하고 싶다면 우리 배너를 사용하세요:
+
+```markdown
+[![EnguiStudio](https://raw.githubusercontent.com/wlsdml1114/Engui_Studio/main/assets/banner.png)](https://github.com/wlsdml1114/Engui_Studio)
+```
+
+### 다양한 크기:
+- **작은 크기**: `width="400" height="140"`
+- **중간 크기**: `width="600" height="210"`
+- **큰 크기**: `width="800" height="280"` (원본)
