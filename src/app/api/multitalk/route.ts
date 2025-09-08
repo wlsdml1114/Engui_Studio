@@ -343,7 +343,7 @@ async function processMultiTalkJob(jobId: string, runpodJobId: string) {
             if (result.output.video_base64) {
                 // Base64 비디오 데이터가 있는 경우
                 console.log('📹 Video base64 data received from RunPod');
-                console.log('📹 Base64 length:', result.output.video_base64.length);
+                console.log('📹 Base64 length:', result.output.video_base64.length, 'characters');
                 
                 // Base64를 디코딩하여 로컬에 저장
                 try {

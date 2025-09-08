@@ -37,8 +37,12 @@ interface Wan22Input {
 
 interface InfiniteTalkInput {
   prompt: string;
-  image_path: string; // S3 경로 또는 로컬 경로
+  input_type: string; // "image" 또는 "video"
+  person_count: string; // "single" 또는 "multi"
+  image_path?: string; // S3 경로 또는 로컬 경로 (image 타입일 때)
+  video_path?: string; // S3 경로 또는 로컬 경로 (video 타입일 때)
   wav_path: string; // S3 경로 또는 로컬 경로
+  wav_path_2?: string; // 다중 인물용 두 번째 오디오 (multi일 때)
   width: number;
   height: number;
 }
@@ -123,8 +127,12 @@ class RunPodService {
       payload = {
         input: {
           prompt: input.prompt,
-          image_path: input.image_path,
+          input_type: input.input_type,
+          person_count: input.person_count,
+          ...(input.image_path && { image_path: input.image_path }),
+          ...(input.video_path && { video_path: input.video_path }),
           wav_path: input.wav_path,
+          ...(input.wav_path_2 && { wav_path_2: input.wav_path_2 }),
           width: input.width,
           height: input.height
         }
@@ -132,8 +140,12 @@ class RunPodService {
       
       console.log('🎭 InfiniteTalk payload created:');
       console.log('  - prompt:', payload.input.prompt);
-      console.log('  - image_path:', payload.input.image_path);
+      console.log('  - input_type:', payload.input.input_type);
+      console.log('  - person_count:', payload.input.person_count);
+      console.log('  - image_path:', payload.input.image_path || 'not set');
+      console.log('  - video_path:', payload.input.video_path || 'not set');
       console.log('  - wav_path:', payload.input.wav_path);
+      console.log('  - wav_path_2:', payload.input.wav_path_2 || 'not set');
       console.log('  - width:', payload.input.width);
       console.log('  - height:', payload.input.height);
     } else {
@@ -199,17 +211,30 @@ class RunPodService {
 
     const data = await response.json();
     console.log(`📊 Job ${jobId} status:`, data.status);
-    console.log(`📊 Job ${jobId} full response:`, JSON.stringify(data, null, 2));
     
-    // 응답 구조 분석
+    // base64 데이터가 포함된 응답은 전체 출력하지 않음 (성능상 이유)
     if (data.output) {
-      console.log(`🔍 Job ${jobId} output keys:`, Object.keys(data.output));
-      if (data.output.image) {
-        console.log(`🖼️ Job ${jobId} has image data, length:`, data.output.image.length);
-      }
+      const outputKeys = Object.keys(data.output);
+      console.log(`📊 Job ${jobId} output keys:`, outputKeys);
+      
+      // base64 데이터가 있는지 확인하고 길이만 로그
       if (data.output.image_base64) {
         console.log(`🖼️ Job ${jobId} has image_base64 data, length:`, data.output.image_base64.length);
       }
+      if (data.output.video_base64) {
+        console.log(`🎬 Job ${jobId} has video_base64 data, length:`, data.output.video_base64.length);
+      }
+      if (data.output.video && typeof data.output.video === 'string' && data.output.video.length > 100) {
+        console.log(`🎬 Job ${jobId} has video data, length:`, data.output.video.length);
+      }
+      if (data.output.mp4 && typeof data.output.mp4 === 'string' && data.output.mp4.length > 100) {
+        console.log(`🎬 Job ${jobId} has mp4 data, length:`, data.output.mp4.length);
+      }
+      if (data.output.result && typeof data.output.result === 'string' && data.output.result.length > 100) {
+        console.log(`🎬 Job ${jobId} has result data, length:`, data.output.result.length);
+      }
+    } else {
+      console.log(`📊 Job ${jobId} full response:`, JSON.stringify(data, null, 2));
     }
     
     return data;

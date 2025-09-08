@@ -19,6 +19,7 @@ model Job {
   runpodJobId   String?   // RunPod job ID 추가
   options       String?
   resultUrl     String?
+  thumbnailUrl  String?    // 썸네일 URL 추가
   isFavorite    Boolean   @default(false) // 즐겨찾기 상태
   createdAt     DateTime  @default(now())
   completedAt   DateTime?

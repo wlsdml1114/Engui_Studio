@@ -73,6 +73,39 @@ async function processInfiniteTalkJob(jobId: string, runpodJobId: string) {
           resultUrl = `/results/${videoFileName}`;
           
           console.log(`✅ Infinite Talk video saved locally: ${videoPath}`);
+          
+          // 썸네일 생성 (입력 이미지/비디오를 썸네일로 사용)
+          try {
+            const jobData = await prisma.job.findUnique({ where: { id: jobId } });
+            if (jobData?.options) {
+              const options = JSON.parse(jobData.options);
+              
+              // 입력 이미지가 있으면 썸네일로 사용
+              if (options.imageWebPath) {
+                await prisma.job.update({
+                  where: { id: jobId },
+                  data: {
+                    thumbnailUrl: options.imageWebPath,
+                  },
+                });
+                console.log(`🖼️ Infinite Talk thumbnail set to input image: ${options.imageWebPath}`);
+              }
+              // 입력 비디오가 있으면 썸네일로 사용
+              else if (options.videoWebPath) {
+                await prisma.job.update({
+                  where: { id: jobId },
+                  data: {
+                    thumbnailUrl: options.videoWebPath,
+                  },
+                });
+                console.log(`🎬 Infinite Talk thumbnail set to input video: ${options.videoWebPath}`);
+              }
+            }
+            
+          } catch (thumbnailError) {
+            console.error('❌ Failed to set thumbnail:', thumbnailError);
+          }
+          
         } else if (typeof videoData === 'string' && videoData.startsWith('http')) {
           // 외부 URL에서 다운로드
           const response = await fetch(videoData);
@@ -84,6 +117,38 @@ async function processInfiniteTalkJob(jobId: string, runpodJobId: string) {
           resultUrl = `/results/${videoFileName}`;
           
           console.log(`✅ Infinite Talk video downloaded and saved: ${videoPath}`);
+          
+          // 썸네일 생성 (입력 이미지/비디오를 썸네일로 사용)
+          try {
+            const jobData = await prisma.job.findUnique({ where: { id: jobId } });
+            if (jobData?.options) {
+              const options = JSON.parse(jobData.options);
+              
+              // 입력 이미지가 있으면 썸네일로 사용
+              if (options.imageWebPath) {
+                await prisma.job.update({
+                  where: { id: jobId },
+                  data: {
+                    thumbnailUrl: options.imageWebPath,
+                  },
+                });
+                console.log(`🖼️ Infinite Talk thumbnail set to input image: ${options.imageWebPath}`);
+              }
+              // 입력 비디오가 있으면 썸네일로 사용
+              else if (options.videoWebPath) {
+                await prisma.job.update({
+                  where: { id: jobId },
+                  data: {
+                    thumbnailUrl: options.videoWebPath,
+                  },
+                });
+                console.log(`🎬 Infinite Talk thumbnail set to input video: ${options.videoWebPath}`);
+              }
+            }
+            
+          } catch (thumbnailError) {
+            console.error('❌ Failed to set thumbnail:', thumbnailError);
+          }
         }
       }
 
@@ -123,23 +188,78 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const userId = formData.get('userId') as string;
+    const inputType = formData.get('input_type') as string || 'image'; // 'image' 또는 'video'
+    const personCount = formData.get('person_count') as string || 'single'; // 'single' 또는 'multi'
     const imageFile = formData.get('image') as File;
+    const videoFile = formData.get('video') as File;
     const audioFile = formData.get('audio') as File;
+    const audioFile2 = formData.get('audio2') as File; // 다중 인물용 두 번째 오디오
     const prompt = formData.get('prompt') as string;
     const width = parseInt(formData.get('width') as string) || 640;
     const height = parseInt(formData.get('height') as string) || 640;
 
-    if (!imageFile || !audioFile || !prompt) {
+    // 입력 타입과 인물 수 검증
+    if (!['image', 'video'].includes(inputType)) {
       return NextResponse.json(
-        { success: false, error: '이미지, 오디오 파일, 프롬프트가 필요합니다.' },
+        { success: false, error: 'input_type은 "image" 또는 "video"여야 합니다.' },
+        { status: 400 }
+      );
+    }
+
+    if (!['single', 'multi'].includes(personCount)) {
+      return NextResponse.json(
+        { success: false, error: 'person_count는 "single" 또는 "multi"여야 합니다.' },
+        { status: 400 }
+      );
+    }
+
+    // 필수 파일 검증
+    if (inputType === 'image' && !imageFile) {
+      return NextResponse.json(
+        { success: false, error: '이미지 파일이 필요합니다.' },
+        { status: 400 }
+      );
+    }
+
+    if (inputType === 'video' && !videoFile) {
+      return NextResponse.json(
+        { success: false, error: '비디오 파일이 필요합니다.' },
+        { status: 400 }
+      );
+    }
+
+    if (!audioFile || !prompt) {
+      return NextResponse.json(
+        { success: false, error: '오디오 파일과 프롬프트가 필요합니다.' },
+        { status: 400 }
+      );
+    }
+
+    // 다중 인물인 경우 두 번째 오디오 파일 검증
+    if (personCount === 'multi' && !audioFile2) {
+      return NextResponse.json(
+        { success: false, error: '다중 인물 모드에서는 두 번째 오디오 파일이 필요합니다.' },
         { status: 400 }
       );
     }
 
     console.log('🎭 Infinite Talk job started');
     console.log('📋 User ID:', userId);
-    console.log('📋 Image file:', imageFile.name, imageFile.size, 'bytes');
+    console.log('📋 Input Type:', inputType, '(from formData)');
+    console.log('📋 Person Count:', personCount, '(from formData)');
+    
+    if (inputType === 'image' && imageFile) {
+      console.log('📋 Image file:', imageFile.name, imageFile.size, 'bytes');
+    } else if (inputType === 'video' && videoFile) {
+      console.log('📋 Video file:', videoFile.name, videoFile.size, 'bytes');
+    }
+    
     console.log('📋 Audio file:', audioFile.name, audioFile.size, 'bytes');
+    
+    if (personCount === 'multi' && audioFile2) {
+      console.log('📋 Audio file 2:', audioFile2.name, audioFile2.size, 'bytes');
+    }
+    
     console.log('📋 Prompt:', prompt);
     console.log('📋 Dimensions:', width, 'x', height);
 
@@ -168,10 +288,14 @@ export async function POST(request: NextRequest) {
         status: 'processing',
         prompt,
         options: JSON.stringify({
+          inputType,
+          personCount,
           width,
           height,
-          imageFileName: imageFile.name,
+          imageFileName: imageFile?.name,
+          videoFileName: videoFile?.name,
           audioFileName: audioFile.name,
+          audioFileName2: audioFile2?.name,
         }),
       },
     });
@@ -179,16 +303,34 @@ export async function POST(request: NextRequest) {
     console.log('✅ Job created in database:', job.id);
 
     // S3에 파일 업로드
-    const imageFileName = `input/infinitetalk/input_${job.id}_${imageFile.name}`;
-    const audioFileName = `input/infinitetalk/audio_${job.id}_${audioFile.name}`;
-    
     console.log('📤 Uploading files to S3...');
-    const imageS3Path = await uploadToS3(imageFile, imageFileName);
-    const audioS3Path = await uploadToS3(audioFile, audioFileName);
     
-    console.log('✅ Files uploaded to S3:');
-    console.log('  - Image:', imageS3Path);
-    console.log('  - Audio:', audioS3Path);
+    let mediaS3Path = '';
+    let audioS3Path = '';
+    let audioS3Path2 = '';
+    
+    // 미디어 파일 업로드 (이미지 또는 비디오)
+    if (inputType === 'image' && imageFile) {
+      const imageFileName = `input/infinitetalk/input_${job.id}_${imageFile.name}`;
+      mediaS3Path = await uploadToS3(imageFile, imageFileName);
+      console.log('✅ Image uploaded to S3:', mediaS3Path);
+    } else if (inputType === 'video' && videoFile) {
+      const videoFileName = `input/infinitetalk/input_${job.id}_${videoFile.name}`;
+      mediaS3Path = await uploadToS3(videoFile, videoFileName);
+      console.log('✅ Video uploaded to S3:', mediaS3Path);
+    }
+    
+    // 첫 번째 오디오 파일 업로드
+    const audioFileName = `input/infinitetalk/audio_${job.id}_${audioFile.name}`;
+    audioS3Path = await uploadToS3(audioFile, audioFileName);
+    console.log('✅ Audio uploaded to S3:', audioS3Path);
+    
+    // 두 번째 오디오 파일 업로드 (다중 인물인 경우)
+    if (personCount === 'multi' && audioFile2) {
+      const audioFileName2 = `input/infinitetalk/audio2_${job.id}_${audioFile2.name}`;
+      audioS3Path2 = await uploadToS3(audioFile2, audioFileName2);
+      console.log('✅ Audio 2 uploaded to S3:', audioS3Path2);
+    }
 
     // 로컬에 백업 저장
     mkdirSync(LOCAL_STORAGE_DIR, { recursive: true });
@@ -197,14 +339,27 @@ export async function POST(request: NextRequest) {
     const infinitetalkDir = join(LOCAL_STORAGE_DIR, 'input', 'infinitetalk');
     mkdirSync(infinitetalkDir, { recursive: true });
     
-    const imageBuffer = Buffer.from(await imageFile.arrayBuffer());
+    // 미디어 파일 로컬 저장
+    if (inputType === 'image' && imageFile) {
+      const imageBuffer = Buffer.from(await imageFile.arrayBuffer());
+      const localImagePath = join(infinitetalkDir, `input_${job.id}_${imageFile.name}`);
+      writeFileSync(localImagePath, imageBuffer);
+    } else if (inputType === 'video' && videoFile) {
+      const videoBuffer = Buffer.from(await videoFile.arrayBuffer());
+      const localVideoPath = join(infinitetalkDir, `input_${job.id}_${videoFile.name}`);
+      writeFileSync(localVideoPath, videoBuffer);
+    }
+    
+    // 오디오 파일들 로컬 저장
     const audioBuffer = Buffer.from(await audioFile.arrayBuffer());
-    
-    const localImagePath = join(infinitetalkDir, `input_${job.id}_${imageFile.name}`);
     const localAudioPath = join(infinitetalkDir, `audio_${job.id}_${audioFile.name}`);
-    
-    writeFileSync(localImagePath, imageBuffer);
     writeFileSync(localAudioPath, audioBuffer);
+    
+    if (personCount === 'multi' && audioFile2) {
+      const audioBuffer2 = Buffer.from(await audioFile2.arrayBuffer());
+      const localAudioPath2 = join(infinitetalkDir, `audio2_${job.id}_${audioFile2.name}`);
+      writeFileSync(localAudioPath2, audioBuffer2);
+    }
     
     console.log('✅ Files saved locally as backup');
 
@@ -216,15 +371,31 @@ export async function POST(request: NextRequest) {
     );
 
     // RunPod에 작업 제출
-    const runpodInput = {
+    const runpodInput: any = {
       prompt,
-      image_path: imageS3Path,
-      wav_path: audioS3Path,
+      input_type: inputType,
+      person_count: personCount,
       width,
       height,
     };
 
+    // 미디어 파일 경로 설정
+    if (inputType === 'image') {
+      runpodInput.image_path = mediaS3Path;
+    } else if (inputType === 'video') {
+      runpodInput.video_path = mediaS3Path;
+    }
+
+    // 오디오 파일 경로 설정
+    runpodInput.wav_path = audioS3Path;
+    
+    // 다중 인물인 경우 두 번째 오디오 파일 경로 설정
+    if (personCount === 'multi' && audioS3Path2) {
+      runpodInput.wav_path_2 = audioS3Path2;
+    }
+
     console.log('🚀 Submitting to RunPod...');
+    console.log('📤 RunPod Input Data:', JSON.stringify(runpodInput, null, 2));
     const runpodJobId = await runpod.submitJob(runpodInput);
     console.log('✅ RunPod job submitted:', runpodJobId);
 
@@ -234,14 +405,21 @@ export async function POST(request: NextRequest) {
       data: {
         runpodJobId,
         options: JSON.stringify({
+          inputType,
+          personCount,
           width,
           height,
-          imageFileName: imageFile.name,
+          imageFileName: imageFile?.name,
+          videoFileName: videoFile?.name,
           audioFileName: audioFile.name,
-          imageS3Path,
+          audioFileName2: audioFile2?.name,
+          mediaS3Path,
           audioS3Path,
-          imageWebPath: `/results/input/infinitetalk/input_${job.id}_${imageFile.name}`, // 실제 저장된 파일명 사용
+          audioS3Path2,
+          imageWebPath: imageFile ? `/results/input/infinitetalk/input_${job.id}_${imageFile.name}` : undefined,
+          videoWebPath: videoFile ? `/results/input/infinitetalk/input_${job.id}_${videoFile.name}` : undefined,
           audioWebPath: `/results/input/infinitetalk/audio_${job.id}_${audioFile.name}`,
+          audioWebPath2: audioFile2 ? `/results/input/infinitetalk/audio2_${job.id}_${audioFile2.name}` : undefined,
         }),
       },
     });

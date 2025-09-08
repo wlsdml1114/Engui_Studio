@@ -274,7 +274,7 @@ async function processFluxKontextJob(jobId: string) {
             } else if (result.output.image_base64) {
                 // 기존 image_base64 지원 (하위 호환성)
                 console.log('🖼️ Image base64 data received from RunPod (legacy)');
-                console.log('🖼️ Base64 length:', result.output.image_base64.length);
+                console.log('🖼️ Base64 length:', result.output.image_base64.length, 'characters');
                 
                 try {
                     const imageBuffer = Buffer.from(result.output.image_base64, 'base64');

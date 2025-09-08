@@ -1,14 +1,19 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { MicrophoneIcon, PhotoIcon, MusicalNoteIcon } from '@heroicons/react/24/outline';
+import { MicrophoneIcon, PhotoIcon, MusicalNoteIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
 
 export default function InfiniteTalkPage() {
   const [prompt, setPrompt] = useState('');
+  const [inputType, setInputType] = useState<'image' | 'video'>('image');
+  const [personCount, setPersonCount] = useState<'single' | 'multi'>('single');
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioFile2, setAudioFile2] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
   const [audioPreviewUrl, setAudioPreviewUrl] = useState<string>('');
+  const [audioPreviewUrl2, setAudioPreviewUrl2] = useState<string>('');
   const [width, setWidth] = useState(640);
   const [height, setHeight] = useState(640);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -16,12 +21,23 @@ export default function InfiniteTalkPage() {
   const [currentJobId, setCurrentJobId] = useState<string>('');
   
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef2 = useRef<HTMLInputElement>(null);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       setImageFile(file);
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+    }
+  };
+
+  const handleVideoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setVideoFile(file);
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
     }
@@ -36,9 +52,31 @@ export default function InfiniteTalkPage() {
     }
   };
 
+  const handleAudioUpload2 = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setAudioFile2(file);
+      const url = URL.createObjectURL(file);
+      setAudioPreviewUrl2(url);
+    }
+  };
+
   const handleGenerate = async () => {
-    if (!imageFile || !audioFile || !prompt.trim()) {
-      setMessage({ type: 'error', text: '이미지, 오디오 파일, 프롬프트를 모두 입력해주세요.' });
+    // 입력 검증
+    if (inputType === 'image' && !imageFile) {
+      setMessage({ type: 'error', text: '이미지 파일을 선택해주세요.' });
+      return;
+    }
+    if (inputType === 'video' && !videoFile) {
+      setMessage({ type: 'error', text: '비디오 파일을 선택해주세요.' });
+      return;
+    }
+    if (!audioFile || !prompt.trim()) {
+      setMessage({ type: 'error', text: '오디오 파일과 프롬프트를 입력해주세요.' });
+      return;
+    }
+    if (personCount === 'multi' && !audioFile2) {
+      setMessage({ type: 'error', text: '다중 인물 모드에서는 두 번째 오디오 파일이 필요합니다.' });
       return;
     }
 
@@ -48,8 +86,21 @@ export default function InfiniteTalkPage() {
     try {
       const formData = new FormData();
       formData.append('userId', 'user-with-settings');
-      formData.append('image', imageFile);
+      formData.append('input_type', inputType);
+      formData.append('person_count', personCount);
+      
+      if (inputType === 'image' && imageFile) {
+        formData.append('image', imageFile);
+      } else if (inputType === 'video' && videoFile) {
+        formData.append('video', videoFile);
+      }
+      
       formData.append('audio', audioFile);
+      
+      if (personCount === 'multi' && audioFile2) {
+        formData.append('audio2', audioFile2);
+      }
+      
       formData.append('prompt', prompt);
       formData.append('width', width.toString());
       formData.append('height', height.toString());
@@ -71,11 +122,16 @@ export default function InfiniteTalkPage() {
         // 입력 초기화
         setPrompt('');
         setImageFile(null);
+        setVideoFile(null);
         setAudioFile(null);
+        setAudioFile2(null);
         setPreviewUrl('');
         setAudioPreviewUrl('');
+        setAudioPreviewUrl2('');
         if (imageInputRef.current) imageInputRef.current.value = '';
+        if (videoInputRef.current) videoInputRef.current.value = '';
         if (audioInputRef.current) audioInputRef.current.value = '';
+        if (audioInputRef2.current) audioInputRef2.current.value = '';
       } else {
         const errorMessage = data.error || 'Infinite Talk 생성에 실패했습니다.';
         throw new Error(errorMessage);
@@ -91,11 +147,16 @@ export default function InfiniteTalkPage() {
   const clearInputs = () => {
     setPrompt('');
     setImageFile(null);
+    setVideoFile(null);
     setAudioFile(null);
+    setAudioFile2(null);
     setPreviewUrl('');
     setAudioPreviewUrl('');
+    setAudioPreviewUrl2('');
     if (imageInputRef.current) imageInputRef.current.value = '';
+    if (videoInputRef.current) videoInputRef.current.value = '';
     if (audioInputRef.current) audioInputRef.current.value = '';
+    if (audioInputRef2.current) audioInputRef2.current.value = '';
     setMessage(null);
     setCurrentJobId('');
   };
@@ -137,53 +198,103 @@ export default function InfiniteTalkPage() {
               />
             </div>
 
-            {/* Image Upload */}
+            {/* Media Upload (Image or Video) */}
             <div>
               <label className="block text-sm font-medium mb-2">
-                이미지 파일 <span className="text-red-400">*</span>
+                {inputType === 'image' ? '이미지 파일' : '비디오 파일'} <span className="text-red-400">*</span>
               </label>
               <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors">
-                <input
-                  ref={imageInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  disabled={isGenerating}
-                />
-                {previewUrl ? (
-                  <div className="space-y-4">
-                    <img 
-                      src={previewUrl} 
-                      alt="Preview" 
-                      className="max-w-full max-h-48 mx-auto rounded-lg"
+                {inputType === 'image' ? (
+                  <>
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      disabled={isGenerating}
                     />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setImageFile(null);
-                        setPreviewUrl('');
-                        if (imageInputRef.current) imageInputRef.current.value = '';
-                      }}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
-                    >
-                      이미지 제거
-                    </button>
-                  </div>
+                    {previewUrl ? (
+                      <div className="space-y-4">
+                        <img 
+                          src={previewUrl} 
+                          alt="Preview" 
+                          className="max-w-full max-h-48 mx-auto rounded-lg"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setImageFile(null);
+                            setPreviewUrl('');
+                            if (imageInputRef.current) imageInputRef.current.value = '';
+                          }}
+                          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
+                        >
+                          이미지 제거
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <PhotoIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground mb-2">
+                          이미지 파일을 선택하거나 드래그하세요
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => imageInputRef.current?.click()}
+                          disabled={isGenerating}
+                          className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors disabled:opacity-50"
+                        >
+                          이미지 선택
+                        </button>
+                      </>
+                    )}
+                  </>
                 ) : (
                   <>
-                    <PhotoIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground mb-2">
-                      이미지 파일을 선택하거나 드래그하세요
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => imageInputRef.current?.click()}
+                    <input
+                      ref={videoInputRef}
+                      type="file"
+                      accept="video/*"
+                      onChange={handleVideoUpload}
+                      className="hidden"
                       disabled={isGenerating}
-                      className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors disabled:opacity-50"
-                    >
-                      이미지 선택
-                    </button>
+                    />
+                    {previewUrl ? (
+                      <div className="space-y-4">
+                        <video 
+                          src={previewUrl} 
+                          controls
+                          className="max-w-full max-h-48 mx-auto rounded-lg"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setVideoFile(null);
+                            setPreviewUrl('');
+                            if (videoInputRef.current) videoInputRef.current.value = '';
+                          }}
+                          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
+                        >
+                          비디오 제거
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <VideoCameraIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground mb-2">
+                          비디오 파일을 선택하거나 드래그하세요
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => videoInputRef.current?.click()}
+                          disabled={isGenerating}
+                          className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors disabled:opacity-50"
+                        >
+                          비디오 선택
+                        </button>
+                      </>
+                    )}
                   </>
                 )}
               </div>
@@ -192,7 +303,7 @@ export default function InfiniteTalkPage() {
             {/* Audio Upload */}
             <div>
               <label className="block text-sm font-medium mb-2">
-                오디오 파일 <span className="text-red-400">*</span>
+                첫 번째 오디오 파일 <span className="text-red-400">*</span>
               </label>
               <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors">
                 <input
@@ -241,6 +352,61 @@ export default function InfiniteTalkPage() {
                 )}
               </div>
             </div>
+
+            {/* Second Audio Upload (Multi-person only) */}
+            {personCount === 'multi' && (
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  두 번째 오디오 파일 <span className="text-red-400">*</span>
+                </label>
+                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors">
+                  <input
+                    ref={audioInputRef2}
+                    type="file"
+                    accept="audio/*"
+                    onChange={handleAudioUpload2}
+                    className="hidden"
+                    disabled={isGenerating}
+                  />
+                  {audioPreviewUrl2 ? (
+                    <div className="space-y-4">
+                      <audio controls className="w-full">
+                        <source src={audioPreviewUrl2} type="audio/wav" />
+                        <source src={audioPreviewUrl2} type="audio/mpeg" />
+                        <source src={audioPreviewUrl2} type="audio/ogg" />
+                        브라우저가 오디오를 지원하지 않습니다.
+                      </audio>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAudioFile2(null);
+                          setAudioPreviewUrl2('');
+                          if (audioInputRef2.current) audioInputRef2.current.value = '';
+                        }}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
+                      >
+                        오디오 제거
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <MusicalNoteIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground mb-2">
+                        두 번째 오디오 파일을 선택하거나 드래그하세요 (WAV 권장)
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => audioInputRef2.current?.click()}
+                        disabled={isGenerating}
+                        className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors disabled:opacity-50"
+                      >
+                        두 번째 오디오 선택
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right Column - Settings & Preview */}
@@ -249,6 +415,75 @@ export default function InfiniteTalkPage() {
             <div className="bg-secondary p-6 rounded-lg border border-border">
               <h3 className="text-lg font-semibold mb-4">설정</h3>
               
+              {/* Input Type Selection */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium mb-3">
+                  입력 타입 <span className="text-red-400">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setInputType('image')}
+                    disabled={isGenerating}
+                    className={`p-3 rounded-lg border transition-colors flex items-center justify-center gap-2 ${
+                      inputType === 'image'
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-background border-border hover:border-primary text-foreground'
+                    }`}
+                  >
+                    <PhotoIcon className="w-5 h-5" />
+                    이미지
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInputType('video')}
+                    disabled={isGenerating}
+                    className={`p-3 rounded-lg border transition-colors flex items-center justify-center gap-2 ${
+                      inputType === 'video'
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-background border-border hover:border-primary text-foreground'
+                    }`}
+                  >
+                    <VideoCameraIcon className="w-5 h-5" />
+                    비디오
+                  </button>
+                </div>
+              </div>
+
+              {/* Person Count Selection */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium mb-3">
+                  인물 수 <span className="text-red-400">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPersonCount('single')}
+                    disabled={isGenerating}
+                    className={`p-3 rounded-lg border transition-colors ${
+                      personCount === 'single'
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-background border-border hover:border-primary text-foreground'
+                    }`}
+                  >
+                    단일 인물
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPersonCount('multi')}
+                    disabled={isGenerating}
+                    className={`p-3 rounded-lg border transition-colors ${
+                      personCount === 'multi'
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-background border-border hover:border-primary text-foreground'
+                    }`}
+                  >
+                    다중 인물
+                  </button>
+                </div>
+              </div>
+              
+              {/* Dimensions */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
@@ -296,7 +531,14 @@ export default function InfiniteTalkPage() {
               </button>
               <button
                 onClick={handleGenerate}
-                disabled={isGenerating || !imageFile || !audioFile || !prompt.trim()}
+                disabled={
+                  isGenerating || 
+                  !prompt.trim() || 
+                  !audioFile || 
+                  (inputType === 'image' && !imageFile) ||
+                  (inputType === 'video' && !videoFile) ||
+                  (personCount === 'multi' && !audioFile2)
+                }
                 className="flex-1 px-6 py-3 bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
               >
                 {isGenerating ? (

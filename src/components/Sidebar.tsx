@@ -2,6 +2,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { VideoCameraIcon, ChatBubbleLeftRightIcon, CogIcon, SparklesIcon, MicrophoneIcon } from '@heroicons/react/24/outline';
 
@@ -19,8 +20,14 @@ export default function Sidebar() {
   return (
     <aside className="w-72 bg-secondary p-6 flex flex-col flex-shrink-0 border-r border-border">
       <div className="flex items-center gap-3 mb-10">
-        <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-          <span className="text-2xl font-bold">E</span>
+        <div className="w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center">
+          <Image 
+            src="/logo.png" 
+            alt="EnguiStudio Logo" 
+            width={48} 
+            height={48}
+            className="object-contain"
+          />
         </div>
         <h2 className="text-2xl font-bold">EnguiStudio</h2>
       </div>
