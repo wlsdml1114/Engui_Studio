@@ -5,6 +5,8 @@
   <img src="assets/banner.png" alt="EnguiStudio Banner" width="800" height="280">
   
   **다양한 오픈소스 AI 모델을 RunPod Serverless로 쉽게 사용할 수 있는 통합 플랫폼**
+  
+  *발음: 은긔 스튜디오 (/ɯnɡɯi ˈstjuːdioʊ/)*
 </div>
 
 ## 🎯 프로젝트 소개

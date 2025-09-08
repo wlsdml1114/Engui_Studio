@@ -4,6 +4,8 @@
   <img src="assets/banner.png" alt="EnguiStudio Banner" width="800" height="280">
   
   **A unified platform for easily using various open-source AI models with RunPod Serverless**
+  
+  *Pronunciation: Eun-gui Studio (/ɯnɡɯi ˈstjuːdioʊ/)*
 </div>
 
 ## 🎯 Project Overview
