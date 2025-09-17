@@ -9,7 +9,7 @@ interface JobItem {
   id: string;
   userId: string;
   status: 'processing' | 'completed' | 'failed';
-  type: 'video' | 'multitalk' | 'flux-kontext' | 'wan22' | 'infinitetalk';
+  type: 'video' | 'multitalk' | 'flux-kontext' | 'flux-krea' | 'wan22' | 'infinitetalk';
   prompt?: string;
   options?: string;
   resultUrl?: string;
@@ -87,15 +87,22 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
       }
     }
     
+    // FLUX KREA의 경우 결과 이미지 사용
+    if (item.type === 'flux-krea' && item.resultUrl) {
+      console.log('🎨 Using result image for FLUX KREA thumbnail');
+      return item.resultUrl;
+    }
+    
     // WAN 2.2의 경우 입력 이미지를 썸네일로 사용
     if (item.type === 'wan22' && item.options) {
       try {
         const options = JSON.parse(item.options);
         console.log('🔍 WAN 2.2 options for thumbnail:', options);
         
-        // 로컬 웹 경로가 있으면 우선 사용 (가장 안정적)
+        // 로컬 웹 경로가 있으면 직접 사용 (프로덕션 환경 호환)
         if (options.imageWebPath) {
           console.log('🖼️ Using local web path for WAN 2.2 thumbnail:', options.imageWebPath);
+          // 프로덕션 환경에서도 직접 경로 사용
           return options.imageWebPath;
         }
         
@@ -125,14 +132,10 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
       try {
         const options = JSON.parse(item.options);
         console.log('🔍 Infinite Talk options for thumbnail:', options);
+        console.log('🔍 Item thumbnailUrl:', item.thumbnailUrl);
+        console.log('🔍 Item ID:', item.id);
         
-        // 생성된 썸네일이 있으면 우선 사용
-        if (item.thumbnailUrl) {
-          console.log('🖼️ Using generated thumbnail for Infinite Talk:', item.thumbnailUrl);
-          return item.thumbnailUrl;
-        }
-        
-        // 로컬 웹 경로가 있으면 사용 (이미지)
+        // 로컬 웹 경로가 있으면 우선 사용 (이미지)
         if (options.imageWebPath) {
           console.log('🖼️ Using local web path for Infinite Talk thumbnail:', options.imageWebPath);
           return options.imageWebPath;
@@ -142,6 +145,12 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
         if (options.videoWebPath) {
           console.log('🎬 Using local web path for Infinite Talk thumbnail (video):', options.videoWebPath);
           return options.videoWebPath;
+        }
+        
+        // 생성된 썸네일이 있으면 사용
+        if (item.thumbnailUrl) {
+          console.log('🖼️ Using generated thumbnail for Infinite Talk:', item.thumbnailUrl);
+          return item.thumbnailUrl;
         }
         
         // 입력 이미지 파일명이 있으면 웹 경로로 변환
@@ -272,6 +281,8 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
         <p className="text-sm text-foreground/80 truncate">
           {item.type === 'multitalk' ? 'MultiTalk Content' : 
            item.type === 'wan22' ? 'WAN 2.2 Video' : 
+           item.type === 'flux-kontext' ? 'FLUX KONTEXT Image' :
+           item.type === 'flux-krea' ? 'FLUX KREA Image' :
            (item.prompt || 'No prompt')}
         </p>
         
@@ -403,6 +414,20 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                   />
                   <div className="text-sm text-foreground/60">
                     🎨 FLUX KONTEXT로 생성된 이미지입니다.
+                  </div>
+                </div>
+              ) : item.type === 'flux-krea' ? (
+                // FLUX KREA는 이미지 결과만 표시
+                <div className="space-y-4">
+                  <img 
+                    src={resultUrl} 
+                    alt="Generated FLUX KREA image" 
+                    className="w-full max-h-96 object-contain rounded-lg bg-background"
+                    onError={(e) => console.error('FLUX KREA image error:', e)}
+                    onLoad={() => console.log('✅ FLUX KREA image loaded successfully:', resultUrl)}
+                  />
+                  <div className="text-sm text-foreground/60">
+                    🎨 FLUX KREA로 생성된 이미지입니다.
                   </div>
                 </div>
               ) : (
@@ -587,7 +612,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                             className="w-full max-h-64 object-contain rounded-lg bg-background"
                             onError={(e) => {
                               console.error('❌ WAN 2.2 input image error:', e);
-                              console.error('❌ Web path:', options.imageWebPath);
+                              console.error('❌ Image path:', options.imageWebPath);
                               
                               // 에러 발생 시 이미지 요소를 숨기고 에러 메시지 표시
                               const imgElement = e.currentTarget;
@@ -717,16 +742,58 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
             </div>
           )}
 
-          {/* Infinite Talk 입력 이미지 */}
+          {/* Infinite Talk 입력 파일 */}
           {item.type === 'infinitetalk' && (
             <div>
-              <h4 className="font-medium mb-2">Input Image</h4>
+              <h4 className="font-medium mb-2">
+                {(() => {
+                  try {
+                    const options = JSON.parse(item.options || '{}');
+                    return options.inputType === 'video' ? 'Input Video' : 'Input Image';
+                  } catch (e) {
+                    return 'Input Image'; // 기본값
+                  }
+                })()}
+              </h4>
               {(() => {
                 try {
                   const options = JSON.parse(item.options || '{}');
                   
-                  // 입력 이미지 웹 경로가 있으면 표시
-                  if (options.imageWebPath) {
+                  // 입력 타입에 따라 다른 처리
+                  if (options.inputType === 'video' && options.videoWebPath) {
+                    // 비디오 입력인 경우
+                    return (
+                      <div className="relative">
+                        <video 
+                          src={options.videoWebPath} 
+                          controls
+                          className="w-full max-h-64 object-contain rounded-lg bg-black"
+                          onError={(e) => {
+                            console.error('❌ Infinite Talk input video error:', e);
+                            console.error('❌ Video path:', options.videoWebPath);
+                            
+                            const videoElement = e.currentTarget;
+                            videoElement.style.display = 'none';
+                            
+                            const errorDiv = document.createElement('div');
+                            errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
+                            errorDiv.innerHTML = `
+                              <div class="mb-2">⚠️ Infinite Talk 입력 비디오를 불러올 수 없습니다</div>
+                              <div class="text-xs text-red-300">
+                                <p>웹 경로: ${options.videoWebPath}</p>
+                                <p>💡 파일이 public/results 폴더에 있는지 확인하세요</p>
+                              </div>
+                            `;
+                            videoElement.parentNode?.appendChild(errorDiv);
+                          }}
+                          onLoad={() => {
+                            console.log('✅ Infinite Talk input video loaded successfully:', options.videoWebPath);
+                          }}
+                        />
+                      </div>
+                    );
+                  } else if (options.inputType === 'image' && options.imageWebPath) {
+                    // 이미지 입력인 경우
                     return (
                       <div className="relative">
                         <img 
@@ -737,11 +804,9 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                             console.error('❌ Infinite Talk input image error:', e);
                             console.error('❌ Image path:', options.imageWebPath);
                             
-                            // 에러 발생 시 이미지 요소를 숨기고 에러 메시지 표시
                             const imgElement = e.currentTarget;
                             imgElement.style.display = 'none';
                             
-                            // 에러 메시지 표시
                             const errorDiv = document.createElement('div');
                             errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
                             errorDiv.innerHTML = `
@@ -761,8 +826,40 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                     );
                   }
                   
-                  // 기존 경로 구조 fallback (imageFileName만 있는 경우)
-                  if (options.imageFileName) {
+                  // 기존 경로 구조 fallback
+                  if (options.inputType === 'video' && options.videoFileName) {
+                    const fallbackPath = `/results/input/infinitetalk/input_${item.id}_${options.videoFileName}`;
+                    return (
+                      <div className="relative">
+                        <video 
+                          src={fallbackPath} 
+                          controls
+                          className="w-full max-h-64 object-contain rounded-lg bg-black"
+                          onError={(e) => {
+                            console.error('❌ Infinite Talk fallback video error:', e);
+                            console.error('❌ Fallback path:', fallbackPath);
+                            
+                            const videoElement = e.currentTarget;
+                            videoElement.style.display = 'none';
+                            
+                            const errorDiv = document.createElement('div');
+                            errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
+                            errorDiv.innerHTML = `
+                              <div class="mb-2">⚠️ Infinite Talk 입력 비디오를 불러올 수 없습니다</div>
+                              <div class="text-xs text-red-300">
+                                <p>Fallback 경로: ${fallbackPath}</p>
+                                <p>💡 파일이 public/results 폴더에 있는지 확인하세요</p>
+                              </div>
+                            `;
+                            videoElement.parentNode?.appendChild(errorDiv);
+                          }}
+                          onLoad={() => {
+                            console.log('✅ Infinite Talk fallback video loaded successfully:', fallbackPath);
+                          }}
+                        />
+                      </div>
+                    );
+                  } else if (options.imageFileName) {
                     const fallbackPath = `/results/input/infinitetalk/input_${item.id}_${options.imageFileName}`;
                     return (
                       <div className="relative">
@@ -832,7 +929,10 @@ export default function Library() {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   const { data, error, isValidating, mutate } = useSWR('/api/jobs', fetcher, { 
-    refreshInterval: 5000,
+    refreshInterval: 1500, // 1.5초마다 새로고침 (매우 빠른 업데이트)
+    revalidateOnFocus: true, // 포커스 시 새로고침
+    revalidateOnReconnect: true, // 재연결 시 새로고침
+    dedupingInterval: 500, // 중복 요청 방지 간격 단축
     onSuccess: () => setLastUpdate(new Date())
   });
 
@@ -928,7 +1028,10 @@ export default function Library() {
               </div>
             )}
             {isValidating && (
-              <div className="text-xs text-foreground/50">Updating...</div>
+              <div className="flex items-center gap-1 text-xs text-foreground/50">
+                <div className="animate-spin rounded-full h-2 w-2 border-b border-foreground/50"></div>
+                <span>Updating...</span>
+              </div>
             )}
           </div>
         </div>
@@ -940,6 +1043,12 @@ export default function Library() {
             {showFavoritesOnly ? '전체 보기' : '즐겨찾기만 보기'}
           </button>
         </div>
+        
+        {/* 마지막 업데이트 시간 표시 */}
+        <div className="text-xs text-foreground/30 mb-2 text-center">
+          Last updated: {lastUpdate.toLocaleTimeString()}
+        </div>
+        
         {error && <div className="text-red-500 text-center">Failed to load jobs</div>}
         {!data && <div className="text-center">Loading...</div>}
         <div className="flex-1 grid grid-cols-2 gap-3 overflow-y-auto pr-2 auto-rows-min library-scrollbar">

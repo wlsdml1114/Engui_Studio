@@ -18,7 +18,10 @@ interface ServiceConfig {
       video: string;
       multitalk: string;
       'flux-kontext': string; // FLUX KONTEXT endpoint 추가
+      'flux-krea': string; // FLUX KREA endpoint 추가
       wan22: string; // WAN 2.2 endpoint 추가
+      'infinite-talk': string; // Infinite Talk endpoint 추가
+      'video-upscale': string; // Video Upscale endpoint 추가
     };
     generateTimeout?: number; // RunPod AI 생성 작업 타임아웃 (초 단위)
   };
@@ -59,7 +62,10 @@ export default function SettingsPage() {
         video: '',
         multitalk: '',
         'flux-kontext': '', // FLUX KONTEXT endpoint 추가
-        wan22: '' // WAN 2.2 endpoint 추가
+        'flux-krea': '', // FLUX KREA endpoint 추가
+        wan22: '', // WAN 2.2 endpoint 추가
+        'infinite-talk': '', // Infinite Talk endpoint 추가
+        'video-upscale': '' // Video Upscale endpoint 추가
       },
       generateTimeout: 3600 // 기본값 3600초 (1시간)
     },
@@ -213,7 +219,7 @@ export default function SettingsPage() {
   };
 
   // Endpoint 테스트 함수
-  const testEndpoint = async (endpointType: 'multitalk' | 'flux-kontext' | 'wan22' | 'infinite-talk') => {
+  const testEndpoint = async (endpointType: 'multitalk' | 'flux-kontext' | 'flux-krea' | 'wan22' | 'infinite-talk' | 'video-upscale') => {
     if (!settings.runpod?.apiKey || !settings.runpod?.endpoints?.[endpointType]) {
       return;
     }
@@ -464,6 +470,42 @@ export default function SettingsPage() {
               )}
             </div>
 
+            {/* FLUX KREA Endpoint ID */}
+            <div>
+              <label className="block text-sm font-medium mb-2">FLUX KREA Endpoint ID</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={settings.runpod?.endpoints?.['flux-krea'] || ''}
+                  onChange={(e) => updateSetting('runpod', 'endpoints', e.target.value, 'flux-krea')}
+                  placeholder="Enter FLUX KREA endpoint ID"
+                  className="flex-1 p-2 border rounded-md bg-background"
+                />
+                <button
+                  onClick={() => testEndpoint('flux-krea')}
+                  disabled={!settings.runpod?.apiKey || !settings.runpod?.endpoints?.['flux-krea'] || testing['flux-krea']}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {testing['flux-krea'] ? 'Testing...' : 'Test'}
+                </button>
+              </div>
+              {testResults['flux-krea'] && (
+                <div className={`mt-2 p-2 rounded-md text-sm ${
+                  testResults['flux-krea'].success 
+                    ? 'bg-green-100 text-green-800 border border-green-200' 
+                    : 'bg-red-100 text-red-800 border border-red-200'
+                }`}>
+                  {testResults['flux-krea'].message}
+                  {testResults['flux-krea'].responseTime && (
+                    <span className="ml-2">({testResults['flux-krea'].responseTime}ms)</span>
+                  )}
+                  {testResults['flux-krea'].statusCode && (
+                    <span className="ml-2">Status: {testResults['flux-krea'].statusCode}</span>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* WAN 2.2 Endpoint ID */}
             <div>
               <label className="block text-sm font-medium mb-2">WAN 2.2 Endpoint ID</label>
@@ -531,6 +573,42 @@ export default function SettingsPage() {
                   )}
                   {testResults['infinite-talk'].statusCode && (
                     <span className="ml-2">Status: {testResults['infinite-talk'].statusCode}</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Video Upscale Endpoint ID */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Video Upscale Endpoint ID</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={settings.runpod?.endpoints?.['video-upscale'] || ''}
+                  onChange={(e) => updateSetting('runpod', 'endpoints', e.target.value, 'video-upscale')}
+                  placeholder="Enter Video Upscale endpoint ID"
+                  className="flex-1 p-2 border rounded-md bg-background"
+                />
+                <button
+                  onClick={() => testEndpoint('video-upscale')}
+                  disabled={!settings.runpod?.apiKey || !settings.runpod?.endpoints?.['video-upscale'] || testing['video-upscale']}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {testing['video-upscale'] ? 'Testing...' : 'Test'}
+                </button>
+              </div>
+              {testResults['video-upscale'] && (
+                <div className={`mt-2 p-2 rounded-md text-sm ${
+                  testResults['video-upscale'].success 
+                    ? 'bg-green-100 text-green-800 border border-green-200' 
+                    : 'bg-red-100 text-red-800 border border-red-200'
+                }`}>
+                  {testResults['video-upscale'].message}
+                  {testResults['video-upscale'].responseTime && (
+                    <span className="ml-2">({testResults['video-upscale'].responseTime}ms)</span>
+                  )}
+                  {testResults['video-upscale'].statusCode && (
+                    <span className="ml-2">Status: {testResults['video-upscale'].statusCode}</span>
                   )}
                 </div>
               )}

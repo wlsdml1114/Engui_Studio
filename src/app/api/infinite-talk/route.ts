@@ -159,6 +159,7 @@ async function processInfiniteTalkJob(jobId: string, runpodJobId: string) {
           status: 'completed',
           resultUrl,
           runpodJobId,
+          completedAt: new Date(),
         },
       });
 

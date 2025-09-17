@@ -108,10 +108,10 @@ export async function POST(request: NextRequest) {
         const runpodInput = {
             prompt: prompt,
             image_path: inputImageBuffer.toString('base64'), // base64 데이터로 전송
-            width: parseInt(width),
-            height: parseInt(height),
-            seed: parseInt(seed) === -1 ? 42 : parseInt(seed), // -1일 때 기본값 42 사용
-            guidance: parseFloat(cfg) // cfg 값을 guidance 필드로 전달
+            width: width,
+            height: height,
+            seed: seed === -1 ? 42 : seed, // -1일 때 기본값 42 사용
+            guidance: cfg // cfg 값을 guidance 필드로 전달
         };
 
         console.log('🚀 RunPod input:', runpodInput);
@@ -223,9 +223,9 @@ async function processFluxKontextJob(jobId: string) {
         
         // Initialize RunPod service
         const runpodService = new RunPodService(
-            settings.runpod.apiKey,
-            settings.runpod.endpoints['flux-kontext'],
-            settings.runpod.generateTimeout || 3600
+            settings.runpod!.apiKey,
+            settings.runpod!.endpoints['flux-kontext'],
+            settings.runpod!.generateTimeout || 3600
         );
         
         // Wait for RunPod job completion

@@ -47,6 +47,247 @@ class S3Service {
     });
   }
 
+  // Network Volume 관리를 위한 메서드들
+
+  // 파일 목록 가져오기 (RunPod S3 API용)
+  async listFiles(prefix: string = ''): Promise<Array<{
+    key: string;
+    size: number;
+    lastModified: Date;
+    type: 'file' | 'directory';
+    extension?: string;
+  }>> {
+    try {
+      // 루트 디렉토리의 경우 prefix를 빈 문자열로 설정하여 모든 폴더 마커를 가져옴
+      const actualPrefix = prefix === '' ? '' : prefix;
+      const command = `aws s3api list-objects-v2 --bucket ${this.config.bucketName} --prefix "${actualPrefix}" --delimiter "/" --region ${this.config.region} --endpoint-url ${this.config.endpointUrl}`;
+      
+      console.log('🔍 Listing files with command:', command);
+      const { stdout } = await execAsync(command, {
+        env: {
+          ...process.env,
+          AWS_ACCESS_KEY_ID: this.config.accessKeyId,
+          AWS_SECRET_ACCESS_KEY: this.config.secretAccessKey,
+          AWS_DEFAULT_REGION: this.config.region,
+          AWS_REGION: this.config.region,
+        },
+        timeout: (this.config.timeout || 3600) * 1000,
+      });
+      
+      const result = JSON.parse(stdout);
+      
+      // 디버깅: S3 API 응답 확인 (간단하게)
+      console.log('🔍 Contents:', result.Contents?.map((c: any) => ({ Key: c.Key, Size: c.Size })));
+      console.log('🔍 CommonPrefixes:', result.CommonPrefixes?.map((p: any) => ({ Prefix: p.Prefix })));
+      
+      // 파일들 처리
+      const files = (result.Contents || []).map((obj: any) => {
+        const key = obj.Key;
+        const size = obj.Size || 0;
+        const extension = path.extname(key);
+        
+        // 폴더 판단 로직:
+        // 1. 키가 슬래시로 끝남 (S3 폴더 마커)
+        // 2. CommonPrefixes에서 온 경우 (이미 폴더로 확인됨)
+        const isDirectory = key.endsWith('/');
+        
+        return {
+          key,
+          size,
+          lastModified: new Date(obj.LastModified),
+          type: isDirectory ? 'directory' as const : 'file' as const,
+          extension: isDirectory ? undefined : extension,
+        };
+      });
+
+      // 폴더들 처리 (CommonPrefixes)
+      const folders = (result.CommonPrefixes || []).map((prefix: any) => {
+        const key = prefix.Prefix;
+        return {
+          key,
+          size: 0,
+          lastModified: new Date(),
+          type: 'directory' as const,
+          extension: undefined,
+        };
+      });
+
+      // 파일과 폴더 합치기
+      const allItems = [...files, ...folders];
+
+      // 현재 경로와 동일한 항목 필터링 (자기 자신 제거)
+      const filteredItems = allItems.filter((item: any) => {
+        // 현재 경로와 정확히 일치하는 항목 제거
+        if (prefix && item.key === prefix) {
+          console.log('🚫 Filtering out self-reference:', item.key);
+          return false;
+        }
+        // CommonPrefixes의 경우 현재 경로로 시작하는지 확인
+        if (prefix && item.key.startsWith(prefix) && item.key !== prefix) {
+          // 현재 경로의 직접 하위 항목만 표시
+          const relativePath = item.key.substring(prefix.length);
+          const pathParts = relativePath.split('/').filter((part: string) => part.length > 0);
+          if (pathParts.length > 1) {
+            console.log('🚫 Filtering out nested item:', item.key);
+            return false;
+          }
+        }
+        return true;
+      });
+
+      // 디버깅: 각 항목의 key 값 확인 (간단하게)
+      console.log('🔍 Found items:', filteredItems.length);
+
+      // 디렉토리와 파일을 구분하여 정렬
+      const directories = filteredItems.filter((f: any) => f.type === 'directory');
+      const fileList = filteredItems.filter((f: any) => f.type === 'file');
+      
+      console.log(`✅ Found ${allItems.length} items (${directories.length} directories, ${fileList.length} files)`);
+      
+      return [...directories, ...fileList];
+    } catch (error) {
+      console.error('❌ Failed to list files:', error);
+      throw new Error(`파일 목록을 가져올 수 없습니다: ${error}`);
+    }
+  }
+
+  // 파일 다운로드 (RunPod S3 API용)
+  async downloadFile(key: string): Promise<Buffer> {
+    try {
+      const tempFile = path.join(os.tmpdir(), `s3-download-${Date.now()}-${path.basename(key)}`);
+      const command = `aws s3 cp "s3://${this.config.bucketName}/${key}" "${tempFile}" --region ${this.config.region} --endpoint-url ${this.config.endpointUrl}`;
+      
+      console.log('📥 Downloading file with command:', command);
+      await execAsync(command, {
+        env: {
+          ...process.env,
+          AWS_ACCESS_KEY_ID: this.config.accessKeyId,
+          AWS_SECRET_ACCESS_KEY: this.config.secretAccessKey,
+          AWS_DEFAULT_REGION: this.config.region,
+          AWS_REGION: this.config.region,
+        },
+        timeout: (this.config.timeout || 3600) * 1000,
+      });
+      
+      const fileBuffer = fs.readFileSync(tempFile);
+      fs.unlinkSync(tempFile); // 임시 파일 삭제
+      
+      console.log('✅ File downloaded successfully:', key);
+      return fileBuffer;
+    } catch (error) {
+      console.error('❌ Failed to download file:', error);
+      throw new Error(`파일 다운로드에 실패했습니다: ${error}`);
+    }
+  }
+
+  // 파일 삭제 (RunPod S3 API용)
+  async deleteFile(key: string): Promise<void> {
+    try {
+      const command = `aws s3 rm "s3://${this.config.bucketName}/${key}" --region ${this.config.region} --endpoint-url ${this.config.endpointUrl}`;
+      
+      console.log('🗑️ Deleting file with command:', command);
+      await execAsync(command, {
+        env: {
+          ...process.env,
+          AWS_ACCESS_KEY_ID: this.config.accessKeyId,
+          AWS_SECRET_ACCESS_KEY: this.config.secretAccessKey,
+          AWS_DEFAULT_REGION: this.config.region,
+          AWS_REGION: this.config.region,
+        },
+        timeout: (this.config.timeout || 3600) * 1000,
+      });
+      
+      console.log('✅ File deleted successfully:', key);
+    } catch (error) {
+      console.error('❌ Failed to delete file:', error);
+      throw new Error(`파일 삭제에 실패했습니다: ${error}`);
+    }
+  }
+
+  // 폴더 생성 (RunPod S3 API용)
+  async createFolder(folderKey: string): Promise<void> {
+    let tempEmptyFile: string | null = null;
+    
+    try {
+      // S3에서는 폴더를 빈 파일로 생성 (끝에 / 추가)
+      const folderPath = folderKey.endsWith('/') ? folderKey : `${folderKey}/`;
+      
+      // 폴더 생성 전에 충돌 확인
+      const conflictCheckCommand = `aws s3api head-object --bucket ${this.config.bucketName} --key "${folderKey}" --region ${this.config.region} --endpoint-url ${this.config.endpointUrl}`;
+      
+      try {
+        await execAsync(conflictCheckCommand, {
+          env: {
+            ...process.env,
+            AWS_ACCESS_KEY_ID: this.config.accessKeyId,
+            AWS_SECRET_ACCESS_KEY: this.config.secretAccessKey,
+            AWS_DEFAULT_REGION: this.config.region,
+            AWS_REGION: this.config.region,
+          },
+          timeout: 10000,
+        });
+        
+        // 파일이 존재함 - 자동으로 삭제하고 폴더 생성
+        console.log('⚠️ Conflicting file found, deleting it first...');
+        const deleteCommand = `aws s3api delete-object --bucket ${this.config.bucketName} --key "${folderKey}" --region ${this.config.region} --endpoint-url ${this.config.endpointUrl}`;
+        
+        await execAsync(deleteCommand, {
+          env: {
+            ...process.env,
+            AWS_ACCESS_KEY_ID: this.config.accessKeyId,
+            AWS_SECRET_ACCESS_KEY: this.config.secretAccessKey,
+            AWS_DEFAULT_REGION: this.config.region,
+            AWS_REGION: this.config.region,
+          },
+          timeout: 10000,
+        });
+        
+        console.log('✅ Conflicting file deleted successfully');
+      } catch (headError: any) {
+        // 파일이 존재하지 않음 (정상)
+        if (headError.code === 'NoSuchKey' || headError.message?.includes('NoSuchKey')) {
+          console.log('✅ No conflict found, proceeding with folder creation');
+        } else {
+          console.warn('⚠️ Conflict check failed, proceeding anyway:', headError.message);
+        }
+      }
+      
+      // S3에서 폴더를 생성하려면 해당 폴더에 파일을 업로드해야 함
+      tempEmptyFile = path.join(os.tmpdir(), `folder-${Date.now()}.txt`);
+      fs.writeFileSync(tempEmptyFile, 'This is a folder marker. You can delete this file.');
+      
+      const command = `aws s3api put-object --bucket ${this.config.bucketName} --key "${folderPath}folder-marker.txt" --body "${tempEmptyFile}" --region ${this.config.region} --endpoint-url ${this.config.endpointUrl}`;
+      
+      console.log('📁 Creating folder with command:', command);
+      await execAsync(command, {
+        env: {
+          ...process.env,
+          AWS_ACCESS_KEY_ID: this.config.accessKeyId,
+          AWS_SECRET_ACCESS_KEY: this.config.secretAccessKey,
+          AWS_DEFAULT_REGION: this.config.region,
+          AWS_REGION: this.config.region,
+        },
+        timeout: (this.config.timeout || 3600) * 1000,
+      });
+      
+      console.log('✅ Folder created:', folderPath);
+      
+    } catch (error) {
+      console.error('❌ Failed to create folder:', error);
+      throw new Error(`폴더 생성에 실패했습니다: ${error}`);
+    } finally {
+      // 임시 파일 정리
+      if (tempEmptyFile && fs.existsSync(tempEmptyFile)) {
+        try {
+          fs.unlinkSync(tempEmptyFile);
+          console.log('🗑️ Temporary file cleaned up');
+        } catch (cleanupError) {
+          console.warn('⚠️ Failed to cleanup temp file:', cleanupError);
+        }
+      }
+    }
+  }
+
   // 파일명을 안전한 형태로 변환하는 함수
   private sanitizeFileName(fileName: string): string {
     // 특수문자 제거 및 안전한 문자로 변환
@@ -57,16 +298,78 @@ class S3Service {
       .replace(/^_|_$/g, ''); // 앞뒤 언더스코어 제거
   }
 
-  async uploadFile(file: Buffer, fileName: string, contentType: string): Promise<{ s3Url: string; filePath: string }> {
+  async uploadFile(file: Buffer, fileName: string, contentType: string, uploadPath: string = ''): Promise<{ s3Url: string; filePath: string }> {
     console.log(`📤 Uploading file to S3: ${fileName}`);
     
     // 파일명을 안전한 형태로 변환
     const safeFileName = this.sanitizeFileName(fileName);
-    const objectKey = `input/multitalk/${Date.now()}_${safeFileName}`;
     
-    console.log(`🔧 Original filename: ${fileName}`);
-    console.log(`🔧 Sanitized filename: ${safeFileName}`);
-    console.log(`🔧 Object key: ${objectKey}`);
+    // 업로드 경로 처리
+    let basePath = '';
+    if (uploadPath) {
+      // 사용자가 지정한 경로가 있으면 그대로 사용
+      basePath = uploadPath.endsWith('/') ? uploadPath : `${uploadPath}/`;
+    } else {
+      // 경로가 지정되지 않았으면 루트에 업로드
+      basePath = '';
+    }
+    // 파일명 중복 처리: 같은 이름의 파일이 있으면 번호를 추가
+    let objectKey = basePath ? `${basePath}${safeFileName}` : safeFileName;
+    
+    // 파일명에서 확장자 분리
+    const fileExt = path.extname(safeFileName);
+    const fileNameWithoutExt = path.basename(safeFileName, fileExt);
+    
+    // 중복 파일명 확인 및 처리
+    try {
+      const checkCommand = `aws s3api head-object --bucket ${this.config.bucketName} --key "${objectKey}" --region ${this.config.region} --endpoint-url ${this.config.endpointUrl}`;
+      await execAsync(checkCommand, {
+        env: {
+          ...process.env,
+          AWS_ACCESS_KEY_ID: this.config.accessKeyId,
+          AWS_SECRET_ACCESS_KEY: this.config.secretAccessKey,
+          AWS_DEFAULT_REGION: this.config.region,
+          AWS_REGION: this.config.region,
+        },
+        timeout: 5000,
+      });
+      
+      // 파일이 존재하면 번호를 추가
+      let counter = 1;
+      let newObjectKey = basePath ? `${basePath}${fileNameWithoutExt}_${counter}${fileExt}` : `${fileNameWithoutExt}_${counter}${fileExt}`;
+      
+      while (true) {
+        try {
+          const checkDuplicateCommand = `aws s3api head-object --bucket ${this.config.bucketName} --key "${newObjectKey}" --region ${this.config.region} --endpoint-url ${this.config.endpointUrl}`;
+          await execAsync(checkDuplicateCommand, {
+            env: {
+              ...process.env,
+              AWS_ACCESS_KEY_ID: this.config.accessKeyId,
+              AWS_SECRET_ACCESS_KEY: this.config.secretAccessKey,
+              AWS_DEFAULT_REGION: this.config.region,
+              AWS_REGION: this.config.region,
+            },
+            timeout: 5000,
+          });
+          counter++;
+          newObjectKey = basePath ? `${basePath}${fileNameWithoutExt}_${counter}${fileExt}` : `${fileNameWithoutExt}_${counter}${fileExt}`;
+        } catch {
+          // 파일이 존재하지 않으면 사용 가능한 이름
+          objectKey = newObjectKey;
+          break;
+        }
+      }
+      
+      console.log(`📝 File name conflict resolved: ${objectKey}`);
+    } catch {
+      // 파일이 존재하지 않으면 원래 이름 사용
+      console.log(`📝 Using original filename: ${objectKey}`);
+    }
+    
+    console.log(`📤 Uploading: ${fileName} to ${objectKey}`);
+    
+    // S3에서는 폴더와 파일이 공존할 수 있으므로 경로 충돌 확인 불필요
+    // 파일을 업로드하면 자동으로 폴더 구조가 생성됨
     
     try {
       // 임시 파일로 저장 (안전한 파일명 사용)
@@ -100,31 +403,8 @@ class S3Service {
       
       console.log('✅ AWS CLI stdout:', stdout);
       
-      // CORS 헤더 설정으로 웹에서 이미지 접근 가능하도록 설정
-      try {
-        console.log('🔧 Setting CORS headers for web access...');
-        const corsCommand = `aws s3api put-object-acl --bucket ${this.config.bucketName} --key ${objectKey} --acl public-read --endpoint-url ${this.config.endpointUrl}`;
-        
-        const { stdout: corsStdout, stderr: corsStderr } = await execAsync(corsCommand, {
-          env: {
-            ...process.env,
-            AWS_ACCESS_KEY_ID: this.config.accessKeyId,
-            AWS_SECRET_ACCESS_KEY: this.config.secretAccessKey,
-            AWS_DEFAULT_REGION: this.config.region,
-            AWS_REGION: this.config.region,
-          },
-          timeout: 30000, // 30초 타임아웃
-        });
-        
-        if (corsStderr) {
-          console.log('⚠️ CORS setting stderr:', corsStderr);
-        } else {
-          console.log('✅ CORS headers set successfully:', corsStdout);
-        }
-      } catch (corsError) {
-        console.warn('⚠️ Failed to set CORS headers (non-critical):', corsError);
-        // CORS 설정 실패는 치명적이지 않으므로 계속 진행
-      }
+      // RunPod S3는 ACL을 지원하지 않으므로 CORS 설정을 건너뜀
+      console.log('🔧 Skipping CORS headers (RunPod S3 does not support ACL)');
       
       // 임시 파일 삭제 (Windows 호환)
       try {
@@ -191,11 +471,11 @@ class S3Service {
     }
   }
 
-  async uploadMultipleFiles(files: { buffer: Buffer; fileName: string; contentType: string }[]): Promise<{ s3Url: string; filePath: string }[]> {
+  async uploadMultipleFiles(files: { buffer: Buffer; fileName: string; contentType: string }[], uploadPath: string = ''): Promise<{ s3Url: string; filePath: string }[]> {
     console.log(`📤 Uploading ${files.length} files to S3...`);
     
     const uploadPromises = files.map(file => 
-      this.uploadFile(file.buffer, file.fileName, file.contentType)
+      this.uploadFile(file.buffer, file.fileName, file.contentType, uploadPath)
     );
     
     try {
@@ -208,38 +488,6 @@ class S3Service {
     }
   }
 
-  async deleteFile(objectKey: string): Promise<void> {
-    console.log(`🗑️ Deleting file from S3: ${objectKey}`);
-    
-    try {
-      const awsCommand = `aws s3 rm s3://${this.config.bucketName}/${objectKey} --region ${this.config.region} --endpoint-url ${this.config.endpointUrl}`;
-      
-      console.log('🔐 Executing AWS CLI delete command...');
-      console.log(`📝 Command: ${awsCommand}`);
-      
-      const { stdout, stderr } = await execAsync(awsCommand, {
-        env: {
-          ...process.env,
-          AWS_ACCESS_KEY_ID: this.config.accessKeyId,
-          AWS_SECRET_ACCESS_KEY: this.config.secretAccessKey,
-          AWS_DEFAULT_REGION: this.config.region,
-          AWS_REGION: this.config.region,
-        },
-        timeout: (this.config.timeout || 3600) * 1000,
-      });
-      
-      if (stderr) {
-        console.log('⚠️ AWS CLI stderr:', stderr);
-      }
-      
-      console.log('✅ AWS CLI stdout:', stdout);
-      console.log(`✅ File deleted successfully: ${objectKey}`);
-      
-    } catch (error) {
-      console.error('❌ S3 delete error:', error);
-      throw error;
-    }
-  }
 }
 
 export default S3Service;

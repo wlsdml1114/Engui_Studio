@@ -19,80 +19,44 @@ try {
     console.log('📁 Results directory already exists or cannot be created');
 }
 
-// S3에 파일 업로드 (Infinite Talk 방식과 동일)
+// S3에 파일 업로드 (infinite talk 방식 참고)
 async function uploadToS3(file: File, fileName: string): Promise<string> {
-    const { settings } = await settingsService.getSettings('user-with-settings');
-    
-    if (!settings.s3?.endpointUrl || !settings.s3?.accessKeyId || !settings.s3?.secretAccessKey) {
-        throw new Error('S3 설정이 완료되지 않았습니다.');
-    }
+  const { settings } = await settingsService.getSettings('user-with-settings');
+  
+  if (!settings.s3?.endpointUrl || !settings.s3?.accessKeyId || !settings.s3?.secretAccessKey) {
+    throw new Error('S3 설정이 완료되지 않았습니다.');
+  }
 
-    const s3Service = new S3Service({
-        endpointUrl: settings.s3.endpointUrl,
-        accessKeyId: settings.s3.accessKeyId,
-        secretAccessKey: settings.s3.secretAccessKey,
-        bucketName: settings.s3.bucketName || 'my-bucket',
-        region: settings.s3.region || 'us-east-1',
-    });
+  const s3Service = new S3Service({
+    endpointUrl: settings.s3.endpointUrl,
+    accessKeyId: settings.s3.accessKeyId,
+    secretAccessKey: settings.s3.secretAccessKey,
+    bucketName: settings.s3.bucketName || 'my-bucket',
+    region: settings.s3.region || 'us-east-1',
+  });
 
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
-    const result = await s3Service.uploadFile(fileBuffer, fileName, file.type);
-    
-    // RunPod에서 사용할 경로 반환 (runpod-volume 형식)
-    return result.filePath;
+  const fileBuffer = Buffer.from(await file.arrayBuffer());
+  const result = await s3Service.uploadFile(fileBuffer, fileName, file.type);
+  
+  // RunPod에서 사용할 경로 반환 (runpod-volume 형식)
+  return result.filePath;
 }
 
 export async function POST(request: NextRequest) {
     try {
-        console.log('🎬 Processing WAN 2.2 video generation request...');
+        console.log('🎬 Processing video upscale request...');
 
         const formData = await request.formData();
 
         // Extract form data
         const userId = formData.get('userId') as string;
-        const prompt = formData.get('prompt') as string;
-        const width = parseInt(formData.get('width') as string);
-        const height = parseInt(formData.get('height') as string);
-        const seed = parseInt(formData.get('seed') as string);
-        const cfg = parseFloat(formData.get('cfg') as string);
-        const length = parseInt(formData.get('length') as string) || 81; // 기본값: 81
-        const step = parseInt(formData.get('step') as string) || 10; // 기본값: 10
-        
-        // LoRA pair 파라미터 추가
-        const loraCount = parseInt(formData.get('loraCount') as string) || 0;
-        console.log(`🔍 Received loraCount: ${loraCount}`);
-        
-        const loraPairs: Array<{high: string, low: string, high_weight: number, low_weight: number}> = [];
-        
-        for (let i = 0; i < loraCount; i++) {
-            const loraHigh = formData.get(`loraHigh_${i}`) as string;
-            const loraLow = formData.get(`loraLow_${i}`) as string;
-            const loraHighWeight = parseFloat(formData.get(`loraHighWeight_${i}`) as string) || 1.0;
-            const loraLowWeight = parseFloat(formData.get(`loraLowWeight_${i}`) as string) || 1.0;
-            
-            console.log(`🔍 LoRA ${i}: high="${loraHigh}", low="${loraLow}", high_weight=${loraHighWeight}, low_weight=${loraLowWeight}`);
-            
-            if (loraHigh && loraLow) {
-                loraPairs.push({
-                    high: loraHigh, // 파일명만 사용
-                    low: loraLow, // 파일명만 사용
-                    high_weight: loraHighWeight,
-                    low_weight: loraLowWeight
-                });
-                console.log(`✅ LoRA pair ${i} added: high="${loraHigh}", low="${loraLow}"`);
-            } else {
-                console.log(`❌ LoRA pair ${i} skipped: missing high or low file`);
-            }
-        }
-        
-        console.log(`📊 Final loraPairs array:`, loraPairs);
-        
-        const imageFile = formData.get('image') as File;
+        const taskType = formData.get('task_type') as string;
+        const videoFile = formData.get('video') as File;
 
         // Validate required data
-        if (!imageFile || !prompt) {
+        if (!videoFile || !taskType) {
             return NextResponse.json({
-                error: 'Missing required fields: image, prompt',
+                error: 'Missing required fields: video, task_type',
                 requiresSetup: true,
             }, { status: 400 });
         }
@@ -103,9 +67,17 @@ export async function POST(request: NextRequest) {
         
         // Validate RunPod configuration
         if (!settings.runpod || typeof settings.runpod === 'string' || typeof settings.runpod === 'number' || 
-            !(settings.runpod as any).apiKey || !(settings.runpod as any).endpoints?.wan22) {
+            !(settings.runpod as any).apiKey || !(settings.runpod as any).endpoints?.['video-upscale']) {
             return NextResponse.json({
-                error: 'RunPod configuration incomplete. Please configure your API key and WAN 2.2 endpoint in Settings.',
+                error: 'RunPod configuration incomplete. Please configure your API key and video-upscale endpoint in Settings.',
+                requiresSetup: true,
+            }, { status: 400 });
+        }
+
+        // Validate S3 configuration
+        if (!settings.s3?.endpointUrl || !settings.s3?.accessKeyId || !settings.s3?.secretAccessKey) {
+            return NextResponse.json({
+                error: 'S3 configuration incomplete. Please configure S3 settings in Settings.',
                 requiresSetup: true,
             }, { status: 400 });
         }
@@ -119,11 +91,12 @@ export async function POST(request: NextRequest) {
                 id: Math.random().toString(36).substring(2, 15),
                 userId,
                 status: 'processing',
-                type: 'wan22',
-                prompt,
+                type: 'video-upscale',
+                prompt: `Video upscale task: ${taskType}`,
                 options: JSON.stringify({ 
-                    width, height, seed, cfg, length, step,
-                    loraCount, loraPairs 
+                    taskType,
+                    originalFileName: videoFile.name,
+                    fileSize: videoFile.size
                 }),
                 createdAt: new Date(),
             },
@@ -135,64 +108,39 @@ export async function POST(request: NextRequest) {
         await prisma.creditActivity.create({
             data: {
                 userId,
-                activity: `Generated WAN 2.2 video (Job ID: ${job.id})`,
-                amount: -2, // WAN 2.2 costs more credits
+                activity: `Video upscale (Job ID: ${job.id})`,
+                amount: -1, // Video upscale costs 1 credit
             },
         });
 
-        // 이미지를 S3에 업로드
-        const imageFileName = `input_${job.id}_${imageFile.name}`;
-        let s3ImagePath: string;
-        
-        try {
-            console.log('📤 Uploading image to S3...');
-            s3ImagePath = await uploadToS3(imageFile, imageFileName);
-            console.log('✅ Image uploaded to S3:', s3ImagePath);
-        } catch (s3Error) {
-            console.error('❌ Failed to upload image to S3:', s3Error);
-            return NextResponse.json({
-                error: 'S3 업로드에 실패했습니다. S3 설정을 확인하세요.',
-                requiresSetup: true,
-            }, { status: 400 });
-        }
+        // S3에 비디오 업로드
+        console.log('📤 Uploading video to S3...');
+        const videoFileName = `input/video-upscale/input_${job.id}_${videoFile.name}`;
+        const videoS3Path = await uploadToS3(videoFile, videoFileName);
+        console.log('✅ Video uploaded to S3:', videoS3Path);
 
-        // 로컬에도 백업 저장 (웹 접근용)
-        const imageBuffer = Buffer.from(await imageFile.arrayBuffer());
-        const localImagePath = join(LOCAL_STORAGE_DIR, imageFileName);
+        // 로컬에 백업 저장
+        const videoBuffer = Buffer.from(await videoFile.arrayBuffer());
+        const videoUpscaleDir = join(LOCAL_STORAGE_DIR, 'input', 'video-upscale');
+        mkdirSync(videoUpscaleDir, { recursive: true });
         
+        const localVideoPath = join(videoUpscaleDir, `input_${job.id}_${videoFile.name}`);
         try {
-            writeFileSync(localImagePath, imageBuffer);
-            console.log('✅ Image saved locally (backup):', localImagePath);
+            writeFileSync(localVideoPath, videoBuffer);
+            console.log('✅ Video saved locally as backup:', localVideoPath);
         } catch (saveError) {
-            console.error('❌ Failed to save image locally (backup):', saveError);
-            // 로컬 저장 실패해도 계속 진행
+            console.error('❌ Failed to save video locally (backup):', saveError);
         }
 
-        // Prepare RunPod input with S3 image path
+        // Prepare RunPod input with S3 video path
         const runpodInput = {
-            prompt: prompt,
-            image_path: s3ImagePath, // S3 경로 사용
-            width: width,
-            height: height,
-            seed: seed,
-            cfg: cfg,
-            length: length,
-            steps: step, // steps로 변경
-            // LoRA pair 설정 추가
-            lora_pairs: loraPairs
+            video_path: videoS3Path, // S3 경로 사용
+            task_type: taskType
         };
 
         console.log('🔧 Final RunPod input structure:');
-        console.log('  - prompt:', runpodInput.prompt);
-        console.log('  - image_path:', runpodInput.image_path);
-        console.log('  - width:', runpodInput.width);
-        console.log('  - height:', runpodInput.height);
-        console.log('  - seed:', runpodInput.seed);
-        console.log('  - cfg:', runpodInput.cfg);
-        console.log('  - length:', runpodInput.length);
-        console.log('  - steps:', runpodInput.steps);
-        console.log('  - lora_pairs:', runpodInput.lora_pairs);
-        console.log('📁 S3 이미지 경로 전달 완료: serverless에서 S3 경로 사용');
+        console.log('  - video_path:', runpodInput.video_path);
+        console.log('  - task_type:', runpodInput.task_type);
 
         // RunPod 입력 로그 출력
         console.log('🚀 Submitting job to RunPod...', runpodInput);
@@ -203,7 +151,7 @@ export async function POST(request: NextRequest) {
             console.log('🔧 Creating RunPod service with user settings...');
             const runpodService = new RunPodService(
                 runpodSettings.apiKey,
-                runpodSettings.endpoints.wan22,
+                runpodSettings.endpoints['video-upscale'],
                 runpodSettings.generateTimeout || 3600
             );
 
@@ -236,30 +184,24 @@ export async function POST(request: NextRequest) {
             data: {
                 runpodJobId,
                 options: JSON.stringify({
-                    width,
-                    height,
-                    seed,
-                    cfg,
-                    length,
-                    step,
-                    loraCount,
-                    loraPairs,
+                    taskType,
                     runpodJobId,
-                    // S3 이미지 경로
-                    s3ImagePath,
-                    // 로컬 이미지 경로 (백업용)
-                    localImagePath,
-                    // 로컬 이미지 웹 경로 (이미지 표시용)
-                    imageWebPath: `/results/${imageFileName}`,
+                    originalFileName: videoFile.name,
+                    fileSize: videoFile.size,
+                    videoS3Path,
+                    // 로컬 파일 경로들 (백업용)
+                    localVideoPath,
+                    // 로컬 비디오 웹 경로 (비디오 표시용)
+                    videoWebPath: `/results/input/video-upscale/input_${job.id}_${videoFile.name}`,
                 }),
             },
         });
 
-        console.log(`✅ WAN 2.2 job submitted: ${job.id} (RunPod: ${runpodJobId})`);
+        console.log(`✅ Video upscale job submitted: ${job.id} (RunPod: ${runpodJobId})`);
 
         // 백그라운드에서 작업 상태 확인 및 결과 처리 (비동기)
         // 사용자는 즉시 응답을 받고 다른 작업을 할 수 있음
-        processWan22Job(job.id, runpodJobId, runpodSettings, prisma).catch(error => {
+        processVideoUpscaleJob(job.id, runpodJobId, runpodSettings, prisma).catch(error => {
             console.error(`❌ Background processing failed for job ${job.id}:`, error);
         });
 
@@ -268,27 +210,27 @@ export async function POST(request: NextRequest) {
             jobId: job.id,
             runpodJobId,
             status: 'processing',
-            message: 'WAN 2.2 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.'
+            message: '비디오 업스케일 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.'
         });
 
     } catch (error) {
-        console.error('❌ WAN 2.2 generation error:', error);
+        console.error('❌ Video upscale error:', error);
         return NextResponse.json(
-            { error: `WAN 2.2 generation failed: ${error}` },
+            { error: `Video upscale failed: ${error}` },
             { status: 500 }
         );
     }
 }
 
 // 백그라운드 작업 처리 함수
-async function processWan22Job(jobId: string, runpodJobId: string, runpodSettings: any, prisma: PrismaClient) {
+async function processVideoUpscaleJob(jobId: string, runpodJobId: string, runpodSettings: any, prisma: PrismaClient) {
     try {
-        console.log(`🔄 Starting background processing for WAN 2.2 job: ${jobId} (RunPod: ${runpodJobId})`);
+        console.log(`🔄 Starting background processing for video upscale job: ${jobId} (RunPod: ${runpodJobId})`);
         console.log(`⏰ Started at: ${new Date().toISOString()}`);
         
         const runpodService = new RunPodService(
             runpodSettings.apiKey,
-            runpodSettings.endpoints.wan22,
+            runpodSettings.endpoints['video-upscale'],
             runpodSettings.generateTimeout || 3600
         );
 
@@ -301,7 +243,7 @@ async function processWan22Job(jobId: string, runpodJobId: string, runpodSetting
         console.log(`⏰ Completed at: ${new Date().toISOString()}`);
         
         if (result.status === 'COMPLETED' && result.output) {
-            console.log(`✅ WAN 2.2 job ${jobId} completed successfully!`);
+            console.log(`✅ Video upscale job ${jobId} completed successfully!`);
             
             let resultUrl: string;
             let runpodResultUrl: string = 'unknown';
@@ -327,32 +269,100 @@ async function processWan22Job(jobId: string, runpodJobId: string, runpodSetting
                 runpodResultUrl = 'unknown';
             }
 
-            // RunPod에서 base64 인코딩된 비디오 데이터 처리
+            // RunPod 결과 처리 - S3 경로와 base64 모두 지원
             let videoData: string | null = null;
+            let videoS3Path: string | null = null;
             let videoFormat: string = 'mp4';
             
-            // video 필드에 base64 데이터가 있는지 확인
-            if (result.output.video && typeof result.output.video === 'string' && 
-                result.output.video.length > 100 && !result.output.video.startsWith('http')) {
-                // video 필드가 base64 데이터로 보이는 경우 (길이가 길고 URL이 아닌 경우)
+            // 1. S3 경로 방식 확인 (우선순위 높음 - 용량이 큰 파일에 효율적)
+            if (result.output.video_path && typeof result.output.video_path === 'string' && 
+                result.output.video_path.startsWith('/runpod-volume/')) {
+                videoS3Path = result.output.video_path;
+                console.log(`🎬 Found S3 path in video_path field: ${videoS3Path}`);
+            } else if (result.output.video && typeof result.output.video === 'string' && 
+                       result.output.video.startsWith('/runpod-volume/')) {
+                videoS3Path = result.output.video;
+                console.log(`🎬 Found S3 path in video field: ${videoS3Path}`);
+            } else if (result.output.mp4 && typeof result.output.mp4 === 'string' && 
+                       result.output.mp4.startsWith('/runpod-volume/')) {
+                videoS3Path = result.output.mp4;
+                console.log(`🎬 Found S3 path in mp4 field: ${videoS3Path}`);
+            } else if (result.output.result && typeof result.output.result === 'string' && 
+                       result.output.result.startsWith('/runpod-volume/')) {
+                videoS3Path = result.output.result;
+                console.log(`🎬 Found S3 path in result field: ${videoS3Path}`);
+            }
+            // 2. base64 방식 확인 (fallback)
+            else if (result.output.video_path && typeof result.output.video_path === 'string' && 
+                     result.output.video_path.length > 100 && !result.output.video_path.startsWith('http') && !result.output.video_path.startsWith('/runpod-volume/')) {
+                videoData = result.output.video_path;
+                videoFormat = 'mp4';
+                console.log(`🎬 Found base64 video data in video_path field, length: ${videoData?.length} characters`);
+            } else if (result.output.video && typeof result.output.video === 'string' && 
+                       result.output.video.length > 100 && !result.output.video.startsWith('http') && !result.output.video.startsWith('/runpod-volume/')) {
                 videoData = result.output.video;
                 videoFormat = 'mp4';
                 console.log(`🎬 Found base64 video data in video field, length: ${videoData?.length} characters`);
             } else if (result.output.mp4 && typeof result.output.mp4 === 'string' && 
-                       result.output.mp4.length > 100 && !result.output.mp4.startsWith('http')) {
-                // mp4 필드에 base64 데이터가 있는 경우
+                       result.output.mp4.length > 100 && !result.output.mp4.startsWith('http') && !result.output.mp4.startsWith('/runpod-volume/')) {
                 videoData = result.output.mp4;
                 videoFormat = 'mp4';
                 console.log(`🎬 Found base64 MP4 data in mp4 field, length: ${videoData?.length} characters`);
             } else if (result.output.result && typeof result.output.result === 'string' && 
-                       result.output.result.length > 100 && !result.output.result.startsWith('http')) {
-                // result 필드에 base64 데이터가 있는 경우
+                       result.output.result.length > 100 && !result.output.result.startsWith('http') && !result.output.result.startsWith('/runpod-volume/')) {
                 videoData = result.output.result;
                 videoFormat = 'mp4';
                 console.log(`🎬 Found base64 result data in result field, length: ${videoData?.length} characters`);
             }
 
-            // base64 비디오 데이터를 디코딩하여 로컬에 저장
+            // S3 경로에서 비디오 다운로드 (우선순위 높음)
+            if (videoS3Path && typeof videoS3Path === 'string' && videoS3Path.length > 0) {
+                try {
+                    console.log(`📥 Downloading video from S3 path: ${videoS3Path}`);
+                    
+                    // S3 경로를 S3 키로 변환 (/runpod-volume/ 제거)
+                    const s3Key = videoS3Path.replace('/runpod-volume/', '');
+                    console.log(`🔧 Converted S3 key: ${s3Key}`);
+                    
+                    // S3에서 파일 다운로드
+                    const { settings } = await settingsService.getSettings('user-with-settings');
+                    
+                    if (!settings.s3?.endpointUrl || !settings.s3?.accessKeyId || !settings.s3?.secretAccessKey) {
+                        throw new Error('S3 설정이 완료되지 않았습니다.');
+                    }
+
+                    const s3Service = new S3Service({
+                        endpointUrl: settings.s3.endpointUrl,
+                        accessKeyId: settings.s3.accessKeyId,
+                        secretAccessKey: settings.s3.secretAccessKey,
+                        bucketName: settings.s3.bucketName || 'my-bucket',
+                        region: settings.s3.region || 'us-east-1',
+                    });
+
+                    const videoBuffer = await s3Service.downloadFile(s3Key);
+                    console.log(`✅ Downloaded video buffer size: ${videoBuffer.length} bytes`);
+                    
+                    // 로컬에 비디오 파일 저장
+                    const videoFileName = `upscale_result_${jobId}.${videoFormat}`;
+                    const videoPath = join(LOCAL_STORAGE_DIR, videoFileName);
+                    
+                    writeFileSync(videoPath, videoBuffer);
+                    console.log(`✅ Video downloaded and saved locally: ${videoPath}`);
+                    
+                    // resultUrl을 로컬 웹 경로로 설정
+                    resultUrl = `/results/${videoFileName}`;
+                    runpodResultUrl = videoS3Path;
+                    
+                    console.log(`🔄 Set resultUrl to local path: ${resultUrl}`);
+                    
+                } catch (downloadError) {
+                    console.error(`❌ Error downloading video from S3 path:`, downloadError);
+                    // S3 경로 다운로드 실패 시 base64 방식으로 fallback
+                    videoData = null;
+                }
+            }
+            
+            // base64 비디오 데이터를 디코딩하여 로컬에 저장 (fallback)
             if (videoData && typeof videoData === 'string' && videoData.length > 0) {
                 try {
                     console.log(`🔓 Decoding base64 video data...`);
@@ -362,7 +372,7 @@ async function processWan22Job(jobId: string, runpodJobId: string, runpodSetting
                     console.log(`✅ Decoded video buffer size: ${videoBuffer.length} bytes`);
                     
                     // 로컬에 비디오 파일 저장
-                    const videoFileName = `wan22_result_${jobId}.${videoFormat}`;
+                    const videoFileName = `upscale_result_${jobId}.${videoFormat}`;
                     const videoPath = join(LOCAL_STORAGE_DIR, videoFileName);
                     
                     writeFileSync(videoPath, videoBuffer);
@@ -379,48 +389,9 @@ async function processWan22Job(jobId: string, runpodJobId: string, runpodSetting
                     console.log(`💡 Using original resultUrl: ${resultUrl}`);
                 }
             } else {
-                // base64 데이터가 없는 경우 기존 로직 사용
-                console.log(`💡 No base64 video data found, using original result handling`);
-                
-                // RunPod URL이 외부 URL인 경우 로컬 경로로 변환 시도
-                if (resultUrl && (resultUrl.startsWith('http://') || resultUrl.startsWith('https://'))) {
-                    console.log(`🌐 RunPod returned external URL: ${resultUrl}`);
-                    console.log(`💡 Converting to local path for web access`);
-                    
-                    // 외부 URL을 로컬 파일명으로 변환
-                    const urlParts = resultUrl.split('/');
-                    const fileName = urlParts[urlParts.length - 1] || `${jobId}.mp4`;
-                    resultUrl = `/results/${fileName}`;
-                    
-                    console.log(`🔄 Converted to local path: ${resultUrl}`);
-                }
-
-                // RunPod 결과 비디오를 로컬에 다운로드
-                if (runpodResultUrl && runpodResultUrl !== 'unknown' && 
-                    (runpodResultUrl.startsWith('http://') || runpodResultUrl.startsWith('https://'))) {
-                    try {
-                        console.log(`📥 Downloading video from RunPod: ${runpodResultUrl}`);
-                        
-                        const videoResponse = await fetch(runpodResultUrl);
-                        if (videoResponse.ok) {
-                            const videoBuffer = await videoResponse.arrayBuffer();
-                            const videoFileName = `wan22_result_${jobId}.mp4`;
-                            const videoPath = join(LOCAL_STORAGE_DIR, videoFileName);
-                            
-                            writeFileSync(videoPath, Buffer.from(videoBuffer));
-                            console.log(`✅ Video downloaded and saved locally: ${videoPath}`);
-                            
-                            // resultUrl을 로컬 웹 경로로 설정
-                            resultUrl = `/results/${videoFileName}`;
-                            console.log(`🔄 Updated resultUrl to local path: ${resultUrl}`);
-                        } else {
-                            console.warn(`⚠️ Failed to download video from RunPod: ${videoResponse.status}`);
-                        }
-                    } catch (downloadError) {
-                        console.error(`❌ Error downloading video from RunPod:`, downloadError);
-                        console.log(`💡 Using original resultUrl: ${resultUrl}`);
-                    }
-                }
+                // base64 데이터와 S3 URL 모두 없는 경우
+                console.log(`💡 No video data found in RunPod output`);
+                console.log(`💡 Using original resultUrl: ${resultUrl}`);
             }
 
             // 작업 상태를 완료로 업데이트
@@ -440,9 +411,30 @@ async function processWan22Job(jobId: string, runpodJobId: string, runpodSetting
                 },
             });
 
+            // 썸네일 설정 (입력 비디오를 썸네일로 사용)
+            try {
+                const jobData = await prisma.job.findUnique({ where: { id: jobId } });
+                if (jobData?.options) {
+                    const options = JSON.parse(jobData.options);
+                    
+                    // 입력 비디오가 있으면 썸네일로 사용
+                    if (options.videoWebPath) {
+                        await prisma.job.update({
+                            where: { id: jobId },
+                            data: {
+                                thumbnailUrl: options.videoWebPath,
+                            },
+                        });
+                        console.log(`🎬 Video upscale thumbnail set to input video: ${options.videoWebPath}`);
+                    }
+                }
+            } catch (thumbnailError) {
+                console.error('❌ Failed to set thumbnail:', thumbnailError);
+            }
+
             console.log(`✅ Job ${jobId} marked as completed with result URL: ${resultUrl}`);
             console.log(`✅ RunPod result URL: ${runpodResultUrl}`);
-            console.log(`🎉 WAN 2.2 video generation completed successfully!`);
+            console.log(`🎉 Video upscale completed successfully!`);
 
         } else {
             console.error('❌ RunPod job failed or no output');

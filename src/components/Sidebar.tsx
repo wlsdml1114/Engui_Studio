@@ -4,13 +4,16 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { VideoCameraIcon, ChatBubbleLeftRightIcon, CogIcon, SparklesIcon, MicrophoneIcon } from '@heroicons/react/24/outline';
+import { VideoCameraIcon, ChatBubbleLeftRightIcon, CogIcon, SparklesIcon, MicrophoneIcon, CloudIcon, PhotoIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
 
 const menuItems = [
   { href: '/video-generation', label: 'WAN 2.2', icon: VideoCameraIcon },
+  { href: '/video-upscale', label: 'Video Upscale', icon: ArrowUpIcon },
   { href: '/flux-kontext', label: 'FLUX KONTEXT', icon: SparklesIcon },
+  { href: '/flux-krea', label: 'FLUX KREA', icon: PhotoIcon },
   { href: '/multitalk', label: 'MultiTalk', icon: ChatBubbleLeftRightIcon },
   { href: '/infinite-talk', label: 'Infinite Talk', icon: MicrophoneIcon },
+  { href: '/s3-storage', label: 'S3 Storage', icon: CloudIcon },
   { href: '/settings', label: 'Settings', icon: CogIcon },
 ];
 

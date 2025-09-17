@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
         // Validate S3 configuration
         const requiredFields = ['endpointUrl', 'accessKeyId', 'secretAccessKey', 'bucketName', 'region'];
-        const missingFields = requiredFields.filter(field => !settings.s3[field]);
+        const missingFields = requiredFields.filter(field => !(settings.s3! as any)[field]);
         
         if (missingFields.length > 0) {
             return NextResponse.json({ 

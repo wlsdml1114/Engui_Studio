@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     
     for (const [key, value] of formData.entries()) {
       if (value instanceof File) {
-        fileMapping[key] = uploadedPaths[index];
+        fileMapping[key] = uploadedPaths[index].filePath;
         index++;
       }
     }

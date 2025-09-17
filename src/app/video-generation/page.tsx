@@ -1,7 +1,21 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { PhotoIcon, SparklesIcon, Cog6ToothIcon, PlayIcon } from '@heroicons/react/24/outline';
+import { useState, useRef, useEffect } from 'react';
+import { PhotoIcon, SparklesIcon, Cog6ToothIcon, PlayIcon, CpuChipIcon } from '@heroicons/react/24/outline';
+
+interface LoRAFile {
+  key: string;
+  name: string;
+  size: number;
+  lastModified: string;
+}
+
+interface LoRAPair {
+  high: string;
+  low: string;
+  high_weight: number;
+  low_weight: number;
+}
 
 export default function Wan22Page() {
   const [prompt, setPrompt] = useState('');
@@ -11,11 +25,71 @@ export default function Wan22Page() {
   const [height, setHeight] = useState(480);
   const [seed, setSeed] = useState(-1);
   const [cfg, setCfg] = useState(2.5);
+  const [length, setLength] = useState(81);
+  const [step, setStep] = useState(10);
   const [isGenerating, setIsGenerating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [currentJobId, setCurrentJobId] = useState<string>('');
   
+  // LoRA 관련 상태
+  const [loraFiles, setLoraFiles] = useState<LoRAFile[]>([]);
+  const [highFiles, setHighFiles] = useState<LoRAFile[]>([]);
+  const [lowFiles, setLowFiles] = useState<LoRAFile[]>([]);
+  const [loraCount, setLoraCount] = useState(0);
+  const [loraPairs, setLoraPairs] = useState<LoRAPair[]>([]);
+  const [loraLoading, setLoraLoading] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // LoRA 파일 목록 가져오기
+  const fetchLoraFiles = async () => {
+    try {
+      setLoraLoading(true);
+      const response = await fetch('/api/s3-storage/loras');
+      const data = await response.json();
+      
+      if (data.success) {
+        setLoraFiles(data.files);
+        setHighFiles(data.highFiles || []);
+        setLowFiles(data.lowFiles || []);
+        console.log('📁 LoRA files loaded:', data.files);
+        console.log('🔺 High files:', data.highFiles);
+        console.log('🔻 Low files:', data.lowFiles);
+      } else {
+        console.error('Failed to load LoRA files:', data.error);
+      }
+    } catch (err) {
+      console.error('❌ Error fetching LoRA files:', err);
+    } finally {
+      setLoraLoading(false);
+    }
+  };
+
+  // LoRA 개수 변경 시 설정 초기화
+  useEffect(() => {
+    const newPairs = Array(loraCount).fill(null).map((_, index) => ({
+      high: loraPairs[index]?.high || '',
+      low: loraPairs[index]?.low || '',
+      high_weight: loraPairs[index]?.high_weight || 1.0,
+      low_weight: loraPairs[index]?.low_weight || 1.0
+    }));
+    setLoraPairs(newPairs);
+  }, [loraCount]);
+
+  // 컴포넌트 마운트 시 LoRA 파일 목록 가져오기
+  useEffect(() => {
+    fetchLoraFiles();
+  }, []);
+
+  // LoRA pair 설정 업데이트
+  const updateLoraPair = (index: number, field: 'high' | 'low' | 'high_weight' | 'low_weight', value: string | number) => {
+    const newPairs = [...loraPairs];
+    newPairs[index] = {
+      ...newPairs[index],
+      [field]: field.includes('weight') ? parseFloat(value as string) || 0 : value
+    };
+    setLoraPairs(newPairs);
+  };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -32,6 +106,15 @@ export default function Wan22Page() {
       return;
     }
 
+    // LoRA pair 설정 검증
+    const validPairs = loraPairs.filter(pair => 
+      pair.high && pair.low && pair.high_weight > 0 && pair.low_weight > 0
+    );
+    if (loraCount > 0 && validPairs.length !== loraCount) {
+      setMessage({ type: 'error', text: '모든 LoRA pair의 high/low 파일을 선택하고 가중치를 설정해주세요.' });
+      return;
+    }
+
     setIsGenerating(true);
     setMessage(null);
 
@@ -44,6 +127,19 @@ export default function Wan22Page() {
       formData.append('height', height.toString());
       formData.append('seed', seed === -1 ? '42' : seed.toString());
       formData.append('cfg', cfg.toString());
+      formData.append('length', length.toString());
+      formData.append('step', step.toString());
+      
+      // LoRA pair 파라미터 추가
+      console.log('🔍 Sending LoRA data:', { loraCount, validPairs });
+      formData.append('loraCount', loraCount.toString());
+      validPairs.forEach((pair, index) => {
+        console.log(`🔍 Adding LoRA pair ${index}:`, pair);
+        formData.append(`loraHigh_${index}`, pair.high);
+        formData.append(`loraLow_${index}`, pair.low);
+        formData.append(`loraHighWeight_${index}`, pair.high_weight.toString());
+        formData.append(`loraLowWeight_${index}`, pair.low_weight.toString());
+      });
 
       const response = await fetch('/api/wan22', {
         method: 'POST',
@@ -78,6 +174,10 @@ export default function Wan22Page() {
     setMessage(null);
     setCurrentJobId('');
     setIsGenerating(false);
+    
+    // LoRA 상태 초기화
+    setLoraCount(0);
+    setLoraPairs([]);
     
     // 파일 입력 초기화
     if (fileInputRef.current) {
@@ -257,7 +357,177 @@ export default function Wan22Page() {
                     disabled={isGenerating}
                   />
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Length (16fps)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="200"
+                      value={length}
+                      onChange={(e) => setLength(parseInt(e.target.value) || 81)}
+                      className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                      disabled={isGenerating}
+                      placeholder="81"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Step
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="50"
+                      value={step}
+                      onChange={(e) => setStep(parseInt(e.target.value) || 10)}
+                      className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                      disabled={isGenerating}
+                      placeholder="10"
+                    />
+                  </div>
+                </div>
               </div>
+            </div>
+
+            {/* LoRA 설정 */}
+            <div className="bg-secondary p-6 rounded-lg border border-border">
+              <div className="flex items-center gap-2 mb-4">
+                <CpuChipIcon className="w-5 h-5 text-purple-500" />
+                <h3 className="text-lg font-semibold">LoRA 모델 설정</h3>
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">
+                  사용할 LoRA 개수 (0-3개)
+                </label>
+                <select
+                  value={loraCount}
+                  onChange={(e) => setLoraCount(parseInt(e.target.value))}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  disabled={isGenerating}
+                >
+                  <option value={0}>0개 (LoRA 사용 안함)</option>
+                  <option value={1}>1개</option>
+                  <option value={2}>2개</option>
+                  <option value={3}>3개</option>
+                </select>
+              </div>
+
+              {/* LoRA pair 설정 */}
+              {loraCount > 0 && (
+                <div className="space-y-4">
+                  {Array.from({ length: loraCount }, (_, index) => (
+                    <div key={index} className="border border-border rounded-lg p-4 bg-background/50">
+                      <h4 className="font-medium mb-3 text-foreground">LoRA Pair {index + 1}</h4>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* High 파일 선택 */}
+                        <div>
+                          <label className="block text-sm font-medium mb-1 text-foreground">
+                            High 파일 🔺
+                          </label>
+                          <select
+                            value={loraPairs[index]?.high || ''}
+                            onChange={(e) => updateLoraPair(index, 'high', e.target.value)}
+                            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                            disabled={isGenerating || loraLoading}
+                          >
+                            <option value="">High 파일을 선택하세요</option>
+                            {highFiles.map((file) => (
+                              <option key={file.key} value={file.name}>
+                                {file.name} ({(file.size / 1024 / 1024).toFixed(1)}MB)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        {/* Low 파일 선택 */}
+                        <div>
+                          <label className="block text-sm font-medium mb-1 text-foreground">
+                            Low 파일 🔻
+                          </label>
+                          <select
+                            value={loraPairs[index]?.low || ''}
+                            onChange={(e) => updateLoraPair(index, 'low', e.target.value)}
+                            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                            disabled={isGenerating || loraLoading}
+                          >
+                            <option value="">Low 파일을 선택하세요</option>
+                            {lowFiles.map((file) => (
+                              <option key={file.key} value={file.name}>
+                                {file.name} ({(file.size / 1024 / 1024).toFixed(1)}MB)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        {/* High 가중치 설정 */}
+                        <div>
+                          <label className="block text-sm font-medium mb-1 text-foreground">
+                            High 가중치 (0.1 - 2.0)
+                          </label>
+                          <input
+                            type="number"
+                            min="0.1"
+                            max="2.0"
+                            step="0.1"
+                            value={loraPairs[index]?.high_weight || 1.0}
+                            onChange={(e) => updateLoraPair(index, 'high_weight', e.target.value)}
+                            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                            disabled={isGenerating}
+                          />
+                        </div>
+                        
+                        {/* Low 가중치 설정 */}
+                        <div>
+                          <label className="block text-sm font-medium mb-1 text-foreground">
+                            Low 가중치 (0.1 - 2.0)
+                          </label>
+                          <input
+                            type="number"
+                            min="0.1"
+                            max="2.0"
+                            step="0.1"
+                            value={loraPairs[index]?.low_weight || 1.0}
+                            onChange={(e) => updateLoraPair(index, 'low_weight', e.target.value)}
+                            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                            disabled={isGenerating}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {/* LoRA 파일 목록 새로고침 버튼 */}
+                  <div className="flex justify-end">
+                    <button
+                      onClick={fetchLoraFiles}
+                      disabled={loraLoading || isGenerating}
+                      className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:opacity-50 text-white rounded-md transition-colors text-sm"
+                    >
+                      {loraLoading ? '로딩 중...' : 'LoRA 목록 새로고침'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* LoRA 파일 목록 표시 (축소된 버전) */}
+              {loraFiles.length === 0 && !loraLoading && (
+                <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                  <p className="text-blue-300 text-sm">
+                    사용 가능한 LoRA 파일이 없습니다. 
+                    <a href="/s3-storage" className="text-blue-200 hover:underline ml-1">
+                      S3 스토리지
+                    </a>에서 .safetensors 파일을 업로드하세요.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Action Buttons */}

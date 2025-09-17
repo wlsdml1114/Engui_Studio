@@ -26,6 +26,16 @@ interface FluxKontextInput {
   guidance: number; // cfg를 guidance로 변경
 }
 
+interface FluxKreaInput {
+  prompt: string;
+  width: number;
+  height: number;
+  seed: number;
+  guidance: number;
+  model?: string;
+  lora?: Array<[string, number]>; // [["filename.safetensors", weight]] 형태
+}
+
 interface Wan22Input {
   prompt: string;
   image_path: string; // base64 인코딩된 이미지 데이터 (키는 image_path)
@@ -33,6 +43,14 @@ interface Wan22Input {
   height: number;
   seed: number;
   cfg: number;
+  length: number;
+  steps: number; // step을 steps로 변경
+  lora_pairs?: Array<{
+    high: string;
+    low: string;
+    high_weight: number;
+    low_weight: number;
+  }>;
 }
 
 interface InfiniteTalkInput {
@@ -47,7 +65,12 @@ interface InfiniteTalkInput {
   height: number;
 }
 
-type RunPodInput = MultiTalkInput | FluxKontextInput | Wan22Input | InfiniteTalkInput;
+interface VideoUpscaleInput {
+  task_type: string; // "upscale" 또는 "upscale_and_interpolation"
+  video_path: string; // S3 경로
+}
+
+type RunPodInput = MultiTalkInput | FluxKontextInput | FluxKreaInput | Wan22Input | InfiniteTalkInput | VideoUpscaleInput;
 
 class RunPodService {
   private apiKey: string;
@@ -76,13 +99,7 @@ class RunPodService {
 
   async submitJob(input: RunPodInput): Promise<string> {
     console.log('🚀 Submitting job to RunPod...');
-    console.log('📋 API Key:', this.apiKey ? `${this.apiKey.substring(0, 10)}...` : 'MISSING');
     console.log('📋 Endpoint ID:', this.endpointId);
-    console.log('📋 Base URL:', this.baseUrl);
-    console.log('📋 Input:', JSON.stringify(input, null, 2));
-    
-    const headers = this.getHeaders();
-    console.log('📋 Headers:', headers);
     
     // Match the Python code structure exactly
     let payload: any;
@@ -102,6 +119,53 @@ class RunPodService {
       console.log('  - image_path:', payload.input.image_path);
       console.log('  - audio_paths:', payload.input.audio_paths);
       console.log('  - audio_type:', payload.input.audio_type || 'not set');
+    } else if ('guidance' in input && 'image_path' in input) {
+      // FluxKontext input
+      payload = {
+        input: {
+          prompt: input.prompt,
+          image_path: input.image_path,
+          width: input.width,
+          height: input.height,
+          seed: input.seed,
+          guidance: input.guidance
+        }
+      };
+      
+      console.log('🎭 FluxKontext payload created:');
+      console.log('  - prompt:', payload.input.prompt);
+      console.log('  - image_path:', payload.input.image_path);
+      console.log('  - width:', payload.input.width);
+      console.log('  - height:', payload.input.height);
+      console.log('  - seed:', payload.input.seed);
+      console.log('  - guidance:', payload.input.guidance);
+    } else if ('guidance' in input && !('image_path' in input)) {
+      // FluxKrea input
+      payload = {
+        input: {
+          prompt: input.prompt,
+          width: input.width,
+          height: input.height,
+          seed: input.seed,
+          guidance: input.guidance,
+          ...(input.model && { model: input.model }),
+          ...(input.lora && { lora: input.lora })
+        }
+      };
+      
+      console.log('🎭 FluxKrea payload created:');
+      console.log('  - prompt:', payload.input.prompt);
+      console.log('  - width:', payload.input.width);
+      console.log('  - height:', payload.input.height);
+      console.log('  - seed:', payload.input.seed);
+      console.log('  - guidance:', payload.input.guidance);
+      if (payload.input.model) {
+        console.log('  - model:', payload.input.model);
+      }
+      if (payload.input.lora) {
+        console.log('  - lora:', payload.input.lora);
+        console.log('  - lora count:', payload.input.lora.length);
+      }
     } else if ('cfg' in input) {
       // Wan22 input
       payload = {
@@ -111,17 +175,25 @@ class RunPodService {
           width: input.width,
           height: input.height,
           seed: input.seed,
-          cfg: input.cfg
+          cfg: input.cfg,
+          length: input.length,
+          steps: input.steps, // steps로 변경
+          ...(input.lora_pairs && { lora_pairs: input.lora_pairs }) // LoRA pairs 추가
         }
       };
       
       console.log('🎭 Wan22 payload created:');
       console.log('  - prompt:', payload.input.prompt);
-      console.log('  - image_path:', `${payload.input.image_path.substring(0, 50)}... (${payload.input.image_path.length} characters)`);
+      console.log('  - image_path:', `[base64 data] (${payload.input.image_path.length} characters)`);
       console.log('  - width:', payload.input.width);
       console.log('  - height:', payload.input.height);
       console.log('  - seed:', payload.input.seed);
       console.log('  - cfg:', payload.input.cfg);
+      console.log('  - length:', payload.input.length);
+      console.log('  - steps:', payload.input.steps);
+      if (payload.input.lora_pairs) {
+        console.log('  - lora_pairs:', payload.input.lora_pairs);
+      }
     } else if ('wav_path' in input) {
       // InfiniteTalk input
       payload = {
@@ -148,42 +220,39 @@ class RunPodService {
       console.log('  - wav_path_2:', payload.input.wav_path_2 || 'not set');
       console.log('  - width:', payload.input.width);
       console.log('  - height:', payload.input.height);
-    } else {
-      // FluxKontext input
+    } else if ('task_type' in input && 'video_path' in input) {
+      // Video Upscale input
       payload = {
         input: {
-          prompt: input.prompt,
-          image_path: input.image_path,
-          width: input.width,
-          height: input.height,
-          seed: input.seed,
-          guidance: input.guidance
+          video_path: input.video_path,
+          task_type: input.task_type,
+          network_volume: true
         }
       };
+      
+      console.log('🎬 Video Upscale payload created:');
+      console.log('  - video_path:', payload.input.video_path);
+      console.log('  - task_type:', payload.input.task_type);
+      console.log('  - network_volume:', payload.input.network_volume);
     }
     
     const requestBody = JSON.stringify(payload);
-    console.log('📋 Request Body:', requestBody);
     
     try {
       const response = await fetch(`${this.baseUrl}/run`, {
         method: 'POST',
-        headers,
+        headers: this.getHeaders(),
         body: requestBody,
       });
 
-      console.log('📋 Response Status:', response.status);
-      console.log('📋 Response Headers:', Object.fromEntries(response.headers.entries()));
-
       const responseText = await response.text();
-      console.log('📋 Response Text:', responseText);
 
       if (!response.ok) {
         throw new Error(`RunPod API error: ${response.status} - ${responseText}`);
       }
 
       const data = JSON.parse(responseText);
-      console.log('✅ Job submitted successfully:', data);
+      console.log('✅ Job submitted successfully, ID:', data.id);
       
       if (!data.id) {
         throw new Error('RunPod API did not return a job ID');
@@ -197,7 +266,6 @@ class RunPodService {
   }
 
   async getJobStatus(jobId: string): Promise<RunPodJobResponse> {
-    console.log(`🔍 Checking job status: ${jobId}`);
     
     const response = await fetch(`${this.baseUrl}/status/${jobId}`, {
       method: 'GET',
@@ -210,31 +278,16 @@ class RunPodService {
     }
 
     const data = await response.json();
-    console.log(`📊 Job ${jobId} status:`, data.status);
     
-    // base64 데이터가 포함된 응답은 전체 출력하지 않음 (성능상 이유)
-    if (data.output) {
-      const outputKeys = Object.keys(data.output);
-      console.log(`📊 Job ${jobId} output keys:`, outputKeys);
+    // 상태가 변경되었을 때만 로그 출력
+    if (data.status === 'COMPLETED' || data.status === 'FAILED') {
+      console.log(`📊 Job ${jobId} status:`, data.status);
       
-      // base64 데이터가 있는지 확인하고 길이만 로그
-      if (data.output.image_base64) {
-        console.log(`🖼️ Job ${jobId} has image_base64 data, length:`, data.output.image_base64.length);
+      // 완료된 경우에만 간단한 출력 정보만 로그
+      if (data.status === 'COMPLETED' && data.output) {
+        const outputKeys = Object.keys(data.output);
+        console.log(`📊 Output keys:`, outputKeys);
       }
-      if (data.output.video_base64) {
-        console.log(`🎬 Job ${jobId} has video_base64 data, length:`, data.output.video_base64.length);
-      }
-      if (data.output.video && typeof data.output.video === 'string' && data.output.video.length > 100) {
-        console.log(`🎬 Job ${jobId} has video data, length:`, data.output.video.length);
-      }
-      if (data.output.mp4 && typeof data.output.mp4 === 'string' && data.output.mp4.length > 100) {
-        console.log(`🎬 Job ${jobId} has mp4 data, length:`, data.output.mp4.length);
-      }
-      if (data.output.result && typeof data.output.result === 'string' && data.output.result.length > 100) {
-        console.log(`🎬 Job ${jobId} has result data, length:`, data.output.result.length);
-      }
-    } else {
-      console.log(`📊 Job ${jobId} full response:`, JSON.stringify(data, null, 2));
     }
     
     return data;
@@ -261,7 +314,11 @@ class RunPodService {
       }
       
       if (status.status === 'IN_QUEUE' || status.status === 'IN_PROGRESS') {
-        console.log(`⏳ Job in progress... (${status.status})`);
+        // 진행 상황은 30초마다만 로그 출력
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        if (elapsed % 30 === 0) {
+          console.log(`⏳ Job in progress... (${status.status}) - ${elapsed}초 경과`);
+        }
         await new Promise(resolve => setTimeout(resolve, pollInterval));
         continue;
       }
