@@ -55,11 +55,20 @@ export default function Wan22Page() {
         console.log('📁 LoRA files loaded:', data.files);
         console.log('🔺 High files:', data.highFiles);
         console.log('🔻 Low files:', data.lowFiles);
+        
+        // S3 설정이 필요한 경우 메시지 표시
+        if (data.message && data.files.length === 0) {
+          setMessage({ type: 'error', text: data.message });
+        }
       } else {
         console.error('Failed to load LoRA files:', data.error);
+        if (data.message) {
+          setMessage({ type: 'error', text: data.message });
+        }
       }
     } catch (err) {
       console.error('❌ Error fetching LoRA files:', err);
+      setMessage({ type: 'error', text: 'LoRA 파일을 불러오는 중 오류가 발생했습니다.' });
     } finally {
       setLoraLoading(false);
     }
@@ -522,6 +531,9 @@ export default function Wan22Page() {
                 <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
                   <p className="text-blue-300 text-sm">
                     사용 가능한 LoRA 파일이 없습니다. 
+                    <a href="/settings" className="text-blue-200 hover:underline ml-1">
+                      설정 페이지
+                    </a>에서 S3 스토리지를 먼저 설정하거나, 
                     <a href="/s3-storage" className="text-blue-200 hover:underline ml-1">
                       S3 스토리지
                     </a>에서 .safetensors 파일을 업로드하세요.
