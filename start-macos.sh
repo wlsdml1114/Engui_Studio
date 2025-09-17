@@ -90,29 +90,12 @@ else
 fi
 echo ""
 
-# Production build
-echo "[INFO] Starting production build..."
-echo "[INFO] This process may take several minutes..."
-npm run build
-if [ $? -ne 0 ]; then
-    echo "[ERROR] Production build failed."
-    echo ""
-    echo "Solution:"
-    echo "1. Check TypeScript errors"
-    echo "2. Check ESLint errors"
-    echo "3. Check dependency versions"
-    echo ""
-    exit 1
-fi
-echo "[OK] Production build completed successfully."
-echo ""
-
-# Start production server
-echo "[INFO] Starting production server..."
+# Start development server
+echo "[INFO] Starting development server..."
 echo "[INFO] Browser will open automatically..."
 echo ""
 echo "========================================"
-echo "   Server started successfully!"
+echo "   Development server started successfully!"
 echo "   Check http://localhost:3000 in your browser"
 echo "========================================"
 echo ""
@@ -127,5 +110,5 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     xdg-open http://localhost:3000
 fi
 
-# Start production server
-npm start
+# Start development server
+npm run dev

@@ -263,13 +263,15 @@ Navigate to `/settings` in your browser
 - Run locally only to protect personal information
 - Recommend environment variable configuration for production
 
-## 🚀 Production Deployment
+## 🚀 Development Environment
 
-To run in production mode locally:
+This application is designed to run in development mode for optimal performance and ease of use:
+
 ```bash
-npm run build
-npm start
+npm run dev
 ```
+
+**Note**: This application uses development mode for the best user experience with static file serving and real-time updates.
 
 ## 🤝 Contributing
 

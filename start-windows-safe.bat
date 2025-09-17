@@ -93,30 +93,12 @@ if exist "prisma\db\database.db" (
 )
 echo.
 
-REM Production build
-echo [INFO] Starting production build...
-echo [INFO] This process may take several minutes...
-call npm run build
-if %errorlevel% neq 0 (
-    echo [ERROR] Production build failed.
-    echo.
-    echo Solution:
-    echo 1. Check TypeScript errors
-    echo 2. Check ESLint errors
-    echo 3. Check dependency versions
-    echo.
-    pause
-    exit /b 1
-)
-echo [OK] Production build completed successfully.
-echo.
-
-REM Start production server
-echo [INFO] Starting production server...
+REM Start development server
+echo [INFO] Starting development server...
 echo [INFO] Browser will open automatically...
 echo.
 echo ========================================
-echo    Server started successfully!
+echo    Development server started successfully!
 echo    Check http://localhost:3000 in your browser
 echo ========================================
 echo.
@@ -126,8 +108,8 @@ echo.
 REM Open browser
 start http://localhost:3000
 
-REM Start production server
-call npm start
+REM Start development server
+call npm run dev
 
 popd
 pause

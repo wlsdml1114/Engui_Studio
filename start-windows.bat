@@ -93,30 +93,12 @@ if exist "prisma\db\database.db" (
 )
 echo.
 
-REM 프로덕션 빌드
-echo [INFO] 프로덕션 빌드 시작...
-echo [INFO] 이 과정은 몇 분이 걸릴 수 있습니다...
-call npm run build
-if %errorlevel% neq 0 (
-    echo [ERROR] 프로덕션 빌드에 실패했습니다.
-    echo.
-    echo 해결 방법:
-    echo 1. TypeScript 오류를 확인하세요
-    echo 2. ESLint 오류를 확인하세요
-    echo 3. 의존성 버전을 확인하세요
-    echo.
-    pause
-    exit /b 1
-)
-echo [OK] 프로덕션 빌드가 완료되었습니다.
-echo.
-
-REM 프로덕션 서버 시작
-echo [INFO] 프로덕션 서버를 시작합니다...
+REM 개발 서버 시작
+echo [INFO] 개발 서버를 시작합니다...
 echo [INFO] 브라우저가 자동으로 열립니다...
 echo.
 echo ========================================
-echo    서버가 시작되었습니다!
+echo    개발 서버가 시작되었습니다!
 echo    브라우저에서 http://localhost:3000 을 확인하세요
 echo ========================================
 echo.
@@ -126,8 +108,8 @@ echo.
 REM 브라우저 열기
 start http://localhost:3000
 
-REM 프로덕션 서버 시작
-call npm start
+REM 개발 서버 시작
+call npm run dev
 
 popd
 pause

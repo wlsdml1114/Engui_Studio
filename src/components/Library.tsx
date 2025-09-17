@@ -99,10 +99,10 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
         const options = JSON.parse(item.options);
         console.log('🔍 WAN 2.2 options for thumbnail:', options);
         
-        // 로컬 웹 경로가 있으면 직접 사용 (프로덕션 환경 호환)
+        // 로컬 웹 경로가 있으면 직접 사용 (개발 환경)
         if (options.imageWebPath) {
           console.log('🖼️ Using local web path for WAN 2.2 thumbnail:', options.imageWebPath);
-          // 프로덕션 환경에서도 직접 경로 사용
+          // 개발 환경에서는 직접 경로 사용
           return options.imageWebPath;
         }
         
