@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title EnguiStudio Production Server Start
+title EnguiStudio Server Start
 
 echo.
 echo ========================================
-echo    EnguiStudio Production Server Start
+echo    EnguiStudio Server Start
 echo ========================================
 echo.
 

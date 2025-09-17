@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# EnguiStudio Production Server Start Script
+# EnguiStudio Server Start Script
 # For macOS and Linux
 
 echo ""
 echo "========================================"
-echo "   EnguiStudio Production Server Start"
+echo "   EnguiStudio Server Start"
 echo "========================================"
 echo ""
 

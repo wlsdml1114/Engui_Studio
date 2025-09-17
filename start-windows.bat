@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title EnguiStudio 프로덕션 서버 시작
+title EnguiStudio 서버 시작
 
 echo.
 echo ========================================
-echo    EnguiStudio 프로덕션 서버 시작
+echo    EnguiStudio 서버 시작
 echo ========================================
 echo.
 
