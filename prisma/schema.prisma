@@ -24,6 +24,9 @@ model Job {
   createdAt     DateTime  @default(now())
   completedAt   DateTime?
 
+  @@index([userId, createdAt(sort: Desc)]) // 사용자별 최신 순 정렬을 위한 복합 인덱스
+  @@index([userId, status]) // 사용자별 상태별 조회를 위한 인덱스
+  @@index([status, createdAt(sort: Desc)]) // 상태별 최신 순 정렬을 위한 인덱스
   @@map("jobs") // Map model name to table name
 }
 

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import useSWR from 'swr';
 import { XMarkIcon, PlayIcon, PhotoIcon, TrashIcon, StarIcon } from '@heroicons/react/24/outline';
 
@@ -928,13 +928,47 @@ export default function Library() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
-  const { data, error, isValidating, mutate } = useSWR('/api/jobs', fetcher, { 
-    refreshInterval: 1500, // 1.5초마다 새로고침 (매우 빠른 업데이트)
-    revalidateOnFocus: true, // 포커스 시 새로고침
-    revalidateOnReconnect: true, // 재연결 시 새로고침
-    dedupingInterval: 500, // 중복 요청 방지 간격 단축
-    onSuccess: () => setLastUpdate(new Date())
-  });
+  // 스마트 폴링을 위한 상태
+  const [hasProcessingJobs, setHasProcessingJobs] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
+
+  // 페이지네이션 상태
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const ITEMS_PER_PAGE = 20; // 한 번에 로드할 아이템 수
+
+  // 처리 중인 작업이 있을 때만 빠른 폴링, 없으면 느린 폴링
+  const refreshInterval = hasProcessingJobs ? 2000 : 10000; // 2초 또는 10초
+
+  const { data, error, isValidating, mutate } = useSWR(
+    `/api/jobs?page=${currentPage}&limit=${ITEMS_PER_PAGE}`, 
+    fetcher, 
+    { 
+      refreshInterval: isVisible ? refreshInterval : 0, // 탭이 보이지 않으면 폴링 중지
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      dedupingInterval: 1000, // 중복 요청 방지 간격 증가
+      onSuccess: (data) => {
+        setLastUpdate(new Date());
+        if (data?.pagination) {
+          setTotalPages(data.pagination.totalPages);
+        }
+        // 처리 중인 작업이 있는지 확인
+        const processingCount = data?.jobs?.filter((job: JobItem) => job.status === 'processing').length || 0;
+        setHasProcessingJobs(processingCount > 0);
+      }
+    }
+  );
+
+  // 페이지 가시성 감지
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsVisible(!document.hidden);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   const jobs: JobItem[] = data?.jobs || [];
   const processingJobs = jobs.filter(job => job.status === 'processing').length;
@@ -1068,6 +1102,48 @@ export default function Library() {
             ))
           )}
         </div>
+
+        {/* 페이지네이션 */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 p-4 border-t border-border">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 text-sm bg-secondary hover:bg-secondary/80 disabled:opacity-50 disabled:cursor-not-allowed rounded border border-border"
+            >
+              이전
+            </button>
+            
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                if (pageNum > totalPages) return null;
+                
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`px-3 py-1 text-sm rounded border ${
+                      currentPage === pageNum
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-secondary hover:bg-secondary/80 border-border'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+            
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 text-sm bg-secondary hover:bg-secondary/80 disabled:opacity-50 disabled:cursor-not-allowed rounded border border-border"
+            >
+              다음
+            </button>
+          </div>
+        )}
       </aside>
       
       {/* 결과 모달 */}

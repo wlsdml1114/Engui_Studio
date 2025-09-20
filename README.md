@@ -33,6 +33,9 @@ EnguiStudio is a platform that enables easy access to various open-source AI mod
 
 ## 🚀 Quick Start
 
+### 📺 Youtube Tutorial
+[![Video Label](http://img.youtube.com/vi/-0LYseEEx4M/0.jpg)](https://youtu.be/-0LYseEEx4M)
+
 ### ⚡ Super Easy Installation (Recommended)
 
 The easiest way to get started with EnguiStudio:

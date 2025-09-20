@@ -118,4 +118,28 @@ body {
     background: linear-gradient(180deg, rgba(99, 102, 241, 0.8), rgba(129, 140, 248, 0.8));
     box-shadow: 0 0 10px rgba(79, 70, 229, 0.3);
   }
+  
+  /* Issues 알림 숨기기 */
+  [class*="issues"], [class*="Issues"], 
+  [id*="issues"], [id*="Issues"],
+  [data-testid*="issues"], [data-testid*="Issues"] {
+    display: none !important;
+  }
+  
+  /* 알림 배지 숨기기 (일반적인 패턴) */
+  .notification-badge, .alert-badge, .issue-badge,
+  [class*="notification"], [class*="alert"], [class*="badge"] {
+    display: none !important;
+  }
+  
+  /* 특정 위치의 알림 숨기기 */
+  .fixed.bottom-4.left-4, .fixed.bottom-4.left-6,
+  .absolute.bottom-4.left-4, .absolute.bottom-4.left-6 {
+    display: none !important;
+  }
+  
+  /* 빨간색 알약 모양 요소 숨기기 */
+  [class*="pill"], [class*="tag"], [class*="chip"] {
+    display: none !important;
+  }
 }

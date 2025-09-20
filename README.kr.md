@@ -48,6 +48,9 @@ EnguiStudio는 RunPod Serverless 인프라를 활용하여 다양한 오픈소�
 
 ## 🚀 빠른 시작
 
+### 📺 유튜브 튜토리얼
+[![Video Label](http://img.youtube.com/vi/-0LYseEEx4M/0.jpg)](https://youtu.be/-0LYseEEx4M)
+
 ### ⚡ 초간단 설치법 (권장)
 
 EnguiStudio를 가장 쉽게 시작하는 방법:

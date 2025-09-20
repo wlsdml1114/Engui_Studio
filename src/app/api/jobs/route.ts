@@ -3,11 +3,19 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// 간단한 메모리 캐시 (프로덕션에서는 Redis 사용 권장)
+const cache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_DURATION = 5000; // 5초 캐시
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const jobId = searchParams.get('jobId');
     const userId = searchParams.get('userId') || 'user-with-settings';
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const skip = (page - 1) * limit;
+    const onlyProcessing = searchParams.get('onlyProcessing') === 'true';
 
     if (jobId) {
       // 특정 작업 조회
@@ -21,13 +29,60 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({ success: true, job });
     } else {
-      // 사용자의 모든 작업 조회
-      const jobs = await prisma.job.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-      });
+      // 캐시 키 생성
+      const cacheKey = `jobs-${userId}-${page}-${limit}-${onlyProcessing}`;
+      const cached = cache.get(cacheKey);
+      
+      // 캐시가 유효한지 확인
+      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        return NextResponse.json({ success: true, ...cached.data });
+      }
 
-      return NextResponse.json({ success: true, jobs });
+      // 쿼리 조건 구성
+      const whereCondition: any = { userId };
+      if (onlyProcessing) {
+        whereCondition.status = 'processing';
+      }
+
+      // 페이지네이션과 함께 작업 조회 (필요한 필드만 선택)
+      const [jobs, totalCount] = await Promise.all([
+        prisma.job.findMany({
+          where: whereCondition,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+          select: {
+            id: true,
+            status: true,
+            type: true,
+            prompt: true,
+            resultUrl: true,
+            thumbnailUrl: true,
+            createdAt: true,
+            completedAt: true,
+            isFavorite: true,
+            options: true, // 입력 이미지 정보를 위해 options 필드 포함
+          },
+        }),
+        prisma.job.count({ where: whereCondition })
+      ]);
+
+      const result = {
+        jobs,
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limit),
+          hasNextPage: page < Math.ceil(totalCount / limit),
+          hasPrevPage: page > 1,
+        }
+      };
+
+      // 캐시에 저장
+      cache.set(cacheKey, { data: result, timestamp: Date.now() });
+
+      return NextResponse.json({ success: true, ...result });
     }
   } catch (error) {
     console.error('Error fetching jobs:', error);
