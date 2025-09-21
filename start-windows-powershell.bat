@@ -11,17 +11,31 @@ echo.
 
 timeout /t 2 >nul
 
-REM Check if PowerShell execution policy allows script execution
-powershell -Command "Get-ExecutionPolicy" | findstr /i "Restricted" >nul
-if %errorlevel% equ 0 (
-    echo [WARNING] PowerShell execution policy is set to Restricted.
-    echo [INFO] This may prevent the script from running.
-    echo [INFO] You may need to run: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-    echo.
-    pause
-)
+REM Check current execution policy
+echo [INFO] Checking PowerShell execution policy...
+for /f "tokens=*" %%i in ('powershell -Command "Get-ExecutionPolicy"') do set current_policy=%%i
+echo [INFO] Current execution policy: %current_policy%
 
-REM Run PowerShell script
+REM Try to run with Bypass first
+echo [INFO] Attempting to run PowerShell script with execution policy bypass...
 powershell -ExecutionPolicy Bypass -File "start-windows.ps1"
+if %errorlevel% neq 0 (
+    echo [WARNING] Failed to run with Bypass policy.
+    echo [INFO] Trying to temporarily change execution policy...
+    
+    REM Try to set execution policy for current user
+    powershell -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force"
+    if %errorlevel% equ 0 (
+        echo [OK] Execution policy changed successfully.
+        echo [INFO] Running PowerShell script...
+        powershell -File "start-windows.ps1"
+    ) else (
+        echo [ERROR] Failed to change execution policy.
+        echo [INFO] Please run this command manually:
+        echo Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+        echo.
+        echo Or run the script as administrator.
+    )
+)
 
 pause
