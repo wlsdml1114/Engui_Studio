@@ -129,14 +129,30 @@ Write-Host ""
 
 # Check FFmpeg installation
 Write-Host "[INFO] Checking FFmpeg installation..." -ForegroundColor Green
+
+# First check if ffmpeg is in system PATH
 try {
     $ffmpegVersion = ffmpeg -version 2>$null
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "[OK] FFmpeg is installed." -ForegroundColor Green
+        Write-Host "[OK] FFmpeg is installed in system PATH." -ForegroundColor Green
+        $ffmpegInstalled = $true
     } else {
-        throw "FFmpeg not found"
+        $ffmpegInstalled = $false
     }
 } catch {
+    $ffmpegInstalled = $false
+}
+
+# Check if ffmpeg is in local ffmpeg folder
+if (-not $ffmpegInstalled) {
+    if (Test-Path "ffmpeg\ffmpeg.exe") {
+        Write-Host "[OK] FFmpeg is installed locally in ffmpeg folder." -ForegroundColor Green
+        $ffmpegInstalled = $true
+    }
+}
+
+# If not found, try to install
+if (-not $ffmpegInstalled) {
     Write-Host "[WARNING] FFmpeg is not installed." -ForegroundColor Yellow
     Write-Host ""
     Write-Host "FFmpeg is required for video thumbnail generation." -ForegroundColor Yellow
@@ -210,14 +226,18 @@ try {
             Write-Host "[INFO] Moving FFmpeg files to correct location..." -ForegroundColor Green
             foreach ($dir in $ffmpegDirs) {
                 if (Test-Path "$($dir.FullName)\bin\ffmpeg.exe") {
+                    Write-Host "[INFO] Moving files from $($dir.Name)..." -ForegroundColor Green
                     Move-Item "$($dir.FullName)\bin\*" "ffmpeg\" -Force
                     if (Test-Path "$($dir.FullName)\doc") {
+                        New-Item -ItemType Directory -Path "ffmpeg\doc" -Force | Out-Null
                         Move-Item "$($dir.FullName)\doc\*" "ffmpeg\doc\" -Force -ErrorAction SilentlyContinue
                     }
                     if (Test-Path "$($dir.FullName)\presets") {
+                        New-Item -ItemType Directory -Path "ffmpeg\presets" -Force | Out-Null
                         Move-Item "$($dir.FullName)\presets\*" "ffmpeg\presets\" -Force -ErrorAction SilentlyContinue
                     }
                     Remove-Item $dir.FullName -Recurse -Force
+                    Write-Host "[OK] FFmpeg files organized successfully." -ForegroundColor Green
                 }
             }
         }
@@ -227,7 +247,13 @@ try {
         
         Write-Host "[INFO] FFmpeg installation completed." -ForegroundColor Green
         Write-Host "[INFO] FFmpeg is available in the ffmpeg folder." -ForegroundColor Green
-        Write-Host ""
+        
+        # Verify installation
+        if (Test-Path "ffmpeg\ffmpeg.exe") {
+            Write-Host "[OK] FFmpeg executable verified: ffmpeg\ffmpeg.exe" -ForegroundColor Green
+        } else {
+            Write-Host "[WARNING] FFmpeg executable not found after installation." -ForegroundColor Yellow
+        }
     } catch {
         Write-Host "[ERROR] Failed to download FFmpeg: $($_.Exception.Message)" -ForegroundColor Red
         Write-Host ""

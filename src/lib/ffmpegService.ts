@@ -29,19 +29,21 @@ export class FFmpegService {
   private findFFmpegPath(): string {
     // Windows에서 ffmpeg 경로 찾기
     const possiblePaths = [
-      path.join(process.cwd(), 'ffmpeg', 'bin', 'ffmpeg.exe'),
-      path.join(process.cwd(), 'ffmpeg', 'ffmpeg.exe'),
-      'ffmpeg.exe',
-      'ffmpeg'
+      path.join(process.cwd(), 'ffmpeg', 'ffmpeg.exe'),  // 로컬 ffmpeg 폴더
+      path.join(process.cwd(), 'ffmpeg', 'bin', 'ffmpeg.exe'),  // 하위 bin 폴더
+      'ffmpeg.exe',  // 시스템 PATH
+      'ffmpeg'  // 시스템 PATH (확장자 없음)
     ];
 
     for (const ffmpegPath of possiblePaths) {
       if (fs.existsSync(ffmpegPath)) {
+        console.log(`[FFmpeg] Found FFmpeg at: ${ffmpegPath}`);
         return ffmpegPath;
       }
     }
 
     // 시스템 PATH에서 찾기
+    console.log('[FFmpeg] FFmpeg not found in local paths, trying system PATH');
     return 'ffmpeg';
   }
 
@@ -66,8 +68,16 @@ export class FFmpegService {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
+    // FFmpeg 경로 결정 (로컬 우선)
+    let ffmpegCommand = this.ffmpegPath;
+    const localPath = path.join(process.cwd(), 'ffmpeg', 'ffmpeg.exe');
+    if (fs.existsSync(localPath)) {
+      ffmpegCommand = localPath;
+      console.log(`[FFmpeg] Using local FFmpeg for thumbnail: ${localPath}`);
+    }
+
     // FFmpeg 명령어 구성
-    const command = `"${this.ffmpegPath}" -i "${inputPath}" -ss 00:00:01 -vframes 1 -vf "scale=${width}:${height}" -q:v ${quality} "${outputPath}"`;
+    const command = `"${ffmpegCommand}" -i "${inputPath}" -ss 00:00:01 -vframes 1 -vf "scale=${width}:${height}" -q:v ${quality} "${outputPath}"`;
 
     try {
       console.log(`[FFmpeg] Extracting thumbnail: ${inputPath} -> ${outputPath}`);
@@ -146,6 +156,18 @@ export class FFmpegService {
    */
   async isFFmpegAvailable(): Promise<boolean> {
     try {
+      // 먼저 로컬 경로에서 찾기
+      const localPath = path.join(process.cwd(), 'ffmpeg', 'ffmpeg.exe');
+      if (fs.existsSync(localPath)) {
+        console.log(`[FFmpeg] Using local FFmpeg: ${localPath}`);
+        await execAsync(`"${localPath}" -version`, {
+          timeout: 5000,
+          maxBuffer: 1024 * 1024
+        });
+        return true;
+      }
+
+      // 시스템 PATH에서 찾기
       await execAsync(`"${this.ffmpegPath}" -version`, {
         timeout: 5000,
         maxBuffer: 1024 * 1024

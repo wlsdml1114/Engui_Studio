@@ -73,13 +73,22 @@ echo.
 
 REM Check FFmpeg installation
 echo [INFO] Checking FFmpeg installation...
+
+REM First check if ffmpeg is in system PATH
 ffmpeg -version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [WARNING] FFmpeg is not installed.
-    echo [INFO] Installing FFmpeg automatically...
-    echo.
-    
-    if not exist "ffmpeg" mkdir ffmpeg
+if %errorlevel% equ 0 (
+    echo [OK] FFmpeg is installed in system PATH.
+    goto :ffmpeg_ok
+)
+
+REM Check if ffmpeg is in local ffmpeg folder
+if exist "ffmpeg\ffmpeg.exe" (
+    echo [OK] FFmpeg is installed locally in ffmpeg folder.
+    goto :ffmpeg_ok
+)
+
+REM If not found, try to install
+if not exist "ffmpeg" mkdir ffmpeg
     
     echo [INFO] Downloading FFmpeg...
     curl -L -o ffmpeg.zip "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
@@ -124,9 +133,8 @@ if %errorlevel% neq 0 (
         pause
         exit /b 1
     )
-) else (
-    echo [OK] FFmpeg is installed.
-)
+
+:ffmpeg_ok
 echo.
 
 REM Check dependencies installation
