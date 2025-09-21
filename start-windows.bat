@@ -39,53 +39,97 @@ if %errorlevel% neq 0 (
     echo [WARNING] AWS CLI is not installed.
     echo.
     echo AWS CLI is required for S3 storage functionality.
+    echo [INFO] Installing AWS CLI automatically...
     echo.
-    set /p install_aws="Do you want to install AWS CLI automatically? (y/n): "
-    if /i "%install_aws%"=="y" (
-        echo [INFO] Downloading AWS CLI installer...
-        powershell -Command "Invoke-WebRequest -Uri 'https://awscli.amazonaws.com/AWSCLIV2.msi' -OutFile 'AWSCLIV2.msi'"
-        if %errorlevel% neq 0 (
-            echo [ERROR] Failed to download AWS CLI installer.
-            echo.
-            echo Manual installation required:
-            echo 1. Download AWS CLI from https://awscli.amazonaws.com/AWSCLIV2.msi
-            echo 2. Run the installer
-            echo 3. Restart command prompt
-            echo.
-            pause
-            exit /b 1
-        )
-        
-        echo [INFO] Installing AWS CLI...
-        msiexec.exe /i AWSCLIV2.msi /quiet /norestart
-        if %errorlevel% neq 0 (
-            echo [ERROR] Failed to install AWS CLI.
-            echo.
-            echo Manual installation required:
-            echo 1. Run AWSCLIV2.msi manually
-            echo 2. Restart command prompt
-            echo.
-            pause
-            exit /b 1
-        )
-        
-        echo [INFO] Cleaning up installer...
-        del AWSCLIV2.msi
-        
-        echo [INFO] AWS CLI installation completed.
-        echo [INFO] Please restart this script to continue.
+    
+    echo [INFO] Downloading AWS CLI installer...
+    powershell -Command "Invoke-WebRequest -Uri 'https://awscli.amazonaws.com/AWSCLIV2.msi' -OutFile 'AWSCLIV2.msi'"
+    if %errorlevel% neq 0 (
+        echo [ERROR] Failed to download AWS CLI installer.
+        echo.
+        echo Manual installation required:
+        echo 1. Download AWS CLI from https://awscli.amazonaws.com/AWSCLIV2.msi
+        echo 2. Run the installer
+        echo 3. Restart command prompt
         echo.
         pause
-        exit /b 0
-    ) else (
-        echo [INFO] AWS CLI installation skipped.
-        echo.
-        echo Note: S3 storage features will not work without AWS CLI.
-        echo You can install it later from: https://awscli.amazonaws.com/AWSCLIV2.msi
-        echo.
+        exit /b 1
     )
+    
+    echo [INFO] Installing AWS CLI...
+    msiexec.exe /i AWSCLIV2.msi /quiet /norestart
+    if %errorlevel% neq 0 (
+        echo [ERROR] Failed to install AWS CLI.
+        echo.
+        echo Manual installation required:
+        echo 1. Run AWSCLIV2.msi manually
+        echo 2. Restart command prompt
+        echo.
+        pause
+        exit /b 1
+    )
+    
+    echo [INFO] Cleaning up installer...
+    del AWSCLIV2.msi
+    
+    echo [INFO] AWS CLI installation completed.
+    echo [INFO] Please restart this script to continue.
+    echo.
+    pause
+    exit /b 0
 ) else (
     echo [OK] AWS CLI is installed.
+)
+echo.
+
+REM Check FFmpeg installation
+echo [INFO] Checking FFmpeg installation...
+ffmpeg -version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [WARNING] FFmpeg is not installed.
+    echo.
+    echo FFmpeg is required for video thumbnail generation.
+    echo [INFO] Installing FFmpeg automatically...
+    echo.
+    
+    echo [INFO] Creating ffmpeg directory...
+    if not exist "ffmpeg" mkdir ffmpeg
+    
+    echo [INFO] Downloading FFmpeg...
+    powershell -Command "Invoke-WebRequest -Uri 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip' -OutFile 'ffmpeg.zip'"
+    if %errorlevel% neq 0 (
+        echo [ERROR] Failed to download FFmpeg.
+        echo.
+        echo Manual installation required:
+        echo 1. Download FFmpeg from https://www.gyan.dev/ffmpeg/builds/
+        echo 2. Extract to ffmpeg folder
+        echo 3. Add to PATH or use full path
+        echo.
+        pause
+        exit /b 1
+    )
+    
+    echo [INFO] Extracting FFmpeg...
+    powershell -Command "Expand-Archive -Path 'ffmpeg.zip' -DestinationPath 'ffmpeg' -Force"
+    if %errorlevel% neq 0 (
+        echo [ERROR] Failed to extract FFmpeg.
+        echo.
+        echo Manual extraction required:
+        echo 1. Extract ffmpeg.zip manually
+        echo 2. Move contents to ffmpeg folder
+        echo.
+        pause
+        exit /b 1
+    )
+    
+    echo [INFO] Cleaning up installer...
+    del ffmpeg.zip
+    
+    echo [INFO] FFmpeg installation completed.
+    echo [INFO] FFmpeg is available in the ffmpeg folder.
+    echo.
+) else (
+    echo [OK] FFmpeg is installed.
 )
 echo.
 

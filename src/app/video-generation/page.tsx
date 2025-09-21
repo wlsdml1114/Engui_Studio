@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { PhotoIcon, SparklesIcon, Cog6ToothIcon, PlayIcon, CpuChipIcon } from '@heroicons/react/24/outline';
+import { PhotoIcon, SparklesIcon, Cog6ToothIcon, PlayIcon, CpuChipIcon, FilmIcon } from '@heroicons/react/24/outline';
+import { thumbnailService, ThumbnailOptions } from '@/lib/thumbnailService';
 
 interface LoRAFile {
   key: string;
@@ -30,6 +31,11 @@ export default function Wan22Page() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [currentJobId, setCurrentJobId] = useState<string>('');
+  
+  // 썸네일 관련 상태
+  const [thumbnailStatus, setThumbnailStatus] = useState<{ ffmpegAvailable: boolean; supportedFormats: string[] } | null>(null);
+  const [isGeneratingThumbnail, setIsGeneratingThumbnail] = useState(false);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string>('');
   
   // LoRA 관련 상태
   const [loraFiles, setLoraFiles] = useState<LoRAFile[]>([]);
@@ -85,10 +91,21 @@ export default function Wan22Page() {
     setLoraPairs(newPairs);
   }, [loraCount]);
 
-  // 컴포넌트 마운트 시 LoRA 파일 목록 가져오기
+  // 컴포넌트 마운트 시 LoRA 파일 목록 가져오기 및 썸네일 상태 확인
   useEffect(() => {
     fetchLoraFiles();
+    checkThumbnailStatus();
   }, []);
+
+  // 썸네일 서비스 상태 확인
+  const checkThumbnailStatus = async () => {
+    try {
+      const status = await thumbnailService.getStatus();
+      setThumbnailStatus(status);
+    } catch (error) {
+      console.error('Failed to check thumbnail status:', error);
+    }
+  };
 
   // LoRA pair 설정 업데이트
   const updateLoraPair = (index: number, field: 'high' | 'low' | 'high_weight' | 'low_weight', value: string | number) => {
@@ -106,6 +123,46 @@ export default function Wan22Page() {
       setImageFile(file);
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
+      
+      // 비디오 파일인 경우 썸네일 생성
+      if (thumbnailService.isSupportedVideoFormat(file)) {
+        generateThumbnail(file);
+      } else {
+        setThumbnailUrl('');
+      }
+    }
+  };
+
+  // 썸네일 생성 함수
+  const generateThumbnail = async (file: File) => {
+    if (!thumbnailStatus?.ffmpegAvailable) {
+      setMessage({ type: 'error', text: 'FFmpeg가 설치되지 않았습니다. 썸네일 생성 기능을 사용하려면 FFmpeg를 설치해주세요.' });
+      return;
+    }
+
+    setIsGeneratingThumbnail(true);
+    setThumbnailUrl('');
+
+    try {
+      const options: ThumbnailOptions = {
+        width: 320,
+        height: 240,
+        quality: 80
+      };
+
+      const result = await thumbnailService.generateThumbnail(file, options);
+
+      if (result.success && result.thumbnail) {
+        setThumbnailUrl(result.thumbnail);
+        setMessage({ type: 'success', text: '비디오 썸네일이 성공적으로 생성되었습니다.' });
+      } else {
+        setMessage({ type: 'error', text: result.error || '썸네일 생성에 실패했습니다.' });
+      }
+    } catch (error) {
+      console.error('Thumbnail generation error:', error);
+      setMessage({ type: 'error', text: '썸네일 생성 중 오류가 발생했습니다.' });
+    } finally {
+      setIsGeneratingThumbnail(false);
     }
   };
 
@@ -180,9 +237,11 @@ export default function Wan22Page() {
     setPrompt('');
     setImageFile(null);
     setPreviewUrl('');
+    setThumbnailUrl('');
     setMessage(null);
     setCurrentJobId('');
     setIsGenerating(false);
+    setIsGeneratingThumbnail(false);
     
     // LoRA 상태 초기화
     setLoraCount(0);
@@ -231,44 +290,78 @@ export default function Wan22Page() {
               />
             </div>
 
-            {/* 이미지 업로드 */}
+            {/* 이미지/비디오 업로드 */}
             <div>
               <label className="block text-sm font-medium mb-2">
-                이미지 파일 <span className="text-red-400">*</span>
+                이미지/비디오 파일 <span className="text-red-400">*</span>
               </label>
               <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors">
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/*"
                   onChange={handleImageUpload}
                   className="hidden"
                   disabled={isGenerating}
                 />
                 {previewUrl ? (
                   <div className="space-y-4">
-                    <img 
-                      src={previewUrl} 
-                      alt="Preview" 
-                      className="max-w-full max-h-48 mx-auto rounded-lg"
-                    />
+                    <div className="relative">
+                      <img 
+                        src={previewUrl} 
+                        alt="Preview" 
+                        className="max-w-full max-h-48 mx-auto rounded-lg"
+                      />
+                      {/* 썸네일 생성 중 표시 */}
+                      {isGeneratingThumbnail && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
+                          <div className="text-white text-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+                            <p className="text-sm">썸네일 생성 중...</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* 생성된 썸네일 표시 */}
+                    {thumbnailUrl && (
+                      <div className="space-y-2">
+                        <p className="text-sm text-green-400 font-medium">생성된 썸네일:</p>
+                        <img 
+                          src={thumbnailUrl} 
+                          alt="Thumbnail" 
+                          className="max-w-full max-h-32 mx-auto rounded-lg border border-green-500"
+                        />
+                        <div className="flex gap-2 justify-center">
+                          <button
+                            type="button"
+                            onClick={() => thumbnailService.downloadThumbnail(thumbnailUrl, `thumbnail_${Date.now()}.jpg`)}
+                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors"
+                          >
+                            썸네일 다운로드
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
                     <button
                       type="button"
                       onClick={() => {
                         setImageFile(null);
                         setPreviewUrl('');
+                        setThumbnailUrl('');
                         if (fileInputRef.current) fileInputRef.current.value = '';
                       }}
                       className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
                     >
-                      이미지 제거
+                      파일 제거
                     </button>
                   </div>
                 ) : (
                   <>
                     <PhotoIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground mb-2">
-                      이미지 파일을 선택하거나 드래그하세요
+                      이미지 또는 비디오 파일을 선택하거나 드래그하세요
                     </p>
                     <button
                       type="button"
@@ -276,8 +369,25 @@ export default function Wan22Page() {
                       disabled={isGenerating}
                       className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors disabled:opacity-50"
                     >
-                      이미지 선택
+                      파일 선택
                     </button>
+                    
+                    {/* FFmpeg 상태 표시 */}
+                    {thumbnailStatus && (
+                      <div className="mt-4 p-3 rounded-lg border">
+                        <div className="flex items-center gap-2 mb-2">
+                          <FilmIcon className="w-4 h-4 text-blue-500" />
+                          <span className="text-sm font-medium">비디오 썸네일 기능</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          <p>FFmpeg 상태: {thumbnailStatus.ffmpegAvailable ? 
+                            <span className="text-green-400">사용 가능</span> : 
+                            <span className="text-red-400">설치 필요</span>
+                          }</p>
+                          <p>지원 형식: {thumbnailStatus.supportedFormats.join(', ')}</p>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
