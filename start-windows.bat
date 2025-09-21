@@ -43,17 +43,34 @@ if %errorlevel% neq 0 (
     echo.
     
     echo [INFO] Downloading AWS CLI installer...
-    powershell -Command "Invoke-WebRequest -Uri 'https://awscli.amazonaws.com/AWSCLIV2.msi' -OutFile 'AWSCLIV2.msi'"
-    if %errorlevel% neq 0 (
-        echo [ERROR] Failed to download AWS CLI installer.
-        echo.
-        echo Manual installation required:
-        echo 1. Download AWS CLI from https://awscli.amazonaws.com/AWSCLIV2.msi
-        echo 2. Run the installer
-        echo 3. Restart command prompt
-        echo.
-        pause
-        exit /b 1
+    echo [INFO] This may take a few minutes depending on your internet connection...
+    
+    REM Try bitsadmin first (most reliable on Windows)
+    bitsadmin /transfer "AWS CLI Download" /priority high "https://awscli.amazonaws.com/AWSCLIV2.msi" "AWSCLIV2.msi"
+    if %errorlevel% equ 0 (
+        echo [OK] AWS CLI installer downloaded successfully via bitsadmin.
+    ) else (
+        echo [WARNING] bitsadmin download failed, trying PowerShell...
+        powershell -Command "try { Invoke-WebRequest -Uri 'https://awscli.amazonaws.com/AWSCLIV2.msi' -OutFile 'AWSCLIV2.msi' -UseBasicParsing -TimeoutSec 300 } catch { Write-Host 'PowerShell download failed: ' $_.Exception.Message; exit 1 }"
+        if %errorlevel% equ 0 (
+            echo [OK] AWS CLI installer downloaded successfully via PowerShell.
+        ) else (
+            echo [WARNING] PowerShell download failed, trying curl...
+            curl -L -o AWSCLIV2.msi "https://awscli.amazonaws.com/AWSCLIV2.msi"
+            if %errorlevel% equ 0 (
+                echo [OK] AWS CLI installer downloaded successfully via curl.
+            ) else (
+                echo [ERROR] All download methods failed.
+                echo.
+                echo Manual installation required:
+                echo 1. Download AWS CLI from https://awscli.amazonaws.com/AWSCLIV2.msi
+                echo 2. Run the installer
+                echo 3. Restart command prompt
+                echo.
+                pause
+                exit /b 1
+            )
+        )
     )
     
     echo [INFO] Installing AWS CLI...
@@ -96,17 +113,34 @@ if %errorlevel% neq 0 (
     if not exist "ffmpeg" mkdir ffmpeg
     
     echo [INFO] Downloading FFmpeg...
-    powershell -Command "Invoke-WebRequest -Uri 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip' -OutFile 'ffmpeg.zip'"
-    if %errorlevel% neq 0 (
-        echo [ERROR] Failed to download FFmpeg.
-        echo.
-        echo Manual installation required:
-        echo 1. Download FFmpeg from https://www.gyan.dev/ffmpeg/builds/
-        echo 2. Extract to ffmpeg folder
-        echo 3. Add to PATH or use full path
-        echo.
-        pause
-        exit /b 1
+    echo [INFO] This may take several minutes depending on your internet connection...
+    
+    REM Try bitsadmin first (most reliable on Windows)
+    bitsadmin /transfer "FFmpeg Download" /priority high "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" "ffmpeg.zip"
+    if %errorlevel% equ 0 (
+        echo [OK] FFmpeg downloaded successfully via bitsadmin.
+    ) else (
+        echo [WARNING] bitsadmin download failed, trying PowerShell...
+        powershell -Command "try { Invoke-WebRequest -Uri 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip' -OutFile 'ffmpeg.zip' -UseBasicParsing -TimeoutSec 600 } catch { Write-Host 'PowerShell download failed: ' $_.Exception.Message; exit 1 }"
+        if %errorlevel% equ 0 (
+            echo [OK] FFmpeg downloaded successfully via PowerShell.
+        ) else (
+            echo [WARNING] PowerShell download failed, trying curl...
+            curl -L -o ffmpeg.zip "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+            if %errorlevel% equ 0 (
+                echo [OK] FFmpeg downloaded successfully via curl.
+            ) else (
+                echo [ERROR] All download methods failed.
+                echo.
+                echo Manual installation required:
+                echo 1. Download FFmpeg from https://www.gyan.dev/ffmpeg/builds/
+                echo 2. Extract to ffmpeg folder
+                echo 3. Add to PATH or use full path
+                echo.
+                pause
+                exit /b 1
+            )
+        )
     )
     
     echo [INFO] Extracting FFmpeg...
