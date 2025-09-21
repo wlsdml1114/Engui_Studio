@@ -99,19 +99,11 @@ if %errorlevel% neq 0 (
             echo 3. Restart command prompt after installation
             echo.
             echo The installer file is ready: AWSCLIV2.msi
-            echo.
-            set /p manual_install="Do you want to open the installer now? (y/n): "
-            if /i "%manual_install%"=="y" (
-                echo [INFO] Opening AWS CLI installer...
-                start AWSCLIV2.msi
-                echo [INFO] Please complete the installation and restart this script.
-                pause
-                exit /b 0
-            ) else (
-                echo [INFO] You can install AWS CLI later by running AWSCLIV2.msi
-                pause
-                exit /b 1
-            )
+            echo [INFO] Opening AWS CLI installer...
+            start AWSCLIV2.msi
+            echo [INFO] Please complete the installation and restart this script.
+            pause
+            exit /b 0
         )
     )
     
@@ -169,16 +161,56 @@ if %errorlevel% neq 0 (
     )
     
     echo [INFO] Extracting FFmpeg...
-    powershell -Command "Expand-Archive -Path 'ffmpeg.zip' -DestinationPath 'ffmpeg' -Force"
-    if %errorlevel% neq 0 (
-        echo [ERROR] Failed to extract FFmpeg.
-        echo.
-        echo Manual extraction required:
-        echo 1. Extract ffmpeg.zip manually
-        echo 2. Move contents to ffmpeg folder
-        echo.
-        pause
-        exit /b 1
+    
+    REM Try PowerShell Expand-Archive first
+    powershell -Command "try { Expand-Archive -Path 'ffmpeg.zip' -DestinationPath 'ffmpeg' -Force } catch { Write-Host 'PowerShell extraction failed: ' $_.Exception.Message; exit 1 }"
+    if %errorlevel% equ 0 (
+        echo [OK] FFmpeg extracted successfully via PowerShell.
+    ) else (
+        echo [WARNING] PowerShell extraction failed, trying tar...
+        tar -xf ffmpeg.zip -C ffmpeg
+        if %errorlevel% equ 0 (
+            echo [OK] FFmpeg extracted successfully via tar.
+        ) else (
+            echo [WARNING] Tar extraction failed, trying 7-Zip...
+            if exist "C:\Program Files\7-Zip\7z.exe" (
+                "C:\Program Files\7-Zip\7z.exe" x ffmpeg.zip -offmpeg
+                if %errorlevel% equ 0 (
+                    echo [OK] FFmpeg extracted successfully via 7-Zip.
+                ) else (
+                    echo [ERROR] All extraction methods failed.
+                    echo.
+                    echo Manual extraction required:
+                    echo 1. Extract ffmpeg.zip manually
+                    echo 2. Move contents to ffmpeg folder
+                    echo.
+                    pause
+                    exit /b 1
+                )
+            ) else (
+                echo [ERROR] All extraction methods failed.
+                echo.
+                echo Manual extraction required:
+                echo 1. Extract ffmpeg.zip manually
+                echo 2. Move contents to ffmpeg folder
+                echo.
+                pause
+                exit /b 1
+            )
+        )
+    )
+    
+    echo [INFO] Organizing FFmpeg files...
+    
+    REM Move FFmpeg files to the correct location
+    if exist "ffmpeg\ffmpeg-*\bin\ffmpeg.exe" (
+        echo [INFO] Moving FFmpeg files to correct location...
+        for /d %%i in (ffmpeg\ffmpeg-*) do (
+            move "%%i\bin\*" "ffmpeg\"
+            move "%%i\doc\*" "ffmpeg\doc\" 2>nul
+            move "%%i\presets\*" "ffmpeg\presets\" 2>nul
+            rmdir /s /q "%%i"
+        )
     )
     
     echo [INFO] Cleaning up installer...
