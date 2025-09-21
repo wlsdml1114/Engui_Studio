@@ -33,6 +33,8 @@ EnguiStudio is a platform that enables easy access to various open-source AI mod
 
 ## 🚀 Quick Start
 
+### You may need to run the script multiple times on your first launch due to AWS S3 and ffmpeg download/installation steps!
+
 ### 📺 Youtube Tutorial
 [![Video Label](http://img.youtube.com/vi/-0LYseEEx4M/0.jpg)](https://youtu.be/-0LYseEEx4M)
 
