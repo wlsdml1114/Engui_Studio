@@ -162,6 +162,25 @@ if %errorlevel% neq 0 (
     
     echo [INFO] Extracting FFmpeg...
     
+    REM Check if the downloaded file is valid
+    echo [INFO] Checking downloaded file...
+    if not exist "ffmpeg.zip" (
+        echo [ERROR] ffmpeg.zip file not found!
+        pause
+        exit /b 1
+    )
+    
+    REM Check file size
+    for %%A in (ffmpeg.zip) do set size=%%~zA
+    echo [INFO] Downloaded file size: %size% bytes
+    if %size% LSS 1000000 (
+        echo [ERROR] Downloaded file is too small (%size% bytes). Download may have failed.
+        echo [INFO] File contents:
+        type ffmpeg.zip
+        pause
+        exit /b 1
+    )
+    
     REM Try PowerShell Expand-Archive first
     powershell -Command "try { Expand-Archive -Path 'ffmpeg.zip' -DestinationPath 'ffmpeg' -Force } catch { Write-Host 'PowerShell extraction failed: ' $_.Exception.Message; exit 1 }"
     if %errorlevel% equ 0 (
@@ -172,7 +191,12 @@ if %errorlevel% neq 0 (
         if %errorlevel% equ 0 (
             echo [OK] FFmpeg extracted successfully via tar.
         ) else (
-            echo [WARNING] Tar extraction failed, trying 7-Zip...
+        echo [WARNING] Tar extraction failed, trying alternative PowerShell method...
+        powershell -Command "Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory('ffmpeg.zip', 'ffmpeg')"
+        if %errorlevel% equ 0 (
+            echo [OK] FFmpeg extracted successfully via alternative PowerShell method.
+        ) else (
+            echo [WARNING] Alternative PowerShell extraction failed, trying 7-Zip...
             if exist "C:\Program Files\7-Zip\7z.exe" (
                 "C:\Program Files\7-Zip\7z.exe" x ffmpeg.zip -offmpeg
                 if %errorlevel% equ 0 (
@@ -184,6 +208,8 @@ if %errorlevel% neq 0 (
                     echo 1. Extract ffmpeg.zip manually
                     echo 2. Move contents to ffmpeg folder
                     echo.
+                    echo Opening Windows Explorer to help with manual extraction...
+                    explorer .
                     pause
                     exit /b 1
                 )
@@ -194,9 +220,19 @@ if %errorlevel% neq 0 (
                 echo 1. Extract ffmpeg.zip manually
                 echo 2. Move contents to ffmpeg folder
                 echo.
-                pause
-                exit /b 1
+                echo Opening Windows Explorer to help with manual extraction...
+                explorer .
+                echo.
+                set /p continue_without_ffmpeg="Do you want to continue without FFmpeg? (y/n): "
+                if /i "%continue_without_ffmpeg%"=="y" (
+                    echo [INFO] Continuing without FFmpeg. Video thumbnail features will not be available.
+                    echo [INFO] You can install FFmpeg later manually.
+                ) else (
+                    pause
+                    exit /b 1
+                )
             )
+        )
         )
     )
     
