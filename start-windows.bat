@@ -32,6 +32,63 @@ if %errorlevel% neq 0 (
 echo [OK] Node.js is installed.
 echo.
 
+REM Check AWS CLI installation
+echo [INFO] Checking AWS CLI installation...
+aws --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [WARNING] AWS CLI is not installed.
+    echo.
+    echo AWS CLI is required for S3 storage functionality.
+    echo.
+    set /p install_aws="Do you want to install AWS CLI automatically? (y/n): "
+    if /i "%install_aws%"=="y" (
+        echo [INFO] Downloading AWS CLI installer...
+        powershell -Command "Invoke-WebRequest -Uri 'https://awscli.amazonaws.com/AWSCLIV2.msi' -OutFile 'AWSCLIV2.msi'"
+        if %errorlevel% neq 0 (
+            echo [ERROR] Failed to download AWS CLI installer.
+            echo.
+            echo Manual installation required:
+            echo 1. Download AWS CLI from https://awscli.amazonaws.com/AWSCLIV2.msi
+            echo 2. Run the installer
+            echo 3. Restart command prompt
+            echo.
+            pause
+            exit /b 1
+        )
+        
+        echo [INFO] Installing AWS CLI...
+        msiexec.exe /i AWSCLIV2.msi /quiet /norestart
+        if %errorlevel% neq 0 (
+            echo [ERROR] Failed to install AWS CLI.
+            echo.
+            echo Manual installation required:
+            echo 1. Run AWSCLIV2.msi manually
+            echo 2. Restart command prompt
+            echo.
+            pause
+            exit /b 1
+        )
+        
+        echo [INFO] Cleaning up installer...
+        del AWSCLIV2.msi
+        
+        echo [INFO] AWS CLI installation completed.
+        echo [INFO] Please restart this script to continue.
+        echo.
+        pause
+        exit /b 0
+    ) else (
+        echo [INFO] AWS CLI installation skipped.
+        echo.
+        echo Note: S3 storage features will not work without AWS CLI.
+        echo You can install it later from: https://awscli.amazonaws.com/AWSCLIV2.msi
+        echo.
+    )
+) else (
+    echo [OK] AWS CLI is installed.
+)
+echo.
+
 REM Check dependencies installation
 echo [INFO] Checking dependencies installation...
 if not exist "node_modules" (

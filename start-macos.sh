@@ -32,6 +32,66 @@ fi
 echo "[OK] Node.js is installed."
 echo ""
 
+# Check AWS CLI installation
+echo "[INFO] Checking AWS CLI installation..."
+if ! command -v aws &> /dev/null; then
+    echo "[WARNING] AWS CLI is not installed."
+    echo ""
+    echo "AWS CLI is required for S3 storage functionality."
+    echo ""
+    read -p "Do you want to install AWS CLI automatically? (y/n): " install_aws
+    if [[ $install_aws =~ ^[Yy]$ ]]; then
+        echo "[INFO] Checking Homebrew installation..."
+        if ! command -v brew &> /dev/null; then
+            echo "[INFO] Homebrew not found. Installing Homebrew..."
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            if [ $? -ne 0 ]; then
+                echo "[ERROR] Failed to install Homebrew."
+                echo ""
+                echo "Manual installation required:"
+                echo "1. Install Homebrew from https://brew.sh"
+                echo "2. Then install AWS CLI: brew install awscli"
+                echo ""
+                exit 1
+            fi
+            
+            # Add Homebrew to PATH for current session
+            if [[ -f "/opt/homebrew/bin/brew" ]]; then
+                eval "$(/opt/homebrew/bin/brew shellenv)"
+            elif [[ -f "/usr/local/bin/brew" ]]; then
+                eval "$(/usr/local/bin/brew shellenv)"
+            fi
+        fi
+        
+        echo "[INFO] Installing AWS CLI via Homebrew..."
+        brew install awscli
+        if [ $? -ne 0 ]; then
+            echo "[ERROR] Failed to install AWS CLI via Homebrew."
+            echo ""
+            echo "Manual installation required:"
+            echo "1. Install AWS CLI: brew install awscli"
+            echo "2. Or download from: https://awscli.amazonaws.com/AWSCLIV2.pkg"
+            echo ""
+            exit 1
+        fi
+        
+        echo "[INFO] AWS CLI installation completed."
+        echo "[INFO] Please restart this script to continue."
+        echo ""
+        exit 0
+    else
+        echo "[INFO] AWS CLI installation skipped."
+        echo ""
+        echo "Note: S3 storage features will not work without AWS CLI."
+        echo "You can install it later with: brew install awscli"
+        echo "Or download from: https://awscli.amazonaws.com/AWSCLIV2.pkg"
+        echo ""
+    fi
+else
+    echo "[OK] AWS CLI is installed."
+fi
+echo ""
+
 # Check dependencies installation
 echo "[INFO] Checking dependencies installation..."
 if [ ! -d "node_modules" ]; then
