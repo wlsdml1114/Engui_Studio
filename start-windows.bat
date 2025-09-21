@@ -12,6 +12,15 @@ timeout /t 2 >nul
 
 pushd "%~dp0"
 
+REM Check for administrator privileges
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [WARNING] This script is not running as administrator.
+    echo [INFO] Some installations may require administrator privileges.
+    echo [INFO] If installation fails, please run this script as administrator.
+    echo.
+)
+
 echo [INFO] Current directory: %CD%
 echo.
 
@@ -70,16 +79,40 @@ if %errorlevel% neq 0 (
     )
     
     echo [INFO] Installing AWS CLI...
+    echo [INFO] This may require administrator privileges...
+    
+    REM Try silent installation first
     msiexec.exe /i AWSCLIV2.msi /quiet /norestart
-    if %errorlevel% neq 0 (
-        echo [ERROR] Failed to install AWS CLI.
-        echo.
-        echo Manual installation required:
-        echo 1. Run AWSCLIV2.msi manually
-        echo 2. Restart command prompt
-        echo.
-        pause
-        exit /b 1
+    if %errorlevel% equ 0 (
+        echo [OK] AWS CLI installed successfully via silent installation.
+    ) else (
+        echo [WARNING] Silent installation failed, trying with UI...
+        msiexec.exe /i AWSCLIV2.msi /passive /norestart
+        if %errorlevel% equ 0 (
+            echo [OK] AWS CLI installed successfully via UI installation.
+        ) else (
+            echo [ERROR] All installation methods failed.
+            echo.
+            echo Manual installation required:
+            echo 1. Run AWSCLIV2.msi manually as administrator
+            echo 2. Or run this script as administrator
+            echo 3. Restart command prompt after installation
+            echo.
+            echo The installer file is ready: AWSCLIV2.msi
+            echo.
+            set /p manual_install="Do you want to open the installer now? (y/n): "
+            if /i "%manual_install%"=="y" (
+                echo [INFO] Opening AWS CLI installer...
+                start AWSCLIV2.msi
+                echo [INFO] Please complete the installation and restart this script.
+                pause
+                exit /b 0
+            ) else (
+                echo [INFO] You can install AWS CLI later by running AWSCLIV2.msi
+                pause
+                exit /b 1
+            )
+        )
     )
     
     echo [INFO] Cleaning up installer...
