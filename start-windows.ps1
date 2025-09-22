@@ -12,6 +12,14 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "   EnguiStudio Server Start" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
+Write-Host "This script will:" -ForegroundColor Green
+Write-Host "1. Check and install required dependencies (Node.js, AWS CLI, FFmpeg)" -ForegroundColor Yellow
+Write-Host "2. Set up the development environment" -ForegroundColor Yellow
+Write-Host "3. Start the development server" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "Note: If AWS CLI or FFmpeg needs to be installed," -ForegroundColor Cyan
+Write-Host "the script will exit after installation and need to be run again." -ForegroundColor Cyan
+Write-Host ""
 
 Start-Sleep -Seconds 2
 
@@ -80,26 +88,54 @@ try {
         Write-Host "[INFO] Installing AWS CLI..." -ForegroundColor Green
         Write-Host "[INFO] This may require administrator privileges..." -ForegroundColor Yellow
         
+        # Check if AWS CLI is already installed
+        try {
+            $existingVersion = aws --version 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "[INFO] AWS CLI is already installed: $existingVersion" -ForegroundColor Green
+                Write-Host "[INFO] Skipping installation." -ForegroundColor Green
+                Remove-Item $installerPath -Force
+                Write-Host "[INFO] Please restart this script to continue." -ForegroundColor Yellow
+                Read-Host "Press Enter to exit"
+                exit 0
+            }
+        } catch {
+            # Continue with installation
+        }
+        
         # Try silent installation first
-        Start-Process -FilePath "msiexec.exe" -ArgumentList "/i", $installerPath, "/quiet", "/norestart" -Wait
-        if ($LASTEXITCODE -eq 0) {
+        Write-Host "[INFO] Attempting silent installation..." -ForegroundColor Green
+        $silentProcess = Start-Process -FilePath "msiexec.exe" -ArgumentList "/i", $installerPath, "/quiet", "/norestart" -Wait -PassThru
+        if ($silentProcess.ExitCode -eq 0) {
             Write-Host "[OK] AWS CLI installed successfully via silent installation." -ForegroundColor Green
         } else {
-            Write-Host "[WARNING] Silent installation failed, trying with UI..." -ForegroundColor Yellow
-            Start-Process -FilePath "msiexec.exe" -ArgumentList "/i", $installerPath, "/passive", "/norestart" -Wait
-            if ($LASTEXITCODE -eq 0) {
+            Write-Host "[WARNING] Silent installation failed (Exit Code: $($silentProcess.ExitCode)), trying with UI..." -ForegroundColor Yellow
+            
+            # Try passive installation
+            Write-Host "[INFO] Attempting passive installation..." -ForegroundColor Green
+            $passiveProcess = Start-Process -FilePath "msiexec.exe" -ArgumentList "/i", $installerPath, "/passive", "/norestart" -Wait -PassThru
+            if ($passiveProcess.ExitCode -eq 0) {
                 Write-Host "[OK] AWS CLI installed successfully via UI installation." -ForegroundColor Green
             } else {
-                Write-Host "[ERROR] All installation methods failed." -ForegroundColor Red
+                Write-Host "[ERROR] All installation methods failed (Exit Code: $($passiveProcess.ExitCode))." -ForegroundColor Red
                 Write-Host ""
-                Write-Host "Manual installation required:" -ForegroundColor Yellow
-                Write-Host "1. Run AWSCLIV2.msi manually as administrator" -ForegroundColor Yellow
-                Write-Host "2. Or run this script as administrator" -ForegroundColor Yellow
-                Write-Host "3. Restart command prompt after installation" -ForegroundColor Yellow
+                Write-Host "Diagnostic information:" -ForegroundColor Yellow
+                Write-Host "- Installer file: $installerPath" -ForegroundColor Yellow
+                Write-Host "- File size: $((Get-Item $installerPath).Length) bytes" -ForegroundColor Yellow
+                Write-Host "- Running as admin: $isAdmin" -ForegroundColor Yellow
+                Write-Host "- Silent install exit code: $($silentProcess.ExitCode)" -ForegroundColor Yellow
+                Write-Host "- Passive install exit code: $($passiveProcess.ExitCode)" -ForegroundColor Yellow
+                Write-Host ""
+                Write-Host "Possible solutions:" -ForegroundColor Yellow
+                Write-Host "1. Run this script as administrator" -ForegroundColor Yellow
+                Write-Host "2. Run AWSCLIV2.msi manually as administrator" -ForegroundColor Yellow
+                Write-Host "3. Uninstall existing AWS CLI first" -ForegroundColor Yellow
+                Write-Host "4. Check Windows Event Viewer for detailed error" -ForegroundColor Yellow
+                Write-Host "5. Try downloading installer again" -ForegroundColor Yellow
                 Write-Host ""
                 Write-Host "[INFO] Opening AWS CLI installer..." -ForegroundColor Green
                 Start-Process $installerPath
-                Write-Host "[INFO] Please complete the installation and restart this script." -ForegroundColor Yellow
+                Write-Host "[INFO] Please complete the installation manually and restart this script." -ForegroundColor Yellow
                 Read-Host "Press Enter to exit"
                 exit 0
             }
@@ -109,9 +145,34 @@ try {
         Remove-Item $installerPath -Force
         
         Write-Host "[INFO] AWS CLI installation completed." -ForegroundColor Green
-        Write-Host "[INFO] Please restart this script to continue." -ForegroundColor Yellow
+        
+        # Verify installation
+        Write-Host "[INFO] Verifying AWS CLI installation..." -ForegroundColor Green
+        try {
+            $newVersion = aws --version 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "[OK] AWS CLI verified: $newVersion" -ForegroundColor Green
+            } else {
+                Write-Host "[WARNING] AWS CLI installation may not be complete." -ForegroundColor Yellow
+                Write-Host "[INFO] You may need to restart your command prompt or add AWS CLI to PATH." -ForegroundColor Yellow
+            }
+        } catch {
+            Write-Host "[WARNING] Could not verify AWS CLI installation." -ForegroundColor Yellow
+        }
+        
         Write-Host ""
-        Read-Host "Press Enter to exit"
+        Write-Host "========================================" -ForegroundColor Cyan
+        Write-Host "   AWS CLI Installation Complete!" -ForegroundColor Cyan
+        Write-Host "========================================" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Next steps:" -ForegroundColor Green
+        Write-Host "1. Close this window" -ForegroundColor Yellow
+        Write-Host "2. Run this script again to continue" -ForegroundColor Yellow
+        Write-Host "3. AWS CLI will be available in the new session" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "The script will now exit to allow PATH updates to take effect." -ForegroundColor Green
+        Write-Host ""
+        Read-Host "Press Enter to close this window"
         exit 0
     } catch {
         Write-Host "[ERROR] Failed to download AWS CLI installer: $($_.Exception.Message)" -ForegroundColor Red
@@ -254,6 +315,15 @@ if (-not $ffmpegInstalled) {
         } else {
             Write-Host "[WARNING] FFmpeg executable not found after installation." -ForegroundColor Yellow
         }
+        
+        Write-Host ""
+        Write-Host "========================================" -ForegroundColor Cyan
+        Write-Host "   FFmpeg Installation Complete!" -ForegroundColor Cyan
+        Write-Host "========================================" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "FFmpeg is now available locally in the ffmpeg folder." -ForegroundColor Green
+        Write-Host "The application will automatically detect and use it." -ForegroundColor Green
+        Write-Host ""
     } catch {
         Write-Host "[ERROR] Failed to download FFmpeg: $($_.Exception.Message)" -ForegroundColor Red
         Write-Host ""

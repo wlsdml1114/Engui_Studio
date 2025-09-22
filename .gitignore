@@ -70,3 +70,6 @@ Desktop.ini
 # Temporary files
 *.tmp
 *.temp
+
+# FFmpeg
+/ffmpeg
