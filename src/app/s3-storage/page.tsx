@@ -78,7 +78,13 @@ export default function S3StoragePage() {
       }
     } catch (error) {
       console.error('Failed to fetch files:', error);
-      setError('파일 목록을 가져올 수 없습니다.');
+      
+      // 502 에러인 경우 특별한 메시지 표시
+      if (error instanceof Error && error.message.includes('502')) {
+        setError('RunPod S3 서버가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.');
+      } else {
+        setError('파일 목록을 가져올 수 없습니다.');
+      }
     } finally {
       setIsLoading(false);
     }
