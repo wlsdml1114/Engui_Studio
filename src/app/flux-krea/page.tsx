@@ -31,7 +31,20 @@ export default function FluxKreaPage() {
   const fetchLoraFiles = async () => {
     try {
       setLoraLoading(true);
-      const response = await fetch('/api/s3-storage/loras');
+      
+      // 먼저 볼륨 목록을 가져와서 첫 번째 볼륨을 사용
+      const volumesResponse = await fetch('/api/s3-storage/volumes');
+      if (!volumesResponse.ok) {
+        throw new Error('볼륨 목록을 가져올 수 없습니다.');
+      }
+      const volumes = await volumesResponse.json();
+      
+      if (volumes.length === 0) {
+        throw new Error('사용 가능한 볼륨이 없습니다.');
+      }
+      
+      const volume = volumes[0].name;
+      const response = await fetch(`/api/s3-storage/loras?volume=${encodeURIComponent(volume)}`);
       const data = await response.json();
       
       if (data.success) {

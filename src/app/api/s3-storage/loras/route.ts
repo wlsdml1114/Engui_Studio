@@ -6,12 +6,27 @@ export async function GET(request: NextRequest) {
     try {
         console.log('🔍 Fetching LoRA files from S3...');
         
+        // URL 파라미터에서 볼륨 정보 가져오기
+        const { searchParams } = new URL(request.url);
+        const volume = searchParams.get('volume');
+        
+        if (!volume) {
+            console.log('⚠️ No volume specified. Returning empty LoRA list.');
+            return NextResponse.json({
+                success: true,
+                files: [],
+                highFiles: [],
+                lowFiles: [],
+                message: '볼륨이 지정되지 않았습니다. S3 Storage 페이지에서 볼륨을 선택해주세요.'
+            });
+        }
+        
         // 설정 서비스에서 S3 설정 가져오기
         const settingsService = new SettingsService();
         const { settings } = await settingsService.getSettings('user-with-settings');
         
         // S3 설정 확인
-        if (!settings.s3?.endpointUrl || !settings.s3?.accessKeyId || !settings.s3?.secretAccessKey || !settings.s3?.bucketName) {
+        if (!settings.s3?.endpointUrl || !settings.s3?.accessKeyId || !settings.s3?.secretAccessKey) {
             console.log('⚠️ S3 configuration is incomplete. Returning empty LoRA list.');
             return NextResponse.json({
                 success: true,
@@ -26,7 +41,7 @@ export async function GET(request: NextRequest) {
             endpointUrl: settings.s3.endpointUrl,
             accessKeyId: settings.s3.accessKeyId,
             secretAccessKey: settings.s3.secretAccessKey,
-            bucketName: settings.s3.bucketName,
+            bucketName: volume, // 동적으로 선택된 볼륨 사용
             region: settings.s3.region || 'us-east-1',
             timeout: settings.s3.timeout || 3600
         });
