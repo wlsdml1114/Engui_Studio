@@ -51,10 +51,8 @@ export default function FluxKreaPage() {
         setLoraFiles(data.files);
         console.log('📁 LoRA files loaded for FLUX KREA:', data.files);
         
-        // S3 설정이 필요한 경우 메시지 표시
-        if (data.message && data.files.length === 0) {
-          setMessage({ type: 'error', text: data.message });
-        }
+        // 성공적으로 목록을 가져왔으면 메시지 초기화
+        setMessage(null);
       } else {
         console.error('Failed to load LoRA files:', data.error);
         if (data.message) {

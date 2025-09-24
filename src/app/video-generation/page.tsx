@@ -75,10 +75,8 @@ export default function Wan22Page() {
         console.log('🔺 High files:', data.highFiles);
         console.log('🔻 Low files:', data.lowFiles);
         
-        // S3 설정이 필요한 경우 메시지 표시
-        if (data.message && data.files.length === 0) {
-          setMessage({ type: 'error', text: data.message });
-        }
+        // 성공적으로 목록을 가져왔으면 메시지 초기화
+        setMessage(null);
       } else {
         console.error('Failed to load LoRA files:', data.error);
         if (data.message) {
@@ -635,19 +633,19 @@ export default function Wan22Page() {
                       </div>
                     </div>
                   ))}
-                  
-                  {/* LoRA 파일 목록 새로고침 버튼 */}
-                  <div className="flex justify-end">
-                    <button
-                      onClick={fetchLoraFiles}
-                      disabled={loraLoading || isGenerating}
-                      className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:opacity-50 text-white rounded-md transition-colors text-sm"
-                    >
-                      {loraLoading ? '로딩 중...' : 'LoRA 목록 새로고침'}
-                    </button>
-                  </div>
                 </div>
               )}
+
+              {/* LoRA 목록 새로고침 버튼 */}
+              <div className="flex justify-end mt-4">
+                <button
+                  onClick={fetchLoraFiles}
+                  disabled={loraLoading || isGenerating}
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:opacity-50 text-white rounded-md transition-colors text-sm"
+                >
+                  {loraLoading ? '로딩 중...' : 'LoRA 목록 새로고침'}
+                </button>
+              </div>
 
               {/* LoRA 파일 목록 표시 (축소된 버전) */}
               {loraFiles.length === 0 && !loraLoading && (
