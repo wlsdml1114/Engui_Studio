@@ -91,6 +91,22 @@ export async function GET(request: NextRequest) {
         
     } catch (error) {
         console.error('❌ Error fetching LoRA files:', error);
+        
+        // 502 Bad Gateway 에러인 경우 특별한 메시지 제공
+        if (error instanceof Error && error.message.includes('502')) {
+            return NextResponse.json(
+                { 
+                    success: false,
+                    error: `RunPod S3 서버가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.`,
+                    files: [],
+                    highFiles: [],
+                    lowFiles: [],
+                    message: 'RunPod S3 서버가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.'
+                },
+                { status: 500 }
+            );
+        }
+        
         return NextResponse.json(
             { 
                 success: false,

@@ -39,6 +39,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ files });
   } catch (error) {
     console.error('Failed to fetch files:', error);
+    
+    // 502 Bad Gateway 에러인 경우 특별한 메시지 제공
+    if (error instanceof Error && error.message.includes('502')) {
+      return NextResponse.json(
+        { error: 'RunPod S3 서버가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.' },
+        { status: 500 }
+      );
+    }
+    
     return NextResponse.json(
       { error: '파일 목록을 가져올 수 없습니다.' },
       { status: 500 }
