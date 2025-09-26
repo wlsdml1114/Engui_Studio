@@ -20,6 +20,7 @@ interface ServiceConfig {
       'flux-kontext': string; // FLUX KONTEXT endpoint 추가
       'flux-krea': string; // FLUX KREA endpoint 추가
       wan22: string; // WAN 2.2 endpoint 추가
+      'wan-animate': string; // WAN Animate endpoint 추가
       'infinite-talk': string; // Infinite Talk endpoint 추가
       'video-upscale': string; // Video Upscale endpoint 추가
     };
@@ -64,6 +65,7 @@ export default function SettingsPage() {
         'flux-kontext': '', // FLUX KONTEXT endpoint 추가
         'flux-krea': '', // FLUX KREA endpoint 추가
         wan22: '', // WAN 2.2 endpoint 추가
+        'wan-animate': '', // WAN Animate endpoint 추가
         'infinite-talk': '', // Infinite Talk endpoint 추가
         'video-upscale': '' // Video Upscale endpoint 추가
       },
@@ -219,7 +221,7 @@ export default function SettingsPage() {
   };
 
   // Endpoint 테스트 함수
-  const testEndpoint = async (endpointType: 'multitalk' | 'flux-kontext' | 'flux-krea' | 'wan22' | 'infinite-talk' | 'video-upscale') => {
+  const testEndpoint = async (endpointType: 'multitalk' | 'flux-kontext' | 'flux-krea' | 'wan22' | 'wan-animate' | 'infinite-talk' | 'video-upscale') => {
     if (!settings.runpod?.apiKey || !settings.runpod?.endpoints?.[endpointType]) {
       return;
     }
@@ -537,6 +539,42 @@ export default function SettingsPage() {
                   )}
                   {testResults['wan22'].statusCode && (
                     <span className="ml-2">Status: {testResults['wan22'].statusCode}</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* WAN Animate Endpoint ID */}
+            <div>
+              <label className="block text-sm font-medium mb-2">WAN Animate Endpoint ID</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={settings.runpod?.endpoints?.['wan-animate'] || ''}
+                  onChange={(e) => updateSetting('runpod', 'endpoints', e.target.value, 'wan-animate')}
+                  placeholder="Enter WAN Animate endpoint ID"
+                  className="flex-1 p-2 border rounded-md bg-background"
+                />
+                <button
+                  onClick={() => testEndpoint('wan-animate')}
+                  disabled={!settings.runpod?.apiKey || !settings.runpod?.endpoints?.['wan-animate'] || testing['wan-animate']}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {testing['wan-animate'] ? 'Testing...' : 'Test'}
+                </button>
+              </div>
+              {testResults['wan-animate'] && (
+                <div className={`mt-2 p-2 rounded-md text-sm ${
+                  testResults['wan-animate'].success 
+                    ? 'bg-green-100 text-green-800 border border-green-200' 
+                    : 'bg-red-100 text-red-800 border border-red-200'
+                }`}>
+                  {testResults['wan-animate'].message}
+                  {testResults['wan-animate'].responseTime && (
+                    <span className="ml-2">({testResults['wan-animate'].responseTime}ms)</span>
+                  )}
+                  {testResults['wan-animate'].statusCode && (
+                    <span className="ml-2">Status: {testResults['wan-animate'].statusCode}</span>
                   )}
                 </div>
               )}

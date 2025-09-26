@@ -4,10 +4,11 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { VideoCameraIcon, ChatBubbleLeftRightIcon, CogIcon, SparklesIcon, MicrophoneIcon, CloudIcon, PhotoIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
+import { VideoCameraIcon, ChatBubbleLeftRightIcon, CogIcon, SparklesIcon, MicrophoneIcon, CloudIcon, PhotoIcon, ArrowUpIcon, PlayIcon } from '@heroicons/react/24/outline';
 
 const menuItems = [
   { href: '/video-generation', label: 'WAN 2.2', icon: VideoCameraIcon },
+  { href: '/wan-animate', label: 'WAN Animate', icon: PlayIcon },
   { href: '/video-upscale', label: 'Video Upscale', icon: ArrowUpIcon },
   { href: '/flux-kontext', label: 'FLUX KONTEXT', icon: SparklesIcon },
   { href: '/flux-krea', label: 'FLUX KREA', icon: PhotoIcon },

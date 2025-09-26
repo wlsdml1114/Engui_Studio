@@ -29,6 +29,7 @@ interface RunPodConfig {
     'flux-kontext': string; // FLUX KONTEXT endpoint 추가
     'flux-krea': string; // FLUX KREA endpoint 추가
     wan22: string; // WAN 2.2 endpoint 추가
+    'wan-animate': string; // WAN Animate endpoint 추가
     'infinite-talk': string; // Infinite Talk endpoint 추가
     'video-upscale': string; // Video Upscale endpoint 추가
   };
@@ -92,7 +93,7 @@ class SettingsService {
         isEncrypted: s.isEncrypted
       })));
 
-      const settings: any = {
+        const settings: any = {
         runpod: {
           apiKey: '',
           endpoints: {
@@ -102,6 +103,7 @@ class SettingsService {
             'flux-kontext': '', // FLUX KONTEXT endpoint 추가
             'flux-krea': '', // FLUX KREA endpoint 추가
             wan22: '', // WAN 2.2 endpoint 추가
+            'wan-animate': '', // WAN Animate endpoint 추가
             'infinite-talk': '', // Infinite Talk endpoint 추가
             'video-upscale': '' // Video Upscale endpoint 추가
           },
@@ -137,7 +139,7 @@ class SettingsService {
               settings.runpod.apiKey = value;
             } else             if (setting.configKey.startsWith('endpoints.')) {
               const endpointType = setting.configKey.split('.')[1];
-              if (endpointType && ['image', 'video', 'multitalk', 'flux-kontext', 'flux-krea', 'wan22', 'infinite-talk', 'video-upscale'].includes(endpointType)) {
+              if (endpointType && ['image', 'video', 'multitalk', 'flux-kontext', 'flux-krea', 'wan22', 'wan-animate', 'infinite-talk', 'video-upscale'].includes(endpointType)) {
                 settings.runpod.endpoints[endpointType as keyof typeof settings.runpod.endpoints] = value;
               }
             } else if (setting.configKey === 'generateTimeout') {
@@ -341,6 +343,7 @@ class SettingsService {
       'endpoints.flux-kontext',
       'endpoints.flux-krea',
       'endpoints.wan22',
+      'endpoints.wan-animate',
       'endpoints.infinite-talk',
       'endpoints.video-upscale'
       // generateTimeout은 선택적 설정이므로 상태 계산에서 제외

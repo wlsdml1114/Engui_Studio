@@ -1,0 +1,570 @@
+'use client';
+
+import { useState, useRef } from 'react';
+import { PhotoIcon, PlayIcon, Cog6ToothIcon, FilmIcon, SparklesIcon } from '@heroicons/react/24/outline';
+
+export default function WanAnimatePage() {
+  const [prompt, setPrompt] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string>('');
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [currentJobId, setCurrentJobId] = useState<string>('');
+  
+  // 추가 설정값들
+  const [seed, setSeed] = useState(-1);
+  const [cfg, setCfg] = useState(1.0);
+  const [steps, setSteps] = useState(6);
+  const [width, setWidth] = useState(512);
+  const [height, setHeight] = useState(512);
+  
+  // 인물 선택 관련 상태
+  const [showPersonSelection, setShowPersonSelection] = useState(false);
+  const [firstFrameImage, setFirstFrameImage] = useState<string>('');
+  const [selectedPoints, setSelectedPoints] = useState<Array<{x: number, y: number}>>([]);
+  
+  // 비디오 크기 및 FPS 정보
+  const [originalVideoSize, setOriginalVideoSize] = useState<{width: number, height: number} | null>(null);
+  const [videoFps, setVideoFps] = useState<number | null>(null);
+  
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const url = URL.createObjectURL(file);
+      setImagePreviewUrl(url);
+    }
+  };
+
+  const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setVideoFile(file);
+      const url = URL.createObjectURL(file);
+      setVideoPreviewUrl(url);
+      
+      // 첫 번째 프레임 추출
+      extractFirstFrame(url);
+    }
+  };
+
+  const extractFirstFrame = (videoUrl: string) => {
+    const video = document.createElement('video');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    video.addEventListener('loadedmetadata', () => {
+      // 원본 비디오 크기 저장
+      setOriginalVideoSize({
+        width: video.videoWidth,
+        height: video.videoHeight
+      });
+      
+      // FPS 추출 (duration과 frameCount를 이용한 근사치)
+      // 정확한 FPS는 브라우저에서 직접 접근할 수 없으므로 duration 기반으로 추정
+      const duration = video.duration;
+      if (duration && duration > 0) {
+        // 일반적인 FPS 값들 중에서 가장 가까운 값으로 추정
+        const commonFps = [24, 25, 30, 50, 60];
+        let estimatedFps = 30; // 기본값
+        
+        // duration이 짧으면 높은 FPS일 가능성이 높음
+        if (duration < 1) {
+          estimatedFps = 60;
+        } else if (duration < 3) {
+          estimatedFps = 30;
+        } else {
+          estimatedFps = 24;
+        }
+        
+        setVideoFps(estimatedFps);
+        console.log(`🎬 비디오 정보: ${video.videoWidth}x${video.videoHeight}, 추정 FPS: ${estimatedFps}, Duration: ${duration}s`);
+      }
+      
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      video.addEventListener('seeked', () => {
+        if (ctx) {
+          ctx.drawImage(video, 0, 0);
+          const imageDataUrl = canvas.toDataURL('image/png');
+          setFirstFrameImage(imageDataUrl);
+        }
+      });
+      
+      video.currentTime = 0.1; // 첫 번째 프레임으로 이동
+    });
+    
+    video.src = videoUrl;
+    video.load();
+  };
+
+  const clearImage = () => {
+    setImageFile(null);
+    setImagePreviewUrl('');
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
+  };
+
+  const clearVideo = () => {
+    setVideoFile(null);
+    setVideoPreviewUrl('');
+    setFirstFrameImage('');
+    setShowPersonSelection(false);
+    setSelectedPoints([]);
+    setOriginalVideoSize(null);
+    setVideoFps(null);
+    if (videoInputRef.current) {
+      videoInputRef.current.value = '';
+    }
+  };
+
+  const handlePersonSelection = () => {
+    if (firstFrameImage) {
+      setShowPersonSelection(true);
+    }
+  };
+
+  const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
+    if (!showPersonSelection) return;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    // 픽셀 좌표로 계산 (원본 이미지 크기 기준)
+    const x = ((e.clientX - rect.left) / rect.width) * (originalVideoSize?.width || rect.width);
+    const y = ((e.clientY - rect.top) / rect.height) * (originalVideoSize?.height || rect.height);
+    
+    setSelectedPoints(prev => [...prev, { x, y }]);
+    
+    console.log('📍 클릭된 좌표:', { x, y });
+    console.log('📍 이미지 크기:', { width: rect.width, height: rect.height });
+    console.log('📍 원본 비디오 크기:', originalVideoSize);
+  };
+
+  const removePoint = (index: number) => {
+    setSelectedPoints(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const finishPersonSelection = () => {
+    setShowPersonSelection(false);
+  };
+
+  // 좌표를 출력 크기에 맞게 조정하는 함수
+  const adjustCoordinatesToOutputSize = (points: Array<{x: number, y: number}>) => {
+    if (!originalVideoSize) return points;
+    
+    const scaleX = width / originalVideoSize.width;
+    const scaleY = height / originalVideoSize.height;
+    
+    const adjustedPoints = points.map(point => ({
+      x: point.x * scaleX,
+      y: point.y * scaleY
+    }));
+    
+    console.log('🔧 좌표 조정:', {
+      원본비디오크기: originalVideoSize,
+      출력크기: { width, height },
+      스케일: { scaleX, scaleY },
+      원본좌표: points,
+      조정된좌표: adjustedPoints
+    });
+    
+    return adjustedPoints;
+  };
+
+  const generateVideo = async () => {
+    if (!imageFile && !videoFile) {
+      setMessage({ type: 'error', text: '이미지 또는 비디오 파일을 업로드해주세요.' });
+      return;
+    }
+
+    if (!prompt.trim()) {
+      setMessage({ type: 'error', text: '프롬프트를 입력해주세요.' });
+      return;
+    }
+
+    try {
+      setIsGenerating(true);
+      setMessage(null);
+
+      const formData = new FormData();
+      formData.append('prompt', prompt);
+      formData.append('seed', seed.toString());
+      formData.append('cfg', cfg.toString());
+      formData.append('steps', steps.toString());
+      formData.append('width', width.toString());
+      formData.append('height', height.toString());
+      // 비디오 FPS 추가 (기본값 30으로 설정)
+      const fpsToSend = videoFps || 30;
+      formData.append('fps', fpsToSend.toString());
+      console.log('🎬 FPS 전송:', fpsToSend, '(원본:', videoFps, ')');
+      // 선택된 포인트들을 올바른 형식으로 변환하여 전송
+      if (selectedPoints.length > 0) {
+        // 좌표를 출력 크기에 맞게 조정
+        const adjustedPoints = adjustCoordinatesToOutputSize(selectedPoints);
+        
+        // points_store 형식: {"positive": [...], "negative": [...]}
+        const pointsStore = {
+          positive: adjustedPoints,
+          negative: [{ x: 0, y: 0 }] // 기본값
+        };
+        formData.append('points_store', JSON.stringify(pointsStore));
+        
+        // coordinates 형식: [{"x": ..., "y": ...}, ...]
+        formData.append('coordinates', JSON.stringify(adjustedPoints));
+        
+        // neg_coordinates는 빈 배열
+        formData.append('neg_coordinates', JSON.stringify([]));
+        
+        console.log('📍 전송할 포인트 데이터:');
+        console.log('  - 원본 비디오 크기:', originalVideoSize);
+        console.log('  - 출력 크기:', { width, height });
+        console.log('  - 원본 포인트:', selectedPoints);
+        console.log('  - 조정된 포인트:', adjustedPoints);
+        console.log('  - points_store:', JSON.stringify(pointsStore));
+        console.log('  - coordinates:', JSON.stringify(adjustedPoints));
+      }
+      
+      if (imageFile) {
+        formData.append('image', imageFile);
+      }
+      
+      if (videoFile) {
+        formData.append('video', videoFile);
+      }
+
+      const response = await fetch('/api/wan-animate', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setCurrentJobId(data.jobId);
+        setMessage({ type: 'success', text: `비디오 생성이 시작되었습니다. Job ID: ${data.jobId}` });
+      } else {
+        setMessage({ type: 'error', text: data.error || '비디오 생성에 실패했습니다.' });
+      }
+    } catch (error) {
+      console.error('Error generating video:', error);
+      setMessage({ type: 'error', text: '비디오 생성 중 오류가 발생했습니다.' });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background p-6 overflow-y-auto custom-scrollbar">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex items-center gap-3 mb-8">
+          <PlayIcon className="w-8 h-8 text-primary" />
+          <h1 className="text-3xl font-bold">WAN Animate</h1>
+        </div>
+
+        {message && (
+          <div className={`mb-6 p-4 rounded-lg ${
+            message.type === 'success' 
+              ? 'bg-green-900/50 border border-green-500 text-green-200' 
+              : 'bg-red-900/50 border border-red-500 text-red-200'
+          }`}>
+            {message.text}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* 입력 섹션 */}
+          <div className="space-y-6">
+            {/* 프롬프트 입력 */}
+            <div className="bg-secondary p-6 rounded-lg border border-border">
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                <SparklesIcon className="w-5 h-5 text-primary" />
+                프롬프트
+              </h2>
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="원하는 애니메이션을 설명하는 프롬프트를 입력하세요..."
+                className="w-full h-32 p-3 border rounded-md bg-background resize-none"
+              />
+            </div>
+
+            {/* 이미지 업로드 */}
+            <div className="bg-secondary p-6 rounded-lg border border-border">
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                <PhotoIcon className="w-5 h-5 text-primary" />
+                이미지 업로드
+              </h2>
+              
+              <div className="space-y-4">
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageFileChange}
+                  className="hidden"
+                />
+                
+                <button
+                  onClick={() => imageInputRef.current?.click()}
+                  className="w-full p-4 border-2 border-dashed border-border rounded-lg hover:border-primary transition-colors flex items-center justify-center gap-2"
+                >
+                  <PhotoIcon className="w-6 h-6" />
+                  이미지 파일 선택
+                </button>
+
+                {imagePreviewUrl && (
+                  <div className="relative">
+                    <img
+                      src={imagePreviewUrl}
+                      alt="Preview"
+                      className="w-full h-48 object-cover rounded-lg"
+                    />
+                    <button
+                      onClick={clearImage}
+                      className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 비디오 업로드 */}
+            <div className="bg-secondary p-6 rounded-lg border border-border">
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                <FilmIcon className="w-5 h-5 text-primary" />
+                비디오 업로드
+              </h2>
+              
+              <div className="space-y-4">
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/*"
+                  onChange={handleVideoFileChange}
+                  className="hidden"
+                />
+                
+                <button
+                  onClick={() => videoInputRef.current?.click()}
+                  className="w-full p-4 border-2 border-dashed border-border rounded-lg hover:border-primary transition-colors flex items-center justify-center gap-2"
+                >
+                  <FilmIcon className="w-6 h-6" />
+                  비디오 파일 선택
+                </button>
+
+                {videoPreviewUrl && (
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <video
+                        src={videoPreviewUrl}
+                        controls
+                        className="w-full h-48 object-cover rounded-lg"
+                      />
+                      <button
+                        onClick={clearVideo}
+                        className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    
+                    {firstFrameImage && (
+                      <div className="space-y-2">
+                        <button
+                          onClick={handlePersonSelection}
+                          className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                        >
+                          인물 선택
+                        </button>
+                        
+                        {showPersonSelection && (
+                          <div className="space-y-2">
+                            <p className="text-sm text-muted-foreground">
+                              이미지를 클릭하여 포인트를 선택하세요
+                            </p>
+                            <div className="relative">
+                              <img
+                                src={firstFrameImage}
+                                alt="First Frame"
+                                className="w-full h-48 object-cover rounded-lg cursor-crosshair"
+                                onClick={handleImageClick}
+                              />
+                              {selectedPoints.map((point, index) => {
+                                // 픽셀 좌표를 화면 표시용 퍼센트로 변환
+                                const displayX = (point.x / (originalVideoSize?.width || 1)) * 100;
+                                const displayY = (point.y / (originalVideoSize?.height || 1)) * 100;
+                                
+                                return (
+                                  <div
+                                    key={index}
+                                    className="absolute w-4 h-4 bg-red-500 rounded-full border-2 border-white transform -translate-x-2 -translate-y-2 cursor-pointer"
+                                    style={{
+                                      left: `${displayX}%`,
+                                      top: `${displayY}%`
+                                    }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      removePoint(index);
+                                    }}
+                                  />
+                                );
+                              })}
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={finishPersonSelection}
+                                className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                              >
+                                선택 완료 ({selectedPoints.length}개 포인트)
+                              </button>
+                              <button
+                                onClick={() => setSelectedPoints([])}
+                                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                              >
+                                초기화
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 생성 버튼 */}
+            <button
+              onClick={generateVideo}
+              disabled={isGenerating || (!imageFile && !videoFile) || !prompt.trim()}
+              className="w-full py-4 bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              {isGenerating ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  생성 중...
+                </>
+              ) : (
+                <>
+                  <PlayIcon className="w-5 h-5" />
+                  애니메이션 생성
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* 고급 설정 섹션 */}
+          <div className="space-y-6">
+            {/* 고급 설정 */}
+            <div className="bg-secondary p-6 rounded-lg border border-border">
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                <Cog6ToothIcon className="w-5 h-5 text-primary" />
+                고급 설정
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Seed */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Seed</label>
+                  <input
+                    type="number"
+                    value={seed}
+                    onChange={(e) => setSeed(parseInt(e.target.value) || -1)}
+                    placeholder="-1 (랜덤)"
+                    className="w-full p-2 border rounded-md bg-background"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">-1은 랜덤 시드</p>
+                </div>
+
+                {/* CFG */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">CFG Scale</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={cfg}
+                    onChange={(e) => setCfg(parseFloat(e.target.value) || 1.0)}
+                    placeholder="1.0"
+                    className="w-full p-2 border rounded-md bg-background"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">프롬프트 준수도 (1.0-20.0)</p>
+                </div>
+
+                {/* Steps */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Steps</label>
+                  <input
+                    type="number"
+                    value={steps}
+                    onChange={(e) => setSteps(parseInt(e.target.value) || 6)}
+                    placeholder="6"
+                    className="w-full p-2 border rounded-md bg-background"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">생성 단계 수</p>
+                </div>
+
+                {/* Width */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Width</label>
+                  <input
+                    type="number"
+                    value={width}
+                    onChange={(e) => setWidth(parseInt(e.target.value) || 512)}
+                    placeholder="512"
+                    className="w-full p-2 border rounded-md bg-background"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    출력 비디오 너비
+                    {originalVideoSize && (
+                      <span className="text-blue-400 ml-2">
+                        (원본: {originalVideoSize.width}px)
+                      </span>
+                    )}
+                  </p>
+                </div>
+
+                {/* Height */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Height</label>
+                  <input
+                    type="number"
+                    value={height}
+                    onChange={(e) => setHeight(parseInt(e.target.value) || 512)}
+                    placeholder="512"
+                    className="w-full p-2 border rounded-md bg-background"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    출력 비디오 높이
+                    {originalVideoSize && (
+                      <span className="text-blue-400 ml-2">
+                        (원본: {originalVideoSize.height}px)
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 사용 안내 */}
+            <div className="bg-blue-900/30 border border-blue-500/50 p-6 rounded-lg">
+              <h3 className="text-lg font-semibold mb-3 text-blue-300">사용 안내</h3>
+              <div className="space-y-2 text-sm text-blue-200">
+                <p>• 비디오 업로드 시 "인물 선택" 버튼으로 포인트를 지정할 수 있습니다.</p>
+                <p>• 이미지를 클릭하여 원하는 위치에 포인트를 추가하세요.</p>
+                <p>• 포인트를 클릭하면 삭제할 수 있습니다.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

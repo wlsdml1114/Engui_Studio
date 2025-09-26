@@ -53,6 +53,25 @@ interface Wan22Input {
   }>;
 }
 
+interface WanAnimateInput {
+  prompt: string;
+  image_path?: string;
+  video_path?: string;
+  positive_prompt: string;
+  seed: number;
+  cfg: number;
+  steps: number;
+  width: number;
+  height: number;
+  fps?: number;
+  points_store: {
+    positive: Array<{x: number, y: number}>;
+    negative: Array<{x: number, y: number}>;
+  };
+  coordinates: Array<{x: number, y: number}>;
+  neg_coordinates: Array<{x: number, y: number}>;
+}
+
 interface InfiniteTalkInput {
   prompt: string;
   input_type: string; // "image" 또는 "video"
@@ -70,7 +89,7 @@ interface VideoUpscaleInput {
   video_path: string; // S3 경로
 }
 
-type RunPodInput = MultiTalkInput | FluxKontextInput | FluxKreaInput | Wan22Input | InfiniteTalkInput | VideoUpscaleInput;
+type RunPodInput = MultiTalkInput | FluxKontextInput | FluxKreaInput | Wan22Input | WanAnimateInput | InfiniteTalkInput | VideoUpscaleInput;
 
 class RunPodService {
   private apiKey: string;
@@ -166,6 +185,40 @@ class RunPodService {
         console.log('  - lora:', payload.input.lora);
         console.log('  - lora count:', payload.input.lora.length);
       }
+    } else if ('cfg' in input && 'points_store' in input) {
+      // WanAnimate input
+      payload = {
+        input: {
+          prompt: input.prompt,
+          positive_prompt: input.positive_prompt,
+          seed: input.seed,
+          cfg: input.cfg,
+          steps: input.steps,
+          width: input.width,
+          height: input.height,
+          ...(input.fps && { fps: input.fps }),
+          points_store: input.points_store,
+          coordinates: input.coordinates,
+          neg_coordinates: input.neg_coordinates,
+          ...(input.image_path && { image_path: input.image_path }),
+          ...(input.video_path && { video_path: input.video_path })
+        }
+      };
+      
+      console.log('🎭 WanAnimate payload created:');
+      console.log('  - prompt:', payload.input.prompt);
+      console.log('  - positive_prompt:', payload.input.positive_prompt);
+      console.log('  - seed:', payload.input.seed);
+      console.log('  - cfg:', payload.input.cfg);
+      console.log('  - steps:', payload.input.steps);
+      console.log('  - width:', payload.input.width);
+      console.log('  - height:', payload.input.height);
+      console.log('  - fps:', payload.input.fps || 'not set');
+      console.log('  - points_store:', payload.input.points_store);
+      console.log('  - coordinates:', payload.input.coordinates);
+      console.log('  - neg_coordinates:', payload.input.neg_coordinates);
+      console.log('  - image_path:', payload.input.image_path || 'not set');
+      console.log('  - video_path:', payload.input.video_path || 'not set');
     } else if ('cfg' in input) {
       // Wan22 input
       payload = {
