@@ -9,7 +9,7 @@ interface JobItem {
   id: string;
   userId: string;
   status: 'processing' | 'completed' | 'failed';
-  type: 'video' | 'multitalk' | 'flux-kontext' | 'flux-krea' | 'wan22' | 'infinitetalk';
+  type: 'video' | 'multitalk' | 'flux-kontext' | 'flux-krea' | 'wan22' | 'wan-animate' | 'infinitetalk';
   prompt?: string;
   options?: string;
   resultUrl?: string;
@@ -177,6 +177,46 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
       }
     }
     
+    // WAN Animate의 경우 입력 이미지/비디오를 썸네일로 사용
+    if (item.type === 'wan-animate' && item.options) {
+      try {
+        const options = JSON.parse(item.options);
+        console.log('🔍 WAN Animate options for thumbnail:', options);
+        
+        // 입력 이미지가 있으면 우선 사용
+        if (options.hasImage && options.s3ImagePath) {
+          // S3 경로를 로컬 웹 경로로 변환
+          const fileName = options.s3ImagePath.split('/').pop();
+          if (fileName) {
+            const webPath = `/results/${fileName}`;
+            console.log('🖼️ Using input image for WAN Animate thumbnail:', webPath);
+            return webPath;
+          }
+        }
+        
+        // 입력 비디오가 있으면 사용
+        if (options.hasVideo && options.s3VideoPath) {
+          // S3 경로를 로컬 웹 경로로 변환
+          const fileName = options.s3VideoPath.split('/').pop();
+          if (fileName) {
+            const webPath = `/results/${fileName}`;
+            console.log('🎬 Using input video for WAN Animate thumbnail:', webPath);
+            return webPath;
+          }
+        }
+        
+        // 결과 비디오가 있으면 사용
+        if (item.resultUrl) {
+          console.log('🎬 Using result video for WAN Animate thumbnail:', item.resultUrl);
+          return item.resultUrl;
+        }
+        
+        console.log('⚠️ No suitable thumbnail found for WAN Animate');
+      } catch (e) {
+        console.warn('Failed to parse WAN Animate options:', e);
+      }
+    }
+    
     // 다른 타입의 경우 결과 URL 사용
     if (item.status === 'completed' && item.resultUrl) {
       return item.resultUrl;
@@ -281,8 +321,10 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
         <p className="text-sm text-foreground/80 truncate">
           {item.type === 'multitalk' ? 'MultiTalk Content' : 
            item.type === 'wan22' ? 'WAN 2.2 Video' : 
+           item.type === 'wan-animate' ? 'WAN Animate Video' :
            item.type === 'flux-kontext' ? 'FLUX KONTEXT Image' :
            item.type === 'flux-krea' ? 'FLUX KREA Image' :
+           item.type === 'infinitetalk' ? 'Infinite Talk Video' :
            (item.prompt || 'No prompt')}
         </p>
         
@@ -735,6 +777,108 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                       <div className="text-xs text-foreground/40 mt-2">
                         <p>Error: {e instanceof Error ? e.message : String(e)}</p>
                       </div>
+                    </div>
+                  );
+                }
+              })()}
+            </div>
+          )}
+
+          {/* WAN Animate 입력 파일 */}
+          {item.type === 'wan-animate' && (
+            <div>
+              <h4 className="font-medium mb-2">Input Files</h4>
+              {(() => {
+                try {
+                  const options = JSON.parse(item.options || '{}');
+                  
+                  return (
+                    <div className="space-y-4">
+                      {/* 입력 이미지 */}
+                      {options.hasImage && options.s3ImagePath && (
+                        <div>
+                          <h5 className="font-medium mb-2 text-sm">Input Image</h5>
+                          <div className="relative">
+                            <img 
+                              src={`/results/${options.s3ImagePath.split('/').pop()}`} 
+                              alt="Input image" 
+                              className="w-full max-h-64 object-contain rounded-lg bg-background"
+                              onError={(e) => {
+                                console.error('❌ WAN Animate input image error:', e);
+                                console.error('❌ Image path:', options.s3ImagePath);
+                                
+                                const imgElement = e.currentTarget;
+                                imgElement.style.display = 'none';
+                                
+                                const errorDiv = document.createElement('div');
+                                errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
+                                errorDiv.innerHTML = `
+                                  <div class="mb-2">⚠️ WAN Animate 입력 이미지를 불러올 수 없습니다</div>
+                                  <div class="text-xs text-red-300">
+                                    <p>S3 경로: ${options.s3ImagePath}</p>
+                                    <p>💡 파일이 public/results 폴더에 있는지 확인하세요</p>
+                                  </div>
+                                `;
+                                imgElement.parentNode?.appendChild(errorDiv);
+                              }}
+                              onLoad={() => {
+                                console.log('✅ WAN Animate input image loaded successfully');
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* 입력 비디오 */}
+                      {options.hasVideo && options.s3VideoPath && (
+                        <div>
+                          <h5 className="font-medium mb-2 text-sm">Input Video</h5>
+                          <div className="relative">
+                            <video 
+                              src={`/results/${options.s3VideoPath.split('/').pop()}`} 
+                              controls
+                              className="w-full max-h-64 object-contain rounded-lg bg-black"
+                              onError={(e) => {
+                                console.error('❌ WAN Animate input video error:', e);
+                                console.error('❌ Video path:', options.s3VideoPath);
+                                
+                                const videoElement = e.currentTarget;
+                                videoElement.style.display = 'none';
+                                
+                                const errorDiv = document.createElement('div');
+                                errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
+                                errorDiv.innerHTML = `
+                                  <div class="mb-2">⚠️ WAN Animate 입력 비디오를 불러올 수 없습니다</div>
+                                  <div class="text-xs text-red-300">
+                                    <p>S3 경로: ${options.s3VideoPath}</p>
+                                    <p>💡 파일이 public/results 폴더에 있는지 확인하세요</p>
+                                  </div>
+                                `;
+                                videoElement.parentNode?.appendChild(errorDiv);
+                              }}
+                              onLoad={() => {
+                                console.log('✅ WAN Animate input video loaded successfully');
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* 입력 파일이 없는 경우 */}
+                      {!options.hasImage && !options.hasVideo && (
+                        <div className="text-center py-8 text-foreground/50">
+                          <PhotoIcon className="w-16 h-16 mx-auto mb-2" />
+                          <p>입력 파일 정보를 찾을 수 없습니다.</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                } catch (e) {
+                  console.error('❌ Failed to parse WAN Animate options:', e);
+                  return (
+                    <div className="text-center py-8 text-foreground/50">
+                      <PhotoIcon className="w-16 h-16 mx-auto mb-2" />
+                      <p>WAN Animate 옵션을 파싱할 수 없습니다.</p>
                     </div>
                   );
                 }

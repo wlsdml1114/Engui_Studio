@@ -24,6 +24,8 @@ EnguiStudio is a platform that enables easy access to various open-source AI mod
   > [![Runpod](https://api.runpod.io/badge/wlsdml1114/Multitalk_Runpod_hub)](https://console.runpod.io/hub/wlsdml1114/Multitalk_Runpod_hub)
 - **🎭 Infinite Talk**(recommend): Talking video generation model combining images and audio
   > [![Runpod](https://api.runpod.io/badge/wlsdml1114/InfiniteTalk_Runpod_hub)](https://console.runpod.io/hub/wlsdml1114/InfiniteTalk_Runpod_hub)
+- **🎬 WAN Animate**: Advanced image-to-video animation with precise control points
+  > [![Runpod](https://api.runpod.io/badge/wlsdml1114/Wan_Animate_Runpod_hub)](https://console.runpod.io/hub/wlsdml1114/Wan_Animate_Runpod_hub)
 - **📈 Video Upscale**: AI-powered video upscaling
   > [![Runpod](https://api.runpod.io/badge/wlsdml1114/upscale_interpolation_runpod_hub)](https://console.runpod.io/hub/wlsdml1114/upscale_interpolation_runpod_hub)
 - **⚙️ Unified Settings**: Manage RunPod endpoints in one place
@@ -91,6 +93,7 @@ Navigate to `/settings` in your browser
     - **FLUX KREA** (Image generation)
     - **MultiTalk** (Audio 2 Video)
     - **Infinite Talk** (Talking video)
+    - **WAN Animate** (Image-to-video animation)
     - **Video Upscale** (Video enhancement)
     - **Example**
     ![image](assets/endpoint.png)
