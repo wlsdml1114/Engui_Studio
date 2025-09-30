@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import RunPodService from '@/lib/runpodService';
 import SettingsService from '@/lib/settingsService';
 import S3Service from '@/lib/s3Service';
-import { writeFileSync, mkdirSync } from 'fs';
+import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 
 const prisma = new PrismaClient();
@@ -135,12 +135,14 @@ export async function POST(request: NextRequest) {
         // Prepare RunPod input with S3 video path
         const runpodInput = {
             video_path: videoS3Path, // S3 경로 사용
-            task_type: taskType
+            task_type: taskType,
+            network_volume: true // 네트워크 볼륨 사용 활성화
         };
 
         console.log('🔧 Final RunPod input structure:');
         console.log('  - video_path:', runpodInput.video_path);
         console.log('  - task_type:', runpodInput.task_type);
+        console.log('  - network_volume:', runpodInput.network_volume);
 
         // RunPod 입력 로그 출력
         console.log('🚀 Submitting job to RunPod...', runpodInput);
@@ -274,45 +276,17 @@ async function processVideoUpscaleJob(jobId: string, runpodJobId: string, runpod
             let videoS3Path: string | null = null;
             let videoFormat: string = 'mp4';
             
-            // 1. S3 경로 방식 확인 (우선순위 높음 - 용량이 큰 파일에 효율적)
-            if (result.output.video_path && typeof result.output.video_path === 'string' && 
-                result.output.video_path.startsWith('/runpod-volume/')) {
+            // 1. video_path 필드에서 RunPod volume 경로 확인 (우선순위 높음)
+            if (result.output.video_path && typeof result.output.video_path === 'string') {
                 videoS3Path = result.output.video_path;
-                console.log(`🎬 Found S3 path in video_path field: ${videoS3Path}`);
-            } else if (result.output.video && typeof result.output.video === 'string' && 
-                       result.output.video.startsWith('/runpod-volume/')) {
-                videoS3Path = result.output.video;
-                console.log(`🎬 Found S3 path in video field: ${videoS3Path}`);
-            } else if (result.output.mp4 && typeof result.output.mp4 === 'string' && 
-                       result.output.mp4.startsWith('/runpod-volume/')) {
-                videoS3Path = result.output.mp4;
-                console.log(`🎬 Found S3 path in mp4 field: ${videoS3Path}`);
-            } else if (result.output.result && typeof result.output.result === 'string' && 
-                       result.output.result.startsWith('/runpod-volume/')) {
-                videoS3Path = result.output.result;
-                console.log(`🎬 Found S3 path in result field: ${videoS3Path}`);
+                console.log(`🎬 Found video_path from RunPod: ${videoS3Path}`);
             }
-            // 2. base64 방식 확인 (fallback)
+            // 2. base64 방식 확인 (fallback) - video_path가 경로가 아닌 base64 데이터인 경우
             else if (result.output.video_path && typeof result.output.video_path === 'string' && 
                      result.output.video_path.length > 100 && !result.output.video_path.startsWith('http') && !result.output.video_path.startsWith('/runpod-volume/')) {
                 videoData = result.output.video_path;
                 videoFormat = 'mp4';
                 console.log(`🎬 Found base64 video data in video_path field, length: ${videoData?.length} characters`);
-            } else if (result.output.video && typeof result.output.video === 'string' && 
-                       result.output.video.length > 100 && !result.output.video.startsWith('http') && !result.output.video.startsWith('/runpod-volume/')) {
-                videoData = result.output.video;
-                videoFormat = 'mp4';
-                console.log(`🎬 Found base64 video data in video field, length: ${videoData?.length} characters`);
-            } else if (result.output.mp4 && typeof result.output.mp4 === 'string' && 
-                       result.output.mp4.length > 100 && !result.output.mp4.startsWith('http') && !result.output.mp4.startsWith('/runpod-volume/')) {
-                videoData = result.output.mp4;
-                videoFormat = 'mp4';
-                console.log(`🎬 Found base64 MP4 data in mp4 field, length: ${videoData?.length} characters`);
-            } else if (result.output.result && typeof result.output.result === 'string' && 
-                       result.output.result.length > 100 && !result.output.result.startsWith('http') && !result.output.result.startsWith('/runpod-volume/')) {
-                videoData = result.output.result;
-                videoFormat = 'mp4';
-                console.log(`🎬 Found base64 result data in result field, length: ${videoData?.length} characters`);
             }
 
             // S3 경로에서 비디오 다운로드 (우선순위 높음)
@@ -321,7 +295,13 @@ async function processVideoUpscaleJob(jobId: string, runpodJobId: string, runpod
                     console.log(`📥 Downloading video from S3 path: ${videoS3Path}`);
                     
                     // S3 경로를 S3 키로 변환 (/runpod-volume/ 제거)
-                    const s3Key = videoS3Path.replace('/runpod-volume/', '');
+                    let s3Key = videoS3Path.replace('/runpod-volume/', '');
+                    
+                    // RunPod volume 경로가 절대 경로인 경우 처리
+                    if (s3Key.startsWith('/')) {
+                        s3Key = s3Key.substring(1); // 앞의 / 제거
+                    }
+                    
                     console.log(`🔧 Converted S3 key: ${s3Key}`);
                     
                     // S3에서 파일 다운로드
@@ -339,6 +319,7 @@ async function processVideoUpscaleJob(jobId: string, runpodJobId: string, runpod
                         region: settings.s3.region || 'us-east-1',
                     });
 
+                    console.log(`🔍 Attempting to download from S3 with key: ${s3Key}`);
                     const videoBuffer = await s3Service.downloadFile(s3Key);
                     console.log(`✅ Downloaded video buffer size: ${videoBuffer.length} bytes`);
                     
@@ -357,13 +338,17 @@ async function processVideoUpscaleJob(jobId: string, runpodJobId: string, runpod
                     
                 } catch (downloadError) {
                     console.error(`❌ Error downloading video from S3 path:`, downloadError);
+                    console.error(`❌ S3 Key used: ${s3Key}`);
+                    console.error(`❌ Original path: ${videoS3Path}`);
+                    
                     // S3 경로 다운로드 실패 시 base64 방식으로 fallback
                     videoData = null;
+                    videoS3Path = null; // S3 경로를 null로 설정하여 base64 방식으로 전환
                 }
             }
             
             // base64 비디오 데이터를 디코딩하여 로컬에 저장 (fallback)
-            if (videoData && typeof videoData === 'string' && videoData.length > 0) {
+            if (!videoS3Path && videoData && typeof videoData === 'string' && videoData.length > 0) {
                 try {
                     console.log(`🔓 Decoding base64 video data...`);
                     
@@ -389,8 +374,10 @@ async function processVideoUpscaleJob(jobId: string, runpodJobId: string, runpod
                     console.log(`💡 Using original resultUrl: ${resultUrl}`);
                 }
             } else {
-                // base64 데이터와 S3 URL 모두 없는 경우
-                console.log(`💡 No video data found in RunPod output`);
+                // video_path가 없거나 처리할 수 없는 경우
+                console.log(`💡 No valid video_path found in RunPod output`);
+                console.log(`💡 RunPod output keys:`, Object.keys(result.output || {}));
+                console.log(`💡 video_path value:`, result.output.video_path);
                 console.log(`💡 Using original resultUrl: ${resultUrl}`);
             }
 
@@ -411,21 +398,70 @@ async function processVideoUpscaleJob(jobId: string, runpodJobId: string, runpod
                 },
             });
 
-            // 썸네일 설정 (입력 비디오를 썸네일로 사용)
+            // 썸네일 생성 (입력 비디오에서 첫 번째 프레임 추출)
             try {
                 const jobData = await prisma.job.findUnique({ where: { id: jobId } });
                 if (jobData?.options) {
                     const options = JSON.parse(jobData.options);
                     
-                    // 입력 비디오가 있으면 썸네일로 사용
-                    if (options.videoWebPath) {
-                        await prisma.job.update({
-                            where: { id: jobId },
-                            data: {
-                                thumbnailUrl: options.videoWebPath,
-                            },
-                        });
-                        console.log(`🎬 Video upscale thumbnail set to input video: ${options.videoWebPath}`);
+                    // 입력 비디오가 로컬에 저장되어 있으면 썸네일 생성
+                    if (options.localVideoPath && existsSync(options.localVideoPath)) {
+                        console.log(`🎬 Generating thumbnail from input video: ${options.localVideoPath}`);
+                        
+                        // 썸네일 파일명 생성
+                        const thumbnailFileName = `thumb_${jobId}.jpg`;
+                        const thumbnailPath = join(LOCAL_STORAGE_DIR, thumbnailFileName);
+                        
+                        // FFmpeg로 첫 번째 프레임 추출
+                        const { ffmpegService } = await import('@/lib/ffmpegService');
+                        
+                        try {
+                            await ffmpegService.extractThumbnail(options.localVideoPath, thumbnailPath, {
+                                width: 320,
+                                height: 240,
+                                quality: 80,
+                                format: 'jpg'
+                            });
+                            
+                            // 썸네일 URL 설정
+                            const thumbnailUrl = `/results/${thumbnailFileName}`;
+                            
+                            await prisma.job.update({
+                                where: { id: jobId },
+                                data: {
+                                    thumbnailUrl,
+                                },
+                            });
+                            
+                            console.log(`✅ Video upscale thumbnail generated: ${thumbnailUrl}`);
+                            
+                        } catch (ffmpegError) {
+                            console.error('❌ FFmpeg thumbnail generation failed:', ffmpegError);
+                            
+                            // FFmpeg 실패 시 입력 비디오를 썸네일로 사용 (폴백)
+                            if (options.videoWebPath) {
+                                await prisma.job.update({
+                                    where: { id: jobId },
+                                    data: {
+                                        thumbnailUrl: options.videoWebPath,
+                                    },
+                                });
+                                console.log(`🎬 Fallback: Video upscale thumbnail set to input video: ${options.videoWebPath}`);
+                            }
+                        }
+                    } else {
+                        console.warn(`⚠️ Input video file not found: ${options.localVideoPath}`);
+                        
+                        // 입력 비디오가 없으면 웹 경로를 썸네일로 사용
+                        if (options.videoWebPath) {
+                            await prisma.job.update({
+                                where: { id: jobId },
+                                data: {
+                                    thumbnailUrl: options.videoWebPath,
+                                },
+                            });
+                            console.log(`🎬 Fallback: Video upscale thumbnail set to input video: ${options.videoWebPath}`);
+                        }
                     }
                 }
             } catch (thumbnailError) {

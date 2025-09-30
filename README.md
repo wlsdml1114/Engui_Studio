@@ -8,6 +8,10 @@
   *Pronunciation: Eun-gui Studio (/ɯnɡɯi ˈstjuːdioʊ/)*
 </div>
 
+### Join our discord!
+
+[![demo](https://img.shields.io/discord/1418269259858968696?logo=discord)](https://discord.gg/8Xhq9f77fK)
+
 ## 🎯 Project Overview
 
 EnguiStudio is a platform that enables easy access to various open-source AI models through a web interface using RunPod Serverless infrastructure. Experience cutting-edge AI technology without complex setup.

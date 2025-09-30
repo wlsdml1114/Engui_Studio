@@ -317,6 +317,9 @@ export async function POST(request: NextRequest) {
                     runpodJobId,
                     s3ImagePath,
                     s3VideoPath,
+                    // 로컬 이미지 웹 경로 (이미지 표시용)
+                    imageWebPath: imageFile ? `/results/input_image_${job.id}_${imageFile.name}` : null,
+                    videoWebPath: videoFile ? `/results/input_video_${job.id}_${videoFile.name}` : null,
                 }),
             },
         });
