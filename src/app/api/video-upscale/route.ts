@@ -135,12 +135,14 @@ export async function POST(request: NextRequest) {
         // Prepare RunPod input with S3 video path
         const runpodInput = {
             video_path: videoS3Path, // S3 경로 사용
-            task_type: taskType
+            task_type: taskType,
+            network_volume: true // 네트워크 볼륨 사용 활성화
         };
 
         console.log('🔧 Final RunPod input structure:');
         console.log('  - video_path:', runpodInput.video_path);
         console.log('  - task_type:', runpodInput.task_type);
+        console.log('  - network_volume:', runpodInput.network_volume);
 
         // RunPod 입력 로그 출력
         console.log('🚀 Submitting job to RunPod...', runpodInput);
