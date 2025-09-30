@@ -183,7 +183,13 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
         const options = JSON.parse(item.options);
         console.log('🔍 WAN Animate options for thumbnail:', options);
         
-        // 입력 이미지가 있으면 우선 사용
+        // 로컬 웹 경로가 있으면 우선 사용 (가장 안정적)
+        if (options.imageWebPath) {
+          console.log('🖼️ Using local web path for WAN Animate thumbnail:', options.imageWebPath);
+          return options.imageWebPath;
+        }
+        
+        // 입력 이미지가 있으면 사용 (폴백)
         if (options.hasImage && options.s3ImagePath) {
           // S3 경로를 로컬 웹 경로로 변환
           const fileName = options.s3ImagePath.split('/').pop();
@@ -194,7 +200,13 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
           }
         }
         
-        // 입력 비디오가 있으면 사용
+        // 로컬 비디오 웹 경로가 있으면 사용
+        if (options.videoWebPath) {
+          console.log('🎬 Using local video web path for WAN Animate thumbnail:', options.videoWebPath);
+          return options.videoWebPath;
+        }
+        
+        // 입력 비디오가 있으면 사용 (폴백)
         if (options.hasVideo && options.s3VideoPath) {
           // S3 경로를 로컬 웹 경로로 변환
           const fileName = options.s3VideoPath.split('/').pop();
@@ -325,6 +337,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
            item.type === 'flux-kontext' ? 'FLUX KONTEXT Image' :
            item.type === 'flux-krea' ? 'FLUX KREA Image' :
            item.type === 'infinitetalk' ? 'Infinite Talk Video' :
+           item.type === 'video-upscale' ? 'Video Upscale' :
            (item.prompt || 'No prompt')}
         </p>
         
@@ -795,17 +808,17 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                   return (
                     <div className="space-y-4">
                       {/* 입력 이미지 */}
-                      {options.hasImage && options.s3ImagePath && (
+                      {options.hasImage && (options.imageWebPath || options.s3ImagePath) && (
                         <div>
                           <h5 className="font-medium mb-2 text-sm">Input Image</h5>
                           <div className="relative">
                             <img 
-                              src={`/results/${options.s3ImagePath.split('/').pop()}`} 
+                              src={options.imageWebPath || `/results/${options.s3ImagePath.split('/').pop()}`} 
                               alt="Input image" 
                               className="w-full max-h-64 object-contain rounded-lg bg-background"
                               onError={(e) => {
                                 console.error('❌ WAN Animate input image error:', e);
-                                console.error('❌ Image path:', options.s3ImagePath);
+                                console.error('❌ Image path:', options.imageWebPath || options.s3ImagePath);
                                 
                                 const imgElement = e.currentTarget;
                                 imgElement.style.display = 'none';
@@ -815,6 +828,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                                 errorDiv.innerHTML = `
                                   <div class="mb-2">⚠️ WAN Animate 입력 이미지를 불러올 수 없습니다</div>
                                   <div class="text-xs text-red-300">
+                                    <p>웹 경로: ${options.imageWebPath || `/results/${options.s3ImagePath.split('/').pop()}`}</p>
                                     <p>S3 경로: ${options.s3ImagePath}</p>
                                     <p>💡 파일이 public/results 폴더에 있는지 확인하세요</p>
                                   </div>
@@ -830,12 +844,12 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                       )}
                       
                       {/* 입력 비디오 */}
-                      {options.hasVideo && options.s3VideoPath && (
+                      {options.hasVideo && (options.videoWebPath || options.s3VideoPath) && (
                         <div>
                           <h5 className="font-medium mb-2 text-sm">Input Video</h5>
                           <div className="relative">
                             <video 
-                              src={`/results/${options.s3VideoPath.split('/').pop()}`} 
+                              src={options.videoWebPath || `/results/${options.s3VideoPath.split('/').pop()}`} 
                               controls
                               className="w-full max-h-64 object-contain rounded-lg bg-black"
                               onError={(e) => {

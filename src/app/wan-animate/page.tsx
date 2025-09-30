@@ -323,7 +323,7 @@ export default function WanAnimatePage() {
                     <img
                       src={imagePreviewUrl}
                       alt="Preview"
-                      className="w-full h-48 object-cover rounded-lg"
+                      className="w-full h-48 object-contain rounded-lg bg-gray-800"
                     />
                     <button
                       onClick={clearImage}
@@ -366,7 +366,7 @@ export default function WanAnimatePage() {
                       <video
                         src={videoPreviewUrl}
                         controls
-                        className="w-full h-48 object-cover rounded-lg"
+                        className="w-full h-48 object-contain rounded-lg bg-black"
                       />
                       <button
                         onClick={clearVideo}
@@ -378,6 +378,15 @@ export default function WanAnimatePage() {
                     
                     {firstFrameImage && (
                       <div className="space-y-2">
+                        {/* 비디오 정보 표시 */}
+                        {originalVideoSize && (
+                          <div className="text-xs text-muted-foreground bg-gray-800 p-2 rounded">
+                            <p>비디오 해상도: {originalVideoSize.width} × {originalVideoSize.height}</p>
+                            {videoFps && <p>추정 FPS: {videoFps}</p>}
+                            <p>출력 해상도: {width} × {height}</p>
+                          </div>
+                        )}
+                        
                         <button
                           onClick={handlePersonSelection}
                           className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
@@ -387,14 +396,17 @@ export default function WanAnimatePage() {
                         
                         {showPersonSelection && (
                           <div className="space-y-2">
-                            <p className="text-sm text-muted-foreground">
-                              이미지를 클릭하여 포인트를 선택하세요
-                            </p>
+                            <div className="text-sm text-muted-foreground bg-blue-900/30 p-3 rounded-lg">
+                              <p className="font-medium text-blue-300 mb-1">인물 선택 가이드</p>
+                              <p>• 이미지를 클릭하여 포인트를 선택하세요</p>
+                              <p>• 선택된 포인트를 클릭하면 삭제됩니다</p>
+                              <p>• 현재 {selectedPoints.length}개 포인트가 선택되었습니다</p>
+                            </div>
                             <div className="relative">
                               <img
                                 src={firstFrameImage}
                                 alt="First Frame"
-                                className="w-full h-48 object-cover rounded-lg cursor-crosshair"
+                                className="w-full h-48 object-contain rounded-lg cursor-crosshair bg-gray-800"
                                 onClick={handleImageClick}
                               />
                               {selectedPoints.map((point, index) => {
@@ -405,7 +417,7 @@ export default function WanAnimatePage() {
                                 return (
                                   <div
                                     key={index}
-                                    className="absolute w-4 h-4 bg-red-500 rounded-full border-2 border-white transform -translate-x-2 -translate-y-2 cursor-pointer"
+                                    className="absolute w-6 h-6 bg-red-500 rounded-full border-2 border-white transform -translate-x-3 -translate-y-3 cursor-pointer flex items-center justify-center text-white text-xs font-bold shadow-lg"
                                     style={{
                                       left: `${displayX}%`,
                                       top: `${displayY}%`
@@ -414,7 +426,10 @@ export default function WanAnimatePage() {
                                       e.stopPropagation();
                                       removePoint(index);
                                     }}
-                                  />
+                                    title={`포인트 ${index + 1}: (${Math.round(point.x)}, ${Math.round(point.y)})`}
+                                  >
+                                    {index + 1}
+                                  </div>
                                 );
                               })}
                             </div>
@@ -560,6 +575,8 @@ export default function WanAnimatePage() {
                 <p>• 비디오 업로드 시 "인물 선택" 버튼으로 포인트를 지정할 수 있습니다.</p>
                 <p>• 이미지를 클릭하여 원하는 위치에 포인트를 추가하세요.</p>
                 <p>• 포인트를 클릭하면 삭제할 수 있습니다.</p>
+                <p>• 비디오는 원본 비율을 유지하여 표시됩니다.</p>
+                <p>• 출력 해상도는 원본과 다를 수 있으니 확인해주세요.</p>
               </div>
             </div>
           </div>
