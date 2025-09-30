@@ -229,6 +229,12 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
       }
     }
     
+    // Video Upscale의 경우 썸네일 URL 우선 사용
+    if (item.type === 'video-upscale' && item.thumbnailUrl) {
+      console.log('🎬 Using thumbnail URL for video-upscale:', item.thumbnailUrl);
+      return item.thumbnailUrl;
+    }
+    
     // 다른 타입의 경우 결과 URL 사용
     if (item.status === 'completed' && item.resultUrl) {
       return item.resultUrl;
