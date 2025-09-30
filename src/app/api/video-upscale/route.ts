@@ -398,23 +398,70 @@ async function processVideoUpscaleJob(jobId: string, runpodJobId: string, runpod
                 },
             });
 
-            // 썸네일 설정 (입력 비디오를 썸네일로 사용)
+            // 썸네일 생성 (입력 비디오에서 첫 번째 프레임 추출)
             try {
                 const jobData = await prisma.job.findUnique({ where: { id: jobId } });
                 if (jobData?.options) {
                     const options = JSON.parse(jobData.options);
                     
-                    // 입력 비디오가 있으면 썸네일로 사용
-                    if (options.videoWebPath) {
-                        await prisma.job.update({
-                            where: { id: jobId },
-                            data: {
-                                thumbnailUrl: options.videoWebPath,
-                            },
-                        });
-                        console.log(`🎬 Video upscale thumbnail set to input video: ${options.videoWebPath}`);
+                    // 입력 비디오가 로컬에 저장되어 있으면 썸네일 생성
+                    if (options.localVideoPath && existsSync(options.localVideoPath)) {
+                        console.log(`🎬 Generating thumbnail from input video: ${options.localVideoPath}`);
+                        
+                        // 썸네일 파일명 생성
+                        const thumbnailFileName = `thumb_${jobId}.jpg`;
+                        const thumbnailPath = join(LOCAL_STORAGE_DIR, thumbnailFileName);
+                        
+                        // FFmpeg로 첫 번째 프레임 추출
+                        const { ffmpegService } = await import('@/lib/ffmpegService');
+                        
+                        try {
+                            await ffmpegService.extractThumbnail(options.localVideoPath, thumbnailPath, {
+                                width: 320,
+                                height: 240,
+                                quality: 80,
+                                format: 'jpg'
+                            });
+                            
+                            // 썸네일 URL 설정
+                            const thumbnailUrl = `/results/${thumbnailFileName}`;
+                            
+                            await prisma.job.update({
+                                where: { id: jobId },
+                                data: {
+                                    thumbnailUrl,
+                                },
+                            });
+                            
+                            console.log(`✅ Video upscale thumbnail generated: ${thumbnailUrl}`);
+                            
+                        } catch (ffmpegError) {
+                            console.error('❌ FFmpeg thumbnail generation failed:', ffmpegError);
+                            
+                            // FFmpeg 실패 시 입력 비디오를 썸네일로 사용 (폴백)
+                            if (options.videoWebPath) {
+                                await prisma.job.update({
+                                    where: { id: jobId },
+                                    data: {
+                                        thumbnailUrl: options.videoWebPath,
+                                    },
+                                });
+                                console.log(`🎬 Fallback: Video upscale thumbnail set to input video: ${options.videoWebPath}`);
+                            }
+                        }
                     } else {
-                        console.warn(`⚠️ No input video path found for thumbnail`);
+                        console.warn(`⚠️ Input video file not found: ${options.localVideoPath}`);
+                        
+                        // 입력 비디오가 없으면 웹 경로를 썸네일로 사용
+                        if (options.videoWebPath) {
+                            await prisma.job.update({
+                                where: { id: jobId },
+                                data: {
+                                    thumbnailUrl: options.videoWebPath,
+                                },
+                            });
+                            console.log(`🎬 Fallback: Video upscale thumbnail set to input video: ${options.videoWebPath}`);
+                        }
                     }
                 }
             } catch (thumbnailError) {
