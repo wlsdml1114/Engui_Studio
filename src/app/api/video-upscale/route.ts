@@ -114,10 +114,36 @@ export async function POST(request: NextRequest) {
         });
 
         // S3에 비디오 업로드
-        console.log('📤 Uploading video to S3...');
-        const videoFileName = `input/video-upscale/input_${job.id}_${videoFile.name}`;
-        const videoS3Path = await uploadToS3(videoFile, videoFileName);
-        console.log('✅ Video uploaded to S3:', videoS3Path);
+        let videoS3Path: string;
+        try {
+            console.log('📤 Uploading video to S3...');
+            const videoFileName = `input/video-upscale/input_${job.id}_${videoFile.name}`;
+            videoS3Path = await uploadToS3(videoFile, videoFileName);
+            console.log('✅ Video uploaded to S3:', videoS3Path);
+        } catch (s3Error) {
+            console.error('❌ Failed to upload video to S3:', s3Error);
+            
+            // Job 상태를 failed로 업데이트
+            await prisma.job.update({
+                where: { id: job.id },
+                data: {
+                    status: 'failed',
+                    completedAt: new Date(),
+                    options: JSON.stringify({
+                        error: `S3 비디오 업로드 실패: ${s3Error instanceof Error ? s3Error.message : String(s3Error)}`,
+                        failedAt: new Date().toISOString(),
+                        failureReason: 'S3_UPLOAD_ERROR'
+                    })
+                },
+            });
+            
+            return NextResponse.json({
+                error: s3Error instanceof Error ? s3Error.message : String(s3Error),
+                requiresSetup: true,
+                jobId: job.id,
+                status: 'failed'
+            }, { status: 400 });
+        }
 
         // 로컬에 백업 저장
         const videoBuffer = Buffer.from(await videoFile.arrayBuffer());
