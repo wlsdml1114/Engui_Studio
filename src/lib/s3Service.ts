@@ -15,6 +15,75 @@ interface S3Config {
   bucketName: string;
   region: string;
   timeout?: number; // 타임아웃 설정 추가 (초 단위)
+  maxRetries?: number; // 최대 재시도 횟수 (기본값: 5)
+  retryDelay?: number; // 재시도 간격 (밀리초, 기본값: 1000)
+}
+
+// 재시도 가능한 에러인지 확인하는 함수
+function isRetryableError(error: any): boolean {
+  if (!error) return false;
+  
+  const errorMessage = error.message || error.stderr || '';
+  
+  // 502 Bad Gateway, 503 Service Unavailable, 504 Gateway Timeout
+  if (errorMessage.includes('502') || errorMessage.includes('503') || errorMessage.includes('504')) {
+    return true;
+  }
+  
+  // 네트워크 관련 에러
+  if (errorMessage.includes('timeout') || errorMessage.includes('ECONNRESET') || errorMessage.includes('ENOTFOUND')) {
+    return true;
+  }
+  
+  // AWS CLI 관련 에러
+  if (errorMessage.includes('reached max retries') || errorMessage.includes('Bad Gateway')) {
+    return true;
+  }
+  
+  return false;
+}
+
+// 지수 백오프를 사용한 재시도 함수
+async function executeWithRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 5,
+  baseDelay: number = 1000,
+  operationName: string = 'operation'
+): Promise<T> {
+  let lastError: any;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 ${operationName} 시도 ${attempt}/${maxRetries}`);
+      const result = await operation();
+      
+      if (attempt > 1) {
+        console.log(`✅ ${operationName} 성공 (${attempt}번째 시도)`);
+      }
+      
+      return result;
+    } catch (error) {
+      lastError = error;
+      
+      if (!isRetryableError(error)) {
+        console.log(`❌ ${operationName} 재시도 불가능한 에러:`, error);
+        throw error;
+      }
+      
+      if (attempt === maxRetries) {
+        console.log(`❌ ${operationName} 최대 재시도 횟수 초과 (${maxRetries}회)`);
+        break;
+      }
+      
+      // 지수 백오프 계산 (최대 30초)
+      const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 30000);
+      console.log(`⏳ ${operationName} 재시도 대기 중... (${delay}ms 후 ${attempt + 1}번째 시도)`);
+      
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw lastError;
 }
 
 class S3Service {
@@ -29,11 +98,13 @@ class S3Service {
       bucketName: config?.bucketName || process.env.S3_BUCKET_NAME!,
       region: config?.region || process.env.S3_REGION!,
       timeout: config?.timeout || 3600, // 기본값 3600초 (1시간)
+      maxRetries: config?.maxRetries || 5, // 기본값 5회 재시도
+      retryDelay: config?.retryDelay || 1000, // 기본값 1초 간격
     };
 
     // Validate required configuration
     Object.entries(this.config).forEach(([key, value]) => {
-      if (!value && key !== 'timeout') { // timeout은 선택적
+      if (!value && !['timeout', 'maxRetries', 'retryDelay'].includes(key)) { // 선택적 필드들
         throw new Error(`Missing required S3 configuration: ${key}`);
       }
     });
@@ -43,7 +114,9 @@ class S3Service {
       bucketName: this.config.bucketName,
       region: this.config.region,
       accessKeyId: this.config.accessKeyId ? '***' + this.config.accessKeyId.slice(-4) : 'missing',
-      timeout: this.config.timeout
+      timeout: this.config.timeout,
+      maxRetries: this.config.maxRetries,
+      retryDelay: this.config.retryDelay
     });
   }
 
@@ -57,7 +130,7 @@ class S3Service {
     type: 'file' | 'directory';
     extension?: string;
   }>> {
-    try {
+    return executeWithRetry(async () => {
       // 루트 디렉토리의 경우 prefix를 빈 문자열로 설정하여 모든 폴더 마커를 가져옴
       const actualPrefix = prefix === '' ? '' : prefix;
       const command = `aws s3api list-objects-v2 --bucket ${this.config.bucketName} --prefix "${actualPrefix}" --delimiter "/" --region ${this.config.region} --endpoint-url ${this.config.endpointUrl}`;
@@ -145,8 +218,8 @@ class S3Service {
       console.log(`✅ Found ${allItems.length} items (${directories.length} directories, ${fileList.length} files)`);
       
       return [...directories, ...fileList];
-    } catch (error) {
-      console.error('❌ Failed to list files:', error);
+    }, this.config.maxRetries || 5, this.config.retryDelay || 1000, '파일 목록 조회').catch(async (error) => {
+      console.error('❌ Failed to list files after retries:', error);
       
       // 502 Bad Gateway 에러인 경우 특별한 메시지 제공
       if (error instanceof Error && error.message.includes('502')) {
@@ -154,12 +227,12 @@ class S3Service {
       }
       
       throw new Error(`파일 목록을 가져올 수 없습니다: ${error}`);
-    }
+    });
   }
 
   // 파일 다운로드 (RunPod S3 API용)
   async downloadFile(key: string): Promise<Buffer> {
-    try {
+    return executeWithRetry(async () => {
       const tempFile = path.join(os.tmpdir(), `s3-download-${Date.now()}-${path.basename(key)}`);
       const command = `aws s3 cp "s3://${this.config.bucketName}/${key}" "${tempFile}" --region ${this.config.region} --endpoint-url ${this.config.endpointUrl}`;
       
@@ -180,15 +253,21 @@ class S3Service {
       
       console.log('✅ File downloaded successfully:', key);
       return fileBuffer;
-    } catch (error) {
-      console.error('❌ Failed to download file:', error);
+    }, this.config.maxRetries || 5, this.config.retryDelay || 1000, '파일 다운로드').catch(async (error) => {
+      console.error('❌ Failed to download file after retries:', error);
+      
+      // 502 Bad Gateway 에러인 경우 특별한 메시지 제공
+      if (error instanceof Error && error.message.includes('502')) {
+        throw new Error(`RunPod S3 서버가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요. (502 Bad Gateway)`);
+      }
+      
       throw new Error(`파일 다운로드에 실패했습니다: ${error}`);
-    }
+    });
   }
 
   // 파일 삭제 (RunPod S3 API용)
   async deleteFile(key: string): Promise<void> {
-    try {
+    return executeWithRetry(async () => {
       const command = `aws s3 rm "s3://${this.config.bucketName}/${key}" --region ${this.config.region} --endpoint-url ${this.config.endpointUrl}`;
       
       console.log('🗑️ Deleting file with command:', command);
@@ -204,10 +283,16 @@ class S3Service {
       });
       
       console.log('✅ File deleted successfully:', key);
-    } catch (error) {
-      console.error('❌ Failed to delete file:', error);
+    }, this.config.maxRetries || 5, this.config.retryDelay || 1000, '파일 삭제').catch(async (error) => {
+      console.error('❌ Failed to delete file after retries:', error);
+      
+      // 502 Bad Gateway 에러인 경우 특별한 메시지 제공
+      if (error instanceof Error && error.message.includes('502')) {
+        throw new Error(`RunPod S3 서버가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요. (502 Bad Gateway)`);
+      }
+      
       throw new Error(`파일 삭제에 실패했습니다: ${error}`);
-    }
+    });
   }
 
   // 폴더 생성 (RunPod S3 API용)
@@ -377,7 +462,7 @@ class S3Service {
     // S3에서는 폴더와 파일이 공존할 수 있으므로 경로 충돌 확인 불필요
     // 파일을 업로드하면 자동으로 폴더 구조가 생성됨
     
-    try {
+    return executeWithRetry(async () => {
       // 임시 파일로 저장 (안전한 파일명 사용)
       const tempDir = os.tmpdir();
       const tempFilePath = path.join(tempDir, safeFileName);
@@ -443,8 +528,8 @@ class S3Service {
       console.log(`📁 RunPod file path: ${filePath}`);
       
       return { s3Url, filePath };
-    } catch (error) {
-      console.error('❌ S3 upload error:', error);
+    }, this.config.maxRetries || 5, this.config.retryDelay || 1000, '파일 업로드').catch(async (error) => {
+      console.error('❌ S3 upload error after retries:', error);
       
       // 임시 파일 정리 (Windows 호환)
       try {
@@ -479,7 +564,7 @@ class S3Service {
       }
       
       throw error;
-    }
+    });
   }
 
   async uploadMultipleFiles(files: { buffer: Buffer; fileName: string; contentType: string }[], uploadPath: string = ''): Promise<{ s3Url: string; filePath: string }[]> {
