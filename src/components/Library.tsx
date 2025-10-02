@@ -424,7 +424,10 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
           }}
         >
           <button
-            onClick={handleReuseInputs}
+            onClick={() => {
+              console.log('🖱️ 입력값 재사용 버튼 클릭됨');
+              handleReuseInputs(item);
+            }}
             className="w-full px-4 py-2 text-left text-sm hover:bg-background/50 transition-colors flex items-center gap-2"
           >
             <ArrowPathIcon className="w-4 h-4" />
@@ -1250,13 +1253,49 @@ export default function Library() {
 
   const handleReuseInputs = (item: JobItem) => {
     try {
-      const options = item.options ? JSON.parse(item.options) : {};
+      console.log('🔄 입력값 재사용 시작:', item);
       
-      // 입력값 재사용을 위한 데이터 구성
+      const options = item.options ? JSON.parse(item.options) : {};
+      console.log('📋 파싱된 옵션:', options);
+      console.log('🔍 LoRA 필드 확인 (Library):', {
+        selectedLora: options.selectedLora,
+        lora: options.lora,
+        loraWeight: options.loraWeight
+      });
+      console.log('🔍 전체 options 객체:', options);
+      
+      // 필요한 설정값만 추출 (용량 절약)
+      const essentialOptions = {
+        // 공통 설정값들
+        width: options.width,
+        height: options.height,
+        seed: options.seed,
+        cfg: options.cfg,
+        steps: options.steps,
+        guidance: options.guidance,
+        model: options.model,
+        length: options.length,
+        step: options.step,
+        audioMode: options.audioMode,
+        taskType: options.taskType,
+        personCount: options.personCount,
+        inputType: options.inputType,
+        hasImage: options.hasImage,
+        hasVideo: options.hasVideo,
+        // LoRA 관련 (필요한 경우만)
+        selectedLora: options.selectedLora || options.lora, // FLUX KREA는 'lora' 필드 사용
+        lora: options.lora, // FLUX KREA 원본 필드도 포함
+        loraWeight: options.loraWeight,
+        // WAN 2.2의 LoRA 페어 정보
+        loraPairs: options.loraPairs,
+        loraCount: options.loraCount
+      };
+      
+      // 입력값 재사용을 위한 데이터 구성 (최소한의 데이터만)
       const reuseData = {
         type: item.type,
         prompt: item.prompt || '',
-        options: options,
+        options: essentialOptions,
         // 각 타입별로 필요한 입력값들 추출
         ...(item.type === 'multitalk' && {
           imagePath: options.imageWebPath || options.imageS3Url,
@@ -1285,6 +1324,9 @@ export default function Library() {
         })
       };
 
+      console.log('💾 재사용 데이터 (압축됨):', reuseData);
+      console.log('📏 데이터 크기:', JSON.stringify(reuseData).length, 'bytes');
+
       // 로컬 스토리지에 저장하여 다른 페이지에서 사용할 수 있도록 함
       localStorage.setItem('reuseInputs', JSON.stringify(reuseData));
       
@@ -1293,21 +1335,36 @@ export default function Library() {
         'multitalk': '/multitalk',
         'flux-kontext': '/flux-kontext',
         'flux-krea': '/flux-krea',
-        'wan22': '/wan22',
+        'wan22': '/video-generation',
         'wan-animate': '/wan-animate',
         'infinitetalk': '/infinite-talk',
         'video-upscale': '/video-upscale'
       };
 
       const targetPage = pageMap[item.type];
+      console.log('🎯 이동할 페이지:', targetPage, '타입:', item.type);
+      
       if (targetPage) {
+        console.log('✅ 페이지 이동 시작:', targetPage);
         window.location.href = targetPage;
       } else {
+        console.error('❌ 페이지를 찾을 수 없음:', item.type);
         alert('해당 타입의 페이지를 찾을 수 없습니다.');
       }
     } catch (error) {
-      console.error('입력값 재사용 중 오류:', error);
-      alert('입력값 재사용 중 오류가 발생했습니다.');
+      console.error('❌ 입력값 재사용 중 오류:', error);
+      console.error('❌ 오류 상세:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        item: item
+      });
+      
+      // localStorage 용량 초과 오류인 경우 특별 처리
+      if (error instanceof Error && error.name === 'QuotaExceededError') {
+        alert('저장 공간이 부족합니다. 브라우저의 저장된 데이터를 정리한 후 다시 시도해주세요.');
+      } else {
+        alert('입력값 재사용 중 오류가 발생했습니다.');
+      }
     }
   };
 

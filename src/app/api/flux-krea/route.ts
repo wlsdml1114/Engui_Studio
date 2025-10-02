@@ -38,6 +38,18 @@ export async function POST(request: NextRequest) {
         const loraWeight = parseFloat(formData.get('loraWeight') as string) || 1.0;
         
         console.log(`🔍 Received LoRA data: lora="${lora}", loraWeight=${loraWeight}`);
+        console.log(`🔍 All form data keys:`, Array.from(formData.keys()));
+        console.log(`🔍 All form data values:`, {
+            userId,
+            prompt,
+            width,
+            height,
+            seed,
+            guidance,
+            model,
+            lora,
+            loraWeight
+        });
 
         // Validate required data
         if (!prompt) {
@@ -80,6 +92,19 @@ export async function POST(request: NextRequest) {
         });
 
         console.log(`📝 Created job record: ${job.id}`);
+        console.log(`📝 Saved options:`, JSON.stringify({ 
+            width, height, seed, guidance, model,
+            lora, loraWeight 
+        }));
+        console.log(`📝 Database job record:`, {
+            id: job.id,
+            userId: job.userId,
+            status: job.status,
+            type: job.type,
+            prompt: job.prompt,
+            options: job.options,
+            createdAt: job.createdAt
+        });
 
         // Deduct credit
         await prisma.creditActivity.create({
@@ -152,7 +177,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Update job with RunPod job ID
-        await prisma.job.update({
+        const updatedJob = await prisma.job.update({
             where: { id: job.id },
             data: {
                 runpodJobId,
@@ -162,9 +187,17 @@ export async function POST(request: NextRequest) {
                     seed,
                     guidance,
                     model,
+                    lora,
+                    loraWeight,
                     runpodJobId,
                 }),
             },
+        });
+
+        console.log(`📝 Updated job record with RunPod ID:`, {
+            id: updatedJob.id,
+            runpodJobId: updatedJob.runpodJobId,
+            options: updatedJob.options
         });
 
         console.log(`✅ Flux Krea job submitted: ${job.id} (RunPod: ${runpodJobId})`);

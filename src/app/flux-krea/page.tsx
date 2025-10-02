@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { PhotoIcon, SparklesIcon, CpuChipIcon } from '@heroicons/react/24/outline';
 
 interface LoRAFile {
@@ -27,13 +27,23 @@ export default function FluxKreaPage() {
   const [loraWeight, setLoraWeight] = useState(1.0);
   const [loraLoading, setLoraLoading] = useState(false);
 
+  // 재사용 데이터를 저장할 ref
+  const pendingReuseData = useRef<any>(null);
+
   // 입력값 자동 로드 기능
   useEffect(() => {
+    console.log('🔄 FLUX KREA 페이지 로드됨');
     const reuseData = localStorage.getItem('reuseInputs');
+    console.log('📋 FLUX KREA 재사용 데이터:', reuseData);
+    
     if (reuseData) {
       try {
         const data = JSON.parse(reuseData);
+        console.log('📊 FLUX KREA 파싱된 데이터:', data);
+        console.log('🎯 FLUX KREA 데이터 타입:', data.type);
+        
         if (data.type === 'flux-krea') {
+          console.log('✅ FLUX KREA 타입 매칭됨');
           // 프롬프트 로드
           if (data.prompt) {
             setPrompt(data.prompt);
@@ -42,13 +52,33 @@ export default function FluxKreaPage() {
           // 설정값 로드
           if (data.options) {
             const options = data.options;
+            console.log('⚙️ FLUX KREA 설정값 로드:', options);
             if (options.width) setWidth(options.width);
             if (options.height) setHeight(options.height);
             if (options.seed !== undefined) setSeed(options.seed);
             if (options.guidance !== undefined) setGuidance(options.guidance);
             if (options.model) setModel(options.model);
-            if (options.selectedLora) setSelectedLora(options.selectedLora);
-            if (options.loraWeight !== undefined) setLoraWeight(options.loraWeight);
+            
+            // LoRA 설정을 나중에 적용하기 위해 저장
+            console.log('🔍 LoRA 필드 확인:', {
+              selectedLora: options.selectedLora,
+              lora: options.lora,
+              loraWeight: options.loraWeight
+            });
+            
+            if (options.selectedLora || options.lora || options.loraWeight !== undefined) {
+              const loraName = options.selectedLora || options.lora;
+              console.log('🎨 FLUX KREA LoRA 설정 저장됨 (나중에 적용):', {
+                selectedLora: loraName,
+                loraWeight: options.loraWeight
+              });
+              pendingReuseData.current = {
+                selectedLora: loraName,
+                loraWeight: options.loraWeight
+              };
+            } else {
+              console.log('⚠️ FLUX KREA LoRA 설정이 없음');
+            }
           }
           
           // 성공 메시지 표시
@@ -86,6 +116,18 @@ export default function FluxKreaPage() {
       if (data.success) {
         setLoraFiles(data.files);
         console.log('📁 LoRA files loaded for FLUX KREA:', data.files);
+        
+        // 재사용 데이터가 있으면 LoRA 설정 적용
+        if (pendingReuseData.current) {
+          console.log('🎯 FLUX KREA LoRA 파일 목록 로드 완료, 재사용 설정 적용:', pendingReuseData.current);
+          if (pendingReuseData.current.selectedLora) {
+            setSelectedLora(pendingReuseData.current.selectedLora);
+          }
+          if (pendingReuseData.current.loraWeight !== undefined) {
+            setLoraWeight(pendingReuseData.current.loraWeight);
+          }
+          pendingReuseData.current = null; // 적용 후 초기화
+        }
         
         // 성공적으로 목록을 가져왔으면 메시지 초기화
         setMessage(null);

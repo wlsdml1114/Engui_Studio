@@ -54,16 +54,35 @@ export default function Wan22Page() {
     return new File([blob], filename, { type: mimeType });
   };
 
+  // LoRA 자동 선택 함수
+  const applyLoraSettings = (loraPairs: LoRAPair[]) => {
+    console.log('🎯 LoRA 설정 적용:', loraPairs);
+    setLoraPairs(loraPairs);
+    setLoraCount(loraPairs.length);
+  };
+
+  // 재사용 데이터를 저장할 ref
+  const pendingReuseData = useRef<any>(null);
+
   // 입력값 자동 로드 기능
   useEffect(() => {
+    console.log('🔄 Video Generation 페이지 로드됨');
     const reuseData = localStorage.getItem('reuseInputs');
+    console.log('📋 재사용 데이터:', reuseData);
+    
     if (reuseData) {
       try {
         const data = JSON.parse(reuseData);
+        console.log('📊 파싱된 데이터:', data);
+        console.log('🎯 데이터 타입:', data.type);
+        
         if (data.type === 'wan22') {
+          console.log('✅ WAN 2.2 타입 매칭됨');
+          
           // 프롬프트 로드
           if (data.prompt) {
             setPrompt(data.prompt);
+            console.log('📝 프롬프트 로드됨:', data.prompt);
           }
           
           // 이미지 로드 및 File 객체 생성
@@ -80,11 +99,14 @@ export default function Wan22Page() {
               .catch(error => {
                 console.error('❌ WAN 2.2 이미지 File 객체 생성 실패:', error);
               });
+          } else {
+            console.log('⚠️ 이미지 경로가 없음');
           }
           
           // 설정값 로드
           if (data.options) {
             const options = data.options;
+            console.log('⚙️ 설정값 로드:', options);
             if (options.width) setWidth(options.width);
             if (options.height) setHeight(options.height);
             if (options.seed !== undefined) setSeed(options.seed);
@@ -93,15 +115,31 @@ export default function Wan22Page() {
             if (options.step) setStep(options.step);
           }
           
+          // LoRA 설정을 나중에 적용하기 위해 저장
+          if (data.options && data.options.loraPairs) {
+            console.log('🎨 LoRA 설정 저장됨 (나중에 적용):', data.options.loraPairs);
+            pendingReuseData.current = data.options.loraPairs;
+          }
+          
           // 성공 메시지 표시
           setMessage({ type: 'success', text: '이전 작업의 입력값이 자동으로 로드되었습니다!' });
           
           // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
           localStorage.removeItem('reuseInputs');
+          console.log('🗑️ 재사용 데이터 제거됨');
+        } else {
+          console.log('❌ 타입이 일치하지 않음. 예상: wan22, 실제:', data.type);
         }
       } catch (error) {
-        console.error('입력값 로드 중 오류:', error);
+        console.error('❌ 입력값 로드 중 오류:', error);
+        console.error('❌ 오류 상세:', {
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          reuseData: reuseData
+        });
       }
+    } else {
+      console.log('ℹ️ 재사용할 데이터가 없음');
     }
   }, []);
 
@@ -132,6 +170,13 @@ export default function Wan22Page() {
         console.log('📁 LoRA files loaded:', data.files);
         console.log('🔺 High files:', data.highFiles);
         console.log('🔻 Low files:', data.lowFiles);
+        
+        // 재사용 데이터가 있으면 LoRA 설정 적용
+        if (pendingReuseData.current) {
+          console.log('🎯 LoRA 파일 목록 로드 완료, 재사용 설정 적용:', pendingReuseData.current);
+          applyLoraSettings(pendingReuseData.current);
+          pendingReuseData.current = null; // 적용 후 초기화
+        }
         
         // 성공적으로 목록을 가져왔으면 메시지 초기화
         setMessage(null);
