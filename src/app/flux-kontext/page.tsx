@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { PhotoIcon, SparklesIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
 
 interface FluxKontextSettings {
@@ -25,6 +25,73 @@ export default function FluxKontextPage() {
   const [currentJobId, setCurrentJobId] = useState<string>('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // URL에서 File 객체를 생성하는 헬퍼 함수
+  const createFileFromUrl = async (url: string, filename: string, mimeType: string): Promise<File> => {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new File([blob], filename, { type: mimeType });
+  };
+
+  // 입력값 자동 로드 기능
+  useEffect(() => {
+    const reuseData = localStorage.getItem('reuseInputs');
+    if (reuseData) {
+      try {
+        const data = JSON.parse(reuseData);
+        if (data.type === 'flux-kontext') {
+          // 프롬프트 로드
+          if (data.prompt) {
+            setPrompt(data.prompt);
+          }
+          
+          // 이미지 로드 및 File 객체 생성
+          if (data.inputImagePath || data.inputImageName) {
+            let imagePath = data.inputImagePath || `/results/${data.inputImageName}`;
+            
+            // 로컬 파일 경로인 경우 웹 경로로 변환
+            if (imagePath.startsWith('file://') || imagePath.includes('C:/Users/') || imagePath.includes('C:\\Users\\')) {
+              // 파일명만 추출하여 웹 경로로 변환
+              const pathParts = imagePath.split(/[/\\]/);
+              const fileName = pathParts[pathParts.length - 1];
+              imagePath = `/results/${fileName}`;
+              console.log('🔄 로컬 경로를 웹 경로로 변환:', imagePath);
+            }
+            
+            setPreviewUrl(imagePath);
+            console.log('🔄 FLUX KONTEXT 이미지 재사용:', imagePath);
+            
+            // URL에서 File 객체 생성
+            createFileFromUrl(imagePath, 'reused_image.jpg', 'image/jpeg')
+              .then(file => {
+                setImageFile(file);
+                console.log('✅ FLUX KONTEXT 이미지 File 객체 생성 완료:', file.name);
+              })
+              .catch(error => {
+                console.error('❌ FLUX KONTEXT 이미지 File 객체 생성 실패:', error);
+              });
+          }
+          
+          // 설정값 로드
+          if (data.options) {
+            const options = data.options;
+            if (options.width) setSettings(prev => ({ ...prev, width: options.width }));
+            if (options.height) setSettings(prev => ({ ...prev, height: options.height }));
+            if (options.seed !== undefined) setSettings(prev => ({ ...prev, seed: options.seed }));
+            if (options.cfg !== undefined) setSettings(prev => ({ ...prev, cfg: options.cfg }));
+          }
+          
+          // 성공 메시지 표시
+          setMessage({ type: 'success', text: '이전 작업의 입력값이 자동으로 로드되었습니다!' });
+          
+          // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
+          localStorage.removeItem('reuseInputs');
+        }
+      } catch (error) {
+        console.error('입력값 로드 중 오류:', error);
+      }
+    }
+  }, []);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

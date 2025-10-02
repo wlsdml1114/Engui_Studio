@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { MicrophoneIcon, PhotoIcon, MusicalNoteIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
 
 export default function InfiniteTalkPage() {
@@ -24,6 +24,114 @@ export default function InfiniteTalkPage() {
   const videoInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef2 = useRef<HTMLInputElement>(null);
+
+  // URL에서 File 객체를 생성하는 헬퍼 함수
+  const createFileFromUrl = async (url: string, filename: string, mimeType: string): Promise<File> => {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new File([blob], filename, { type: mimeType });
+  };
+
+  // 입력값 자동 로드 기능
+  useEffect(() => {
+    const reuseData = localStorage.getItem('reuseInputs');
+    if (reuseData) {
+      try {
+        const data = JSON.parse(reuseData);
+        if (data.type === 'infinitetalk') {
+          // 프롬프트 로드
+          if (data.prompt) {
+            setPrompt(data.prompt);
+          }
+          
+          // 입력 타입 로드
+          if (data.inputType) {
+            setInputType(data.inputType);
+          }
+          
+          // 이미지 로드 및 File 객체 생성
+          if (data.imagePath) {
+            setPreviewUrl(data.imagePath);
+            console.log('🔄 Infinite Talk 이미지 재사용:', data.imagePath);
+            
+            // URL에서 File 객체 생성
+            createFileFromUrl(data.imagePath, 'reused_image.jpg', 'image/jpeg')
+              .then(file => {
+                setImageFile(file);
+                console.log('✅ Infinite Talk 이미지 File 객체 생성 완료:', file.name);
+              })
+              .catch(error => {
+                console.error('❌ Infinite Talk 이미지 File 객체 생성 실패:', error);
+              });
+          }
+          
+          // 비디오 로드 및 File 객체 생성
+          if (data.videoPath) {
+            setPreviewUrl(data.videoPath);
+            console.log('🔄 Infinite Talk 비디오 재사용:', data.videoPath);
+            
+            // URL에서 File 객체 생성
+            createFileFromUrl(data.videoPath, 'reused_video.mp4', 'video/mp4')
+              .then(file => {
+                setVideoFile(file);
+                console.log('✅ Infinite Talk 비디오 File 객체 생성 완료:', file.name);
+              })
+              .catch(error => {
+                console.error('❌ Infinite Talk 비디오 File 객체 생성 실패:', error);
+              });
+          }
+          
+          // 오디오 1 로드 및 File 객체 생성
+          if (data.audioPath) {
+            setAudioPreviewUrl(data.audioPath);
+            console.log('🔄 Infinite Talk 오디오 1 재사용:', data.audioPath);
+            
+            // URL에서 File 객체 생성
+            createFileFromUrl(data.audioPath, 'reused_audio.mp3', 'audio/mpeg')
+              .then(file => {
+                setAudioFile(file);
+                console.log('✅ Infinite Talk 오디오 1 File 객체 생성 완료:', file.name);
+              })
+              .catch(error => {
+                console.error('❌ Infinite Talk 오디오 1 File 객체 생성 실패:', error);
+              });
+          }
+          
+          // 오디오 2 로드 및 File 객체 생성
+          if (data.audioPath2) {
+            setAudioPreviewUrl2(data.audioPath2);
+            console.log('🔄 Infinite Talk 오디오 2 재사용:', data.audioPath2);
+            
+            // URL에서 File 객체 생성
+            createFileFromUrl(data.audioPath2, 'reused_audio2.mp3', 'audio/mpeg')
+              .then(file => {
+                setAudioFile2(file);
+                console.log('✅ Infinite Talk 오디오 2 File 객체 생성 완료:', file.name);
+              })
+              .catch(error => {
+                console.error('❌ Infinite Talk 오디오 2 File 객체 생성 실패:', error);
+              });
+          }
+          
+          // 설정값 로드
+          if (data.options) {
+            const options = data.options;
+            if (options.personCount) setPersonCount(options.personCount);
+            if (options.width) setWidth(options.width);
+            if (options.height) setHeight(options.height);
+          }
+          
+          // 성공 메시지 표시
+          setMessage({ type: 'success', text: '이전 작업의 입력값이 자동으로 로드되었습니다!' });
+          
+          // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
+          localStorage.removeItem('reuseInputs');
+        }
+      } catch (error) {
+        console.error('입력값 로드 중 오류:', error);
+      }
+    }
+  }, []);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
