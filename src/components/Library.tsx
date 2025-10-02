@@ -1321,6 +1321,10 @@ export default function Library() {
           videoPath: options.videoWebPath,
           imageFileName: options.imageFileName,
           videoFileName: options.videoFileName
+        }),
+        ...(item.type === 'video-upscale' && {
+          videoPath: options.videoWebPath || options.s3VideoPath,
+          videoFileName: options.videoFileName
         })
       };
 

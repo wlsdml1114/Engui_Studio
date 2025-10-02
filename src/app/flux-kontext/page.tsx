@@ -47,7 +47,17 @@ export default function FluxKontextPage() {
           
           // 이미지 로드 및 File 객체 생성
           if (data.inputImagePath || data.inputImageName) {
-            const imagePath = data.inputImagePath || `/results/${data.inputImageName}`;
+            let imagePath = data.inputImagePath || `/results/${data.inputImageName}`;
+            
+            // 로컬 파일 경로인 경우 웹 경로로 변환
+            if (imagePath.startsWith('file://') || imagePath.includes('C:/Users/') || imagePath.includes('C:\\Users\\')) {
+              // 파일명만 추출하여 웹 경로로 변환
+              const pathParts = imagePath.split(/[/\\]/);
+              const fileName = pathParts[pathParts.length - 1];
+              imagePath = `/results/${fileName}`;
+              console.log('🔄 로컬 경로를 웹 경로로 변환:', imagePath);
+            }
+            
             setPreviewUrl(imagePath);
             console.log('🔄 FLUX KONTEXT 이미지 재사용:', imagePath);
             
