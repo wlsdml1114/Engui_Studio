@@ -143,29 +143,29 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
         console.log('🔍 Item thumbnailUrl:', item.thumbnailUrl);
         console.log('🔍 Item ID:', item.id);
         
-        // 로컬 웹 경로가 있으면 우선 사용 (이미지)
+        // 생성된 썸네일이 있으면 우선 사용 (최고 우선순위)
+        if (item.thumbnailUrl) {
+          console.log('🖼️ Using generated thumbnail for Infinite Talk:', item.thumbnailUrl);
+          return item.thumbnailUrl;
+        }
+        
+        // 로컬 웹 경로가 있으면 사용 (이미지)
         if (options.imageWebPath) {
-          console.log('🖼️ Using local web path for Infinite Talk thumbnail:', options.imageWebPath);
+          console.log('🖼️ Using external web path for Infinite Talk thumbnail:', options.imageWebPath);
           return options.imageWebPath;
         }
         
         // 로컬 웹 경로가 있으면 사용 (비디오)
         if (options.videoWebPath) {
-          console.log('🎬 Using local web path for Infinite Talk thumbnail (video):', options.videoWebPath);
+          console.log('🎬 Using external web path for Infinite Talk thumbnail (video):', options.videoWebPath);
           return options.videoWebPath;
-        }
-        
-        // 생성된 썸네일이 있으면 사용
-        if (item.thumbnailUrl) {
-          console.log('🖼️ Using generated thumbnail for Infinite Talk:', item.thumbnailUrl);
-          return item.thumbnailUrl;
         }
         
         // 입력 이미지 파일명이 있으면 웹 경로로 변환
         if (options.imageFileName) {
           // 실제 저장된 파일명으로 변환 (input/infinitetalk/input_${jobId}_${originalName})
           const actualFileName = `input/infinitetalk/input_${item.id}_${options.imageFileName}`;
-          const webPath = `/results/${actualFileName}`;
+          const webPath = `/results/${encodeURIComponent(actualFileName)}`;
           console.log('🖼️ Using actual image file name for Infinite Talk thumbnail:', webPath);
           return webPath;
         }
@@ -174,7 +174,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
         if (options.videoFileName) {
           // 실제 저장된 파일명으로 변환 (input/infinitetalk/input_${jobId}_${originalName})
           const actualFileName = `input/infinitetalk/input_${item.id}_${options.videoFileName}`;
-          const webPath = `/results/${actualFileName}`;
+          const webPath = `/results/${encodeURIComponent(actualFileName)}`;
           console.log('🎬 Using actual video file name for Infinite Talk thumbnail:', webPath);
           return webPath;
         }
@@ -1068,7 +1068,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                     return (
                       <div className="relative">
                         <video 
-                          src={fallbackPath} 
+                          src={encodeURI(fallbackPath)} 
                           controls
                           className="w-full max-h-64 object-contain rounded-lg bg-black"
                           onError={(e) => {
@@ -1100,7 +1100,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                     return (
                       <div className="relative">
                         <img 
-                          src={fallbackPath} 
+                          src={encodeURI(fallbackPath)} 
                           alt="Input image" 
                           className="w-full max-h-64 object-contain rounded-lg bg-background"
                           onError={(e) => {

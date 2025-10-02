@@ -74,37 +74,7 @@ async function processInfiniteTalkJob(jobId: string, runpodJobId: string) {
           
           console.log(`✅ Infinite Talk video saved locally: ${videoPath}`);
           
-          // 썸네일 생성 (입력 이미지/비디오를 썸네일로 사용)
-          try {
-            const jobData = await prisma.job.findUnique({ where: { id: jobId } });
-            if (jobData?.options) {
-              const options = JSON.parse(jobData.options);
-              
-              // 입력 이미지가 있으면 썸네일로 사용
-              if (options.imageWebPath) {
-                await prisma.job.update({
-                  where: { id: jobId },
-                  data: {
-                    thumbnailUrl: options.imageWebPath,
-                  },
-                });
-                console.log(`🖼️ Infinite Talk thumbnail set to input image: ${options.imageWebPath}`);
-              }
-              // 입력 비디오가 있으면 썸네일로 사용
-              else if (options.videoWebPath) {
-                await prisma.job.update({
-                  where: { id: jobId },
-                  data: {
-                    thumbnailUrl: options.videoWebPath,
-                  },
-                });
-                console.log(`🎬 Infinite Talk thumbnail set to input video: ${options.videoWebPath}`);
-              }
-            }
-            
-          } catch (thumbnailError) {
-            console.error('❌ Failed to set thumbnail:', thumbnailError);
-          }
+          // 썸네일은 이미 작업 시작 시 생성되었으므로 여기서는 생성하지 않음
           
         } else if (typeof videoData === 'string' && videoData.startsWith('http')) {
           // 외부 URL에서 다운로드
@@ -118,37 +88,7 @@ async function processInfiniteTalkJob(jobId: string, runpodJobId: string) {
           
           console.log(`✅ Infinite Talk video downloaded and saved: ${videoPath}`);
           
-          // 썸네일 생성 (입력 이미지/비디오를 썸네일로 사용)
-          try {
-            const jobData = await prisma.job.findUnique({ where: { id: jobId } });
-            if (jobData?.options) {
-              const options = JSON.parse(jobData.options);
-              
-              // 입력 이미지가 있으면 썸네일로 사용
-              if (options.imageWebPath) {
-                await prisma.job.update({
-                  where: { id: jobId },
-                  data: {
-                    thumbnailUrl: options.imageWebPath,
-                  },
-                });
-                console.log(`🖼️ Infinite Talk thumbnail set to input image: ${options.imageWebPath}`);
-              }
-              // 입력 비디오가 있으면 썸네일로 사용
-              else if (options.videoWebPath) {
-                await prisma.job.update({
-                  where: { id: jobId },
-                  data: {
-                    thumbnailUrl: options.videoWebPath,
-                  },
-                });
-                console.log(`🎬 Infinite Talk thumbnail set to input video: ${options.videoWebPath}`);
-              }
-            }
-            
-          } catch (thumbnailError) {
-            console.error('❌ Failed to set thumbnail:', thumbnailError);
-          }
+          // 썸네일은 이미 작업 시작 시 생성되었으므로 여기서는 생성하지 않음
         }
       }
 
@@ -417,13 +357,80 @@ export async function POST(request: NextRequest) {
           mediaS3Path,
           audioS3Path,
           audioS3Path2,
-          imageWebPath: imageFile ? `/results/input/infinitetalk/input_${job.id}_${imageFile.name}` : undefined,
-          videoWebPath: videoFile ? `/results/input/infinitetalk/input_${job.id}_${videoFile.name}` : undefined,
           audioWebPath: `/results/input/infinitetalk/audio_${job.id}_${audioFile.name}`,
-          audioWebPath2: audioFile2 ? `/results/input/infinitetalk/audio2_${job.id}_${audioFile2.name}` : undefined,
+          ...(imageFile && {
+            imageWebPath: `/results/input/infinitetalk/input_${job.id}_${imageFile.name}`,
+            localImagePath: join(infinitetalkDir, `input_${job.id}_${imageFile.name}`)
+          }),
+          ...(videoFile && {
+            videoWebPath: `/results/input/infinitetalk/input_${job.id}_${videoFile.name}`,
+            localVideoPath: join(infinitetalkDir, `input_${job.id}_${videoFile.name}`)
+          }),
+          ...(audioFile2 && {
+            audioWebPath2: `/results/input/infinitetalk/audio2_${job.id}_${audioFile2.name}`
+          })
         }),
       },
     });
+
+    // 썸네일 생성 (동기 처리로 완료 후 응답)
+    let thumbnailSetSuccess = false;
+    try {
+      if (inputType === 'image' && imageFile) {
+        // 이미지 입력인 경우 이미지를 썸네일로 사용
+        const thumbnailUrl = `/results/input/infinitetalk/input_${job.id}_${imageFile.name}`;
+        await prisma.job.update({
+          where: { id: job.id },
+          data: { thumbnailUrl },
+        });
+        console.log(`🖼️ Infinite Talk thumbnail set to input image: ${thumbnailUrl}`);
+        thumbnailSetSuccess = true;
+      } else if (inputType === 'video' && videoFile) {
+        // 비디오 입력인 경우 첫 번째 프레임을 썸네일로 생성
+        const localVideoPath = join(infinitetalkDir, `input_${job.id}_${videoFile.name}`);
+        console.log(`🎬 Generating thumbnail from input video: ${localVideoPath}`);
+        
+        // 썸네일 파일명 생성
+        const thumbnailFileName = `thumb_${job.id}.jpg`;
+        const thumbnailPath = join(LOCAL_STORAGE_DIR, thumbnailFileName);
+        
+        // FFmpeg로 첫 번째 프레임 추출
+        const { ffmpegService } = await import('@/lib/ffmpegService');
+        
+        try {
+          await ffmpegService.extractThumbnail(localVideoPath, thumbnailPath, {
+            width: 320,
+            height: 240,
+            quality: 80,
+            format: 'jpg'
+          });
+          
+          // 썸네일 URL 설정
+          const thumbnailUrl = `/results/${thumbnailFileName}`;
+          await prisma.job.update({
+            where: { id: job.id },
+            data: { thumbnailUrl },
+          });
+          
+          console.log(`✅ Infinite Talk thumbnail generated: ${thumbnailUrl}`);
+          thumbnailSetSuccess = true;
+        } catch (ffmpegError) {
+          console.error('❌ Failed to generate thumbnail from video:', ffmpegError);
+          // FFmpeg 실패 시 비디오 자체를 썸네일로 사용
+          const fallbackThumbnailUrl = `/results/input/infinitetalk/input_${job.id}_${videoFile.name}`;
+          await prisma.job.update({
+            where: { id: job.id },
+            data: { thumbnailUrl: fallbackThumbnailUrl },
+          });
+          console.log(`🎬 Fallback: Infinite Talk thumbnail set to input video: ${fallbackThumbnailUrl}`);
+          thumbnailSetSuccess = true;
+        }
+      }
+    } catch (thumbnailError) {
+      console.error('❌ Failed to set initial thumbnail:', thumbnailError);
+    }
+
+    console.log(`📸 Thumbnail generation ${thumbnailSetSuccess ? 'completed' : 'skipped'}: ${job.id}`);
 
     // 백그라운드에서 작업 처리 시작
     processInfiniteTalkJob(job.id, runpodJobId).catch(error => {

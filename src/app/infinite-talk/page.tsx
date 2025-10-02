@@ -222,10 +222,18 @@ export default function InfiniteTalkPage() {
 
       if (response.ok && data.success && data.jobId) {
         setCurrentJobId(data.jobId);
-        setMessage({ type: 'success', text: data.message || 'Infinite Talk 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.' });
+        setMessage({ 
+          type: 'success', 
+          text: data.message || 'Infinite Talk 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.' 
+        });
         
         // 백그라운드 처리이므로 즉시 완료 상태로 변경
         setIsGenerating(false);
+        
+        // Library로 이동하여 새로운 작업 확인
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1000);
         
         // 입력 초기화
         setPrompt('');

@@ -76,8 +76,8 @@ export class FFmpegService {
       console.log(`[FFmpeg] Using local FFmpeg for thumbnail: ${localPath}`);
     }
 
-    // FFmpeg 명령어 구성
-    const command = `"${ffmpegCommand}" -i "${inputPath}" -ss 00:00:01 -vframes 1 -vf "scale=${width}:${height}" -q:v ${quality} "${outputPath}"`;
+    // FFmpeg 명령어 구성 (-y 옵션으로 자동 덮어쓰기)
+    const command = `"${ffmpegCommand}" -y -i "${inputPath}" -ss 00:00:01 -vframes 1 -vf "scale=${width}:${height}" -q:v ${quality} "${outputPath}"`;
 
     try {
       console.log(`[FFmpeg] Extracting thumbnail: ${inputPath} -> ${outputPath}`);
