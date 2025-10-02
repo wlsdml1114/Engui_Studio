@@ -420,16 +420,6 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
           </div>
         )}
         
-        {/* 상태 표시 */}
-        <div className="absolute top-2 left-2 px-2 flex gap-1">
-          <div className="px-2 py-1 bg-black/70 rounded text-xs text-white backdrop-blur-sm">
-            ID: {item.id.substring(0, 6)}</div>
-          {(item.status === 'completed' && (thumbnailUrl || item.resultUrl)) && (
-            <div className="px-2 py-1 bg-blue-500/70 rounded text-xs text-white backdrop-blur-sm">
-              🖱️ 드래그 가능
-            </div>
-          )}
-        </div>
 
         {/* 삭제 버튼 */}
         <button
@@ -455,19 +445,13 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
       </div>
       
       <div className="p-3 space-y-2">
-        <p className="text-sm text-foreground/80 truncate">
-          {item.type === 'multitalk' ? 'MultiTalk Content' : 
-           item.type === 'wan22' ? 'WAN 2.2 Video' : 
-           item.type === 'wan-animate' ? 'WAN Animate Video' :
-           item.type === 'flux-kontext' ? 'FLUX KONTEXT Image' :
-           item.type === 'flux-krea' ? 'FLUX KREA Image' :
-           item.type === 'infinitetalk' ? 'Infinite Talk Video' :
-           item.type === 'video-upscale' ? 'Video Upscale' :
-           (item.prompt || 'No prompt')}
-        </p>
         
         <div className="flex justify-between items-center">
-          <span className="text-xs px-2 py-1 bg-primary/20 text-primary rounded-full capitalize">
+          <span className={`text-xs px-2 py-1 rounded-full capitalize font-medium ${
+            item.type === 'flux-kontext' || item.type === 'flux-krea' 
+              ? 'bg-purple-500/20 text-purple-300' // 이미지 타입 - 보라색
+              : 'bg-blue-500/20 text-blue-300'     // 비디오 타입 - 파란색
+          }`}>
             {item.type}
           </span>
           <span className={`text-xs font-medium ${
@@ -476,11 +460,6 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
           }`}>
             {item.status}
           </span>
-        </div>
-        
-        <div className="text-xs text-foreground/50 space-y-1">
-          <div>Created: {createdTime}</div>
-          {completedTime && <div>Completed: {completedTime}</div>}
         </div>
       </div>
 
@@ -587,6 +566,33 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
               <p className="text-foreground/80 bg-background p-3 rounded-lg">{item.prompt}</p>
             </div>
           )}
+          
+          {/* 작업 정보 */}
+          <div>
+            <h4 className="font-medium mb-2">작업 정보</h4>
+            <div className="bg-background/50 p-4 rounded-lg space-y-2">
+              <div className="text-sm text-foreground/80">
+                <span className="font-medium">Job ID:</span> {item.id.substring(0, 8)}
+              </div>
+              <div className="text-sm text-foreground/80">
+                <span className="font-medium">생성 시간:</span> {new Date(item.createdAt).toLocaleString()}
+              </div>
+              {item.completedAt && (
+                <span className="text-sm text-foreground/80">
+                  <span className="font-medium">완료 시간:</span> {new Date(item.completedAt).toLocaleString()}
+                </span>
+              )}
+              <div className="text-sm text-foreground/80">
+                <span className="font-medium">상태:</span> 
+                <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
+                  item.status === 'completed' ? 'bg-green-500/20 text-green-300' : 
+                  item.status === 'failed' ? 'bg-red-500/20 text-red-300' : 'bg-yellow-500/20 text-yellow-300'
+                }`}>
+                  {item.status}
+                </span>
+              </div>
+            </div>
+          </div>
           
           {/* 결과물 */}
           {resultUrl ? (
