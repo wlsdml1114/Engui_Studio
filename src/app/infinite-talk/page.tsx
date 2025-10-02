@@ -81,6 +81,38 @@ export default function InfiniteTalkPage() {
               });
           }
           
+          // 오디오 1 로드 및 File 객체 생성
+          if (data.audioPath) {
+            setAudioPreviewUrl(data.audioPath);
+            console.log('🔄 Infinite Talk 오디오 1 재사용:', data.audioPath);
+            
+            // URL에서 File 객체 생성
+            createFileFromUrl(data.audioPath, 'reused_audio.mp3', 'audio/mpeg')
+              .then(file => {
+                setAudioFile(file);
+                console.log('✅ Infinite Talk 오디오 1 File 객체 생성 완료:', file.name);
+              })
+              .catch(error => {
+                console.error('❌ Infinite Talk 오디오 1 File 객체 생성 실패:', error);
+              });
+          }
+          
+          // 오디오 2 로드 및 File 객체 생성
+          if (data.audioPath2) {
+            setAudioPreviewUrl2(data.audioPath2);
+            console.log('🔄 Infinite Talk 오디오 2 재사용:', data.audioPath2);
+            
+            // URL에서 File 객체 생성
+            createFileFromUrl(data.audioPath2, 'reused_audio2.mp3', 'audio/mpeg')
+              .then(file => {
+                setAudioFile2(file);
+                console.log('✅ Infinite Talk 오디오 2 File 객체 생성 완료:', file.name);
+              })
+              .catch(error => {
+                console.error('❌ Infinite Talk 오디오 2 File 객체 생성 실패:', error);
+              });
+          }
+          
           // 설정값 로드
           if (data.options) {
             const options = data.options;

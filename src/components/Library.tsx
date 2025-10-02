@@ -9,7 +9,7 @@ interface JobItem {
   id: string;
   userId: string;
   status: 'processing' | 'completed' | 'failed';
-  type: 'video' | 'multitalk' | 'flux-kontext' | 'flux-krea' | 'wan22' | 'wan-animate' | 'infinitetalk';
+  type: 'video' | 'multitalk' | 'flux-kontext' | 'flux-krea' | 'wan22' | 'wan-animate' | 'infinitetalk'|'video-upscale';
   prompt?: string;
   options?: string;
   resultUrl?: string;
@@ -1320,7 +1320,11 @@ export default function Library() {
           imagePath: options.imageWebPath,
           videoPath: options.videoWebPath,
           imageFileName: options.imageFileName,
-          videoFileName: options.videoFileName
+          videoFileName: options.videoFileName,
+          audioPath: options.audioWebPath,
+          audioPath2: options.audioWebPath2,
+          audioFileName: options.audioFileName,
+          audioFileName2: options.audioFileName2
         }),
         ...(item.type === 'video-upscale' && {
           videoPath: options.videoWebPath || options.s3VideoPath,
