@@ -35,6 +35,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
     x: 0,
     y: 0
   });
+  const [isDragging, setIsDragging] = useState(false);
   const itemRef = useRef<HTMLDivElement>(null);
 
   // MultiTalk의 경우 options에서 입력 이미지 경로 추출
@@ -300,6 +301,53 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
     handleContextMenuAction(() => onReuseInputs(item));
   };
 
+  // 드래그 시작 핸들러
+  const handleDragStart = (e: React.DragEvent) => {
+    console.log('🖱️ 드래그 시작:', item.type, item.id);
+    setIsDragging(true);
+    
+    // 드래그할 데이터 구성
+    const dragData = {
+      type: 'library-result',
+      jobType: item.type,
+      jobId: item.id,
+      prompt: item.prompt || '',
+      // 미디어 타입과 URL 정보
+      mediaType: item.type === 'flux-kontext' || item.type === 'flux-krea' ? 'image' : 'video',
+      mediaUrl: item.resultUrl || thumbnailUrl,
+      thumbnailUrl: thumbnailUrl,
+      // 각 타입별 추가 정보
+      ...(item.type === 'multitalk' && { inputImagePath: getThumbnailUrl() }),
+      ...(item.type === 'flux-kontext' && { inputImagePath: getThumbnailUrl() }),
+      ...(item.type === 'flux-krea' && { imageUrl: getThumbnailUrl() }),
+      ...(item.type === 'wan22' && { inputImagePath: getThumbnailUrl() }),
+      ...(item.type === 'wan-animate' && { imageUrl: getThumbnailUrl() }),
+      ...(item.type === 'infinitetalk' && { 
+        inputType: 'video',
+        videoUrl: getThumbnailUrl()
+      }),
+      ...(item.type === 'video-upscale' && { videoUrl: getThumbnailUrl() })
+    };
+
+    // 드래그 데이터를 텍스트로 저장 (다른 페이지에서 접근 가능)
+    e.dataTransfer.setData('application/json', JSON.stringify(dragData));
+    e.dataTransfer.setData('text/plain', JSON.stringify(dragData)); // 폴백용
+    
+    // 썸네일을 드래그 이미지로 설정
+    const img = itemRef.current?.querySelector('img');
+    if (img) {
+      e.dataTransfer.setDragImage(img, 50, 30); // 드래그 시 보여질 썸네일 위치
+    }
+    
+    console.log('📦 드래그 데이터:', dragData);
+  };
+
+  // 드래그 종료 핸들러
+  const handleDragEnd = () => {
+    console.log('🖱️ 드래그 종료');
+    setIsDragging(false);
+  };
+
   // 컨텍스트 메뉴 외부 클릭 시 닫기
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -321,9 +369,13 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
         className={`
           relative bg-background/50 rounded-lg border border-border overflow-hidden cursor-pointer transition-all duration-200 hover:border-primary/50 hover:bg-background/70 group
           ${item.status === 'completed' ? 'hover:shadow-lg hover:shadow-primary/20' : ''}
+          ${isDragging ? 'opacity-50 scale-95 transform origin-center' : ''}
         `}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
+        draggable={item.status === 'completed' && (thumbnailUrl || item.resultUrl)}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
       >
       {/* 썸네일 */}
       <div className="relative aspect-video bg-background overflow-hidden">
@@ -331,7 +383,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
           <img 
             src={thumbnailUrl} 
             alt="Thumbnail" 
-            className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+            className={`w-full h-full object-cover transition-transform duration-200 ${isDragging ? 'brightness-50' : 'group-hover:scale-105'}`}
             onError={(e) => {
               console.error('❌ Thumbnail error for', item.type, item.id, ':', e);
               console.error('❌ Failed URL:', thumbnailUrl);
@@ -356,8 +408,14 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
         )}
         
         {/* 상태 표시 */}
-        <div className="absolute top-2 left-2 px-2 py-1 bg-black/70 rounded text-xs text-white backdrop-blur-sm">
-          ID: {item.id.substring(0, 6)}
+        <div className="absolute top-2 left-2 px-2 flex gap-1">
+          <div className="px-2 py-1 bg-black/70 rounded text-xs text-white backdrop-blur-sm">
+            ID: {item.id.substring(0, 6)}</div>
+          {(item.status === 'completed' && (thumbnailUrl || item.resultUrl)) && (
+            <div className="px-2 py-1 bg-blue-500/70 rounded text-xs text-white backdrop-blur-sm">
+              🖱️ 드래그 가능
+            </div>
+          )}
         </div>
 
         {/* 삭제 버튼 */}
@@ -426,7 +484,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
           <button
             onClick={() => {
               console.log('🖱️ 입력값 재사용 버튼 클릭됨');
-              handleReuseInputs(item);
+              handleReuseInputs();
             }}
             className="w-full px-4 py-2 text-left text-sm hover:bg-background/50 transition-colors flex items-center gap-2"
           >

@@ -24,6 +24,7 @@ export default function InfiniteTalkPage() {
   const videoInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef2 = useRef<HTMLInputElement>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // URL에서 File 객체를 생성하는 헬퍼 함수
   const createFileFromUrl = async (url: string, filename: string, mimeType: string): Promise<File> => {
@@ -166,6 +167,110 @@ export default function InfiniteTalkPage() {
       setAudioFile2(file);
       const url = URL.createObjectURL(file);
       setAudioPreviewUrl2(url);
+    }
+  };
+
+  // 드래그 앤 드롭 핸들러들
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    try {
+      // 드래그된 데이터를 찾기
+      let dragData = null;
+      
+      try {
+        const jsonData = e.dataTransfer.getData('application/json');
+        dragData = jsonData ? JSON.parse(jsonData) : null;
+      } catch {
+        try {
+          const textData = e.dataTransfer.getData('text/plain');
+          dragData = textData ? JSON.parse(textData) : null;
+        } catch {
+          console.log('❌ 드래그 데이터를 파싱할 수 없음');
+          return;
+        }
+      }
+
+      if (!dragData || dragData.type !== 'library-result') {
+        console.log('❌ 라이브러리 결과 데이터가 아님');
+        return;
+      }
+
+      console.log('🎯 Infinite Talk에 드롭된 데이터:', dragData);
+
+      // 미디어 타입에 따라 처리
+      const mediaUrl = dragData.inputImagePath || dragData.imageUrl || dragData.videoUrl || dragData.thumbnailUrl;
+      
+      if (mediaUrl) {
+        console.log('🎬 미디어 드롭 처리:', mediaUrl);
+        
+        // 미디어 타입 감지
+        const isVideo = dragData.mediaType === 'video' || dragData.jobType === 'multitalk' || 
+                       dragData.jobType === 'wan22' || dragData.jobType === 'wan-animate' || 
+                       dragData.jobType === 'infinitetalk' || dragData.jobType === 'video-upscale';
+        
+        try {
+          if (isVideo) {
+            // 비디오 처리
+            setInputType('video');
+            setPreviewUrl(mediaUrl);
+            const file = await createFileFromUrl(mediaUrl, 'dropped_video.mp4', 'video/mp4');
+            setVideoFile(file);
+            console.log('✅ 드롭된 비디오 File 객체 생성 완료');
+          } else {
+            // 이미지 처리
+            setInputType('image');
+            setPreviewUrl(mediaUrl);
+            const file = await createFileFromUrl(mediaUrl, 'dropped_image.jpg', 'image/jpeg');
+            setImageFile(file);
+            console.log('✅ 드롭된 이미지 File 객체 생성 완료');
+          }
+          
+          setMessage({ 
+            type: 'success', 
+            text: `라이브러리에서 ${dragData.jobType} 결과물을 ${isVideo ? '비디오' : '이미지'}로 사용했습니다!` 
+          });
+        } catch (error) {
+          console.error('❌ 드롭된 미디어 File 객체 생성 실패:', error);
+          setMessage({ 
+            type: 'error', 
+            text: '드롭된 미디어를 처리하는 중 오류가 발생했습니다.' 
+          });
+        }
+      } else {
+        setMessage({ 
+          type: 'error', 
+          text: '이 드래그된 항목에는 미디어 데이터가 없습니다.' 
+        });
+        return;
+      }
+
+      // 프롬프트가 있으면 적용
+      if (dragData.prompt && dragData.prompt.trim()) {
+        setPrompt(dragData.prompt);
+        console.log('📝 프롬프트 자동 설정:', dragData.prompt);
+      }
+
+    } catch (error) {
+      console.error('❌ 드롭 처리 중 오류:', error);
+      setMessage({ 
+        type: 'error', 
+        text: '드롭된 데이터를 처리하는 중 오류가 발생했습니다.' 
+      });
     }
   };
 
@@ -319,7 +424,16 @@ export default function InfiniteTalkPage() {
               <label className="block text-sm font-medium mb-2">
                 {inputType === 'image' ? '이미지 파일' : '비디오 파일'} <span className="text-red-400">*</span>
               </label>
-              <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors">
+              <div 
+                className={`border-2 border-dashed rounded-lg p-6 text-center transition-all duration-200 ${
+                  isDragOver 
+                    ? 'border-primary bg-primary/10 border-solid' 
+                    : 'border-border hover:border-primary'
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
                 {inputType === 'image' ? (
                   <>
                     <input
@@ -353,8 +467,13 @@ export default function InfiniteTalkPage() {
                       <>
                         <PhotoIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                         <p className="text-sm text-muted-foreground mb-2">
-                          이미지 파일을 선택하거나 드래그하세요
+                          {isDragOver ? '🎯 여기에 놓으세요!' : '이미지 파일을 선택하거나 드래그하세요'}
                         </p>
+                        {isDragOver && (
+                          <p className="text-xs text-primary mb-2">
+                            라이브러리의 결과물을 여기에 드래그하세요
+                          </p>
+                        )}
                         <button
                           type="button"
                           onClick={() => imageInputRef.current?.click()}
@@ -399,8 +518,13 @@ export default function InfiniteTalkPage() {
                       <>
                         <VideoCameraIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                         <p className="text-sm text-muted-foreground mb-2">
-                          비디오 파일을 선택하거나 드래그하세요
+                          {isDragOver ? '🎯 여기에 놓으세요!' : '비디오 파일을 선택하거나 드래그하세요'}
                         </p>
+                        {isDragOver && (
+                          <p className="text-xs text-primary mb-2">
+                            라이브러리의 비디오 결과물을 여기에 드래그하세요
+                          </p>
+                        )}
                         <button
                           type="button"
                           onClick={() => videoInputRef.current?.click()}
