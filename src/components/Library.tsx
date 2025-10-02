@@ -5,9 +5,23 @@ import { useState, useEffect, useRef } from "react";
 import useSWR from 'swr';
 import { XMarkIcon, PlayIcon, PhotoIcon, TrashIcon, StarIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
+interface Workspace {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+  _count?: {
+    jobs: number;
+  };
+}
+
 interface JobItem {
   id: string;
   userId: string;
+  workspaceId?: string;
   status: 'processing' | 'completed' | 'failed';
   type: 'video' | 'multitalk' | 'flux-kontext' | 'flux-krea' | 'wan22' | 'wan-animate' | 'infinitetalk'|'video-upscale';
   prompt?: string;
@@ -17,6 +31,7 @@ interface JobItem {
   createdAt: string;
   completedAt?: string;
   isFavorite?: boolean; // 즐겨찾기 상태
+  workspace?: Workspace; // 워크스페이스 정보
 }
 
 interface LibraryItemProps {
@@ -25,11 +40,16 @@ interface LibraryItemProps {
   onDeleteClick: (item: JobItem, e: React.MouseEvent) => void;
   onFavoriteToggle: (item: JobItem, e: React.MouseEvent) => void;
   onReuseInputs: (item: JobItem) => void;
+  onMoveToWorkspace: (jobId: string, workspaceId: string) => void;
+  availableWorkspaces: Workspace[];
 }
 
 const fetcher = (url: string) => fetch(url).then(res => res.json());
 
-const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteClick, onFavoriteToggle, onReuseInputs }) => {
+// 워크스페이스 데이터 fetcher
+const workspaceFetcher = (url: string) => fetch(url).then(res => res.json());
+
+const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteClick, onFavoriteToggle, onReuseInputs, onMoveToWorkspace, availableWorkspaces }) => {
   const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number }>({
     visible: false,
     x: 0,
@@ -466,7 +486,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
       {/* 컨텍스트 메뉴 */}
       {contextMenu.visible && (
         <div
-          className="fixed z-50 bg-secondary border border-border rounded-lg shadow-lg py-1 min-w-[180px]"
+          className="fixed z-50 bg-gradient-to-br from-secondary/95 to-secondary/90 backdrop-blur-xl border border-border/50 rounded-xl shadow-2xl py-2 min-w-[200px]"
           style={{
             left: contextMenu.x,
             top: contextMenu.y,
@@ -478,11 +498,67 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
               console.log('🖱️ 입력값 재사용 버튼 클릭됨');
               handleReuseInputs();
             }}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-background/50 transition-colors flex items-center gap-2"
+            className="w-full px-4 py-3 text-left text-sm hover:bg-background/30 transition-all duration-200 flex items-center gap-3 rounded-lg mx-2 group"
           >
-            <ArrowPathIcon className="w-4 h-4" />
-            입력값 재사용
+            <ArrowPathIcon className="w-4 h-4 text-primary group-hover:rotate-180 transition-transform duration-300" />
+            <span className="text-foreground/90">🔄 입력값 재사용</span>
           </button>
+          
+          {/* 워크스페이스로 이동 */}
+          {availableWorkspaces.length > 0 && (
+            <>
+              <div className="border-t border-border/30 my-2 mx-2"></div>
+              <div className="px-4 py-2 text-xs text-foreground/60 font-medium bg-background/20 mx-2 rounded-lg">
+                📂 워크스페이스로 이동
+              </div>
+              {availableWorkspaces
+                .filter(ws => ws.id !== item.workspaceId)
+                .map((workspace) => (
+                  <button
+                    key={workspace.id}
+                    onClick={() => {
+                      onMoveToWorkspace(item.id, workspace.id);
+                      setContextMenu({ visible: false, x: 0, y: 0 });
+                    }}
+                    className="w-full px-4 py-3 text-left text-sm hover:bg-background/30 transition-all duration-200 flex items-center gap-3 rounded-lg mx-2 group"
+                  >
+                    {workspace.color ? (
+                      <div 
+                        className="w-3 h-3 rounded-full flex-shrink-0 shadow-sm ring-1 ring-white/20"
+                        style={{ backgroundColor: workspace.color }}
+                      />
+                    ) : (
+                      <div className="w-3 h-3 rounded-full bg-gradient-to-br from-primary/60 to-primary/40 flex-shrink-0 shadow-sm ring-1 ring-white/20" />
+                    )}
+                    <span className="text-foreground/90 group-hover:text-foreground transition-colors">
+                      {workspace.name}
+                    </span>
+                  </button>
+                ))}
+              {/* 워크스페이스에서 제거 */}
+              {item.workspaceId && (
+                <button
+                  onClick={() => {
+                    fetch(`/api/workspaces/${item.workspaceId}/jobs/${item.id}`, {
+                      method: 'DELETE'
+                    }).then(() => {
+                      // 간단한 새로고침 (실제로는 부모에서 mutate 호출해야 함)
+                      window.location.reload();
+                    });
+                    setContextMenu({ visible: false, x: 0, y: 0 });
+                  }}
+                  className="w-full px-4 py-3 text-left text-sm hover:bg-red-500/10 transition-all duration-200 flex items-center gap-3 rounded-lg mx-2 group"
+                >
+                  <div className="w-4 h-4 rounded-full bg-red-500/20 flex items-center justify-center">
+                    <span className="text-red-400 text-xs">✕</span>
+                  </div>
+                  <span className="text-red-400 group-hover:text-red-300 transition-colors">
+                    워크스페이스에서 제거
+                  </span>
+                </button>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
@@ -1240,6 +1316,14 @@ export default function Library() {
   const [deleteConfirm, setDeleteConfirm] = useState<JobItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  
+  // 워크스페이스 관련 상태
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
+  const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
+  const [newWorkspaceName, setNewWorkspaceName] = useState('');
+  const [showWorkspaceDropdown, setShowWorkspaceDropdown] = useState(false);
+  const [deleteWorkspaceConfirm, setDeleteWorkspaceConfirm] = useState<{id: string, name: string} | null>(null);
+  const [isDeletingWorkspace, setIsDeletingWorkspace] = useState(false);
 
   // 스마트 폴링을 위한 상태
   const [hasProcessingJobs, setHasProcessingJobs] = useState(false);
@@ -1253,8 +1337,20 @@ export default function Library() {
   // 처리 중인 작업이 있을 때만 빠른 폴링, 없으면 느린 폴링
   const refreshInterval = hasProcessingJobs ? 2000 : 10000; // 2초 또는 10초
 
+  // 워크스페이스 데이터 가져오기
+  const { data: workspaceData, mutate: mutateWorkspaces } = useSWR(
+    `/api/workspaces?userId=user-with-settings`,
+    workspaceFetcher,
+    { revalidateOnFocus: false }
+  );
+
+  // 작업 데이터 가져오기 (워크스페이스 필터 포함)
+  const jobsUrl = selectedWorkspaceId 
+    ? `/api/jobs?page=${currentPage}&limit=${ITEMS_PER_PAGE}&workspaceId=${selectedWorkspaceId}`
+    : `/api/jobs?page=${currentPage}&limit=${ITEMS_PER_PAGE}`;
+    
   const { data, error, isValidating, mutate } = useSWR(
-    `/api/jobs?page=${currentPage}&limit=${ITEMS_PER_PAGE}`, 
+    jobsUrl, 
     fetcher, 
     { 
       refreshInterval: isVisible ? refreshInterval : 0, // 탭이 보이지 않으면 폴링 중지
@@ -1273,6 +1369,14 @@ export default function Library() {
     }
   );
 
+  // 데이터 변수들 선언
+  const jobs: JobItem[] = data?.jobs || [];
+  const workspaces: Workspace[] = workspaceData?.workspaces || [];
+  const processingJobs = jobs.filter(job => job.status === 'processing').length;
+  
+  // 즐겨찾기 필터링
+  const filteredJobs = showFavoritesOnly ? jobs.filter(job => job.isFavorite) : jobs;
+
   // 페이지 가시성 감지
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -1283,11 +1387,71 @@ export default function Library() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
-  const jobs: JobItem[] = data?.jobs || [];
-  const processingJobs = jobs.filter(job => job.status === 'processing').length;
-  
-  // 즐겨찾기 필터링
-  const filteredJobs = showFavoritesOnly ? jobs.filter(job => job.isFavorite) : jobs;
+  // 워크스페이스 드롭다운 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showWorkspaceDropdown) {
+        const target = e.target as Element;
+        if (!target.closest('[data-workspace-dropdown]')) {
+          setShowWorkspaceDropdown(false);
+        }
+      }
+    };
+
+    if (showWorkspaceDropdown) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showWorkspaceDropdown]);
+
+  // 워크스페이스 초기화 및 선택된 워크스페이스 로드
+  useEffect(() => {
+    const initializeWorkspace = async () => {
+      try {
+        // 기본 워크스페이스 초기화
+        const response = await fetch('/api/workspaces/initialize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: 'user-with-settings' })
+        });
+
+        if (response.ok) {
+          const { workspace, isNew } = await response.json();
+          if (isNew) {
+            console.log('✅ 기본 워크스페이스 생성됨:', workspace.name);
+          }
+          
+          // 워크스페이스 새로고침
+          await mutateWorkspaces();
+          
+          // 마지막으로 선택된 워크스페이스를 설정으로부터 로드시도
+          try {
+            const settingsResponse = await fetch('/api/settings?userId=user-with-settings');
+            if (settingsResponse.ok) {
+              const { settings } = await settingsResponse.json();
+              const currentWorkspaceId = settings.workspace?.currentWorkspaceId || settings.workspace?.defaultWorkspaceId;
+              if (currentWorkspaceId) {
+                setSelectedWorkspaceId(currentWorkspaceId);
+              } else if (workspace.id) {
+                // 기본 워크스페이스를 현재 워크스페이스로 설정
+                setSelectedWorkspaceId(workspace.id);
+              }
+            }
+          } catch (error) {
+            console.error('설정 로드 실패:', error);
+            // 폴백: 생성된 워크스페이스를 선택
+            setSelectedWorkspaceId(workspace.id);
+          }
+        }
+      } catch (error) {
+        console.error('워크스페이스 초기화 실패:', error);
+      }
+    };
+
+    if (!selectedWorkspaceId && workspaces.length === 0) {
+      initializeWorkspace();
+    }
+  }, [selectedWorkspaceId, workspaces.length, mutateWorkspaces]);
 
   const handleItemClick = (item: JobItem) => {
     setSelectedItem(item);
@@ -1487,6 +1651,120 @@ export default function Library() {
     setDeleteConfirm(null);
   };
 
+  // 워크스페이스 관련 핸들러들
+  const handleWorkspaceChange = async (workspaceId: string | null) => {
+    setSelectedWorkspaceId(workspaceId);
+    setCurrentPage(1); // 페이지 리셋
+    
+    // 현재 워크스페이스를 설정으로 저장
+    try {
+      if (workspaceId) {
+        await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: 'user-with-settings',
+            settings: {
+              workspace: {
+                currentWorkspaceId: workspaceId
+              }
+            }
+          })
+        });
+      }
+    } catch (error) {
+      console.error('워크스페이스 설정 저장 실패:', error);
+    }
+  };
+
+  const handleCreateWorkspace = async () => {
+    if (!newWorkspaceName.trim()) return;
+
+    try {
+      const response = await fetch('/api/workspaces', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-with-settings',
+          name: newWorkspaceName.trim(),
+          description: ''
+        })
+      });
+
+      if (response.ok) {
+        await mutateWorkspaces();
+        setNewWorkspaceName('');
+        setShowWorkspaceManager(false);
+      } else {
+        const errorData = await response.json();
+        alert(errorData.error || '워크스페이스 생성에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('Workspace creation error:', error);
+      alert('워크스페이스 생성 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleMoveToWorkspace = async (jobId: string, workspaceId: string) => {
+    try {
+      const response = await fetch(`/api/workspaces/${workspaceId}/jobs/${jobId}`, {
+        method: 'PUT'
+      });
+
+      if (response.ok) {
+        await mutate(); // 작업 목록 새로고침
+        await mutateWorkspaces(); // 워크스페이스 개수 업데이트
+      } else {
+        const errorData = await response.json();
+        alert(errorData.error || '작업 이동에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('Job move error:', error);
+      alert('작업 이동 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleDeleteWorkspace = (workspaceId: string, workspaceName: string) => {
+    setDeleteWorkspaceConfirm({ id: workspaceId, name: workspaceName });
+  };
+
+  const handleDeleteWorkspaceConfirm = async () => {
+    if (!deleteWorkspaceConfirm) return;
+
+    setIsDeletingWorkspace(true);
+    try {
+      const response = await fetch(`/api/workspaces/${deleteWorkspaceConfirm.id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        // 워크스페이스 목록 새로고침
+        await mutateWorkspaces();
+        
+        // 삭제된 워크스페이스가 현재 선택된 워크스페이스라면 전체 작업으로 변경
+        if (selectedWorkspaceId === deleteWorkspaceConfirm.id) {
+          await handleWorkspaceChange(null);
+        }
+        
+        setDeleteWorkspaceConfirm(null);
+        console.log('✅ 워크스페이스가 삭제되었습니다.');
+      } else {
+        const errorData = await response.json();
+        console.error('❌ 워크스페이스 삭제 실패:', errorData);
+        alert(errorData.error || '워크스페이스 삭제에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('❌ 워크스페이스 삭제 오류:', error);
+      alert('워크스페이스 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setIsDeletingWorkspace(false);
+    }
+  };
+
+  const handleDeleteWorkspaceCancel = () => {
+    setDeleteWorkspaceConfirm(null);
+  };
+
   return (
     <>
       <aside className="w-[450px] bg-secondary p-6 flex flex-col flex-shrink-0 border-l border-border">
@@ -1507,6 +1785,111 @@ export default function Library() {
             )}
           </div>
         </div>
+        
+        {/* 워크스페이스 선택기 */}
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-sm font-medium text-foreground/70">워크스페이스</h3>
+            <button
+              onClick={() => setShowWorkspaceManager(true)}
+              className="group relative text-xs text-foreground/60 hover:text-primary transition-all duration-200 px-3 py-1.5 rounded-lg hover:bg-primary/10 hover:shadow-sm border border-transparent hover:border-primary/20"
+              title="워크스페이스 관리"
+            >
+              <div className="flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span className="font-medium">관리</span>
+              </div>
+              {/* 호버 시 미묘한 글로우 효과 */}
+              <div className="absolute inset-0 rounded-lg bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 -z-10" />
+            </button>
+          </div>
+          <div className="relative" data-workspace-dropdown>
+            {/* 커스텀 드롭다운 버튼 */}
+            <button
+              onClick={() => setShowWorkspaceDropdown(!showWorkspaceDropdown)}
+              className="w-full bg-gradient-to-r from-secondary/80 to-secondary/60 border border-border/50 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all duration-200 hover:from-secondary/90 hover:to-secondary/70 hover:border-border/70 shadow-sm backdrop-blur-sm text-foreground flex items-center justify-between group"
+            >
+              <div className="flex items-center gap-3">
+                {selectedWorkspaceId ? (
+                  (() => {
+                    const selectedWorkspace = workspaces.find(w => w.id === selectedWorkspaceId);
+                    return (
+                      <span className="text-foreground/90">
+                        {selectedWorkspace?.name} ({selectedWorkspace?._count?.jobs || 0})
+                      </span>
+                    );
+                  })()
+                ) : (
+                  <span className="text-foreground/90">📁 전체 작업</span>
+                )}
+              </div>
+              <svg 
+                className={`w-4 h-4 text-foreground/50 transition-transform duration-200 ${showWorkspaceDropdown ? 'rotate-180' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {/* 드롭다운 메뉴 */}
+            {showWorkspaceDropdown && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-gradient-to-br from-secondary/95 to-secondary/90 backdrop-blur-xl border border-border/50 rounded-xl shadow-2xl z-50 overflow-hidden">
+                <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                  <div className="py-2">
+                    {/* 전체 작업 옵션 */}
+                    <button
+                      onClick={() => {
+                        handleWorkspaceChange(null);
+                        setShowWorkspaceDropdown(false);
+                      }}
+                      className={`w-full px-4 py-3 text-left text-sm transition-all duration-200 flex items-center gap-3 hover:bg-background/30 ${
+                        !selectedWorkspaceId ? 'bg-primary/10 text-primary' : 'text-foreground/90'
+                      }`}
+                    >
+                      <span>📁 전체 작업</span>
+                    </button>
+
+                    {/* 워크스페이스 옵션들 */}
+                    {workspaces.map((workspace) => (
+                      <button
+                        key={workspace.id}
+                        onClick={() => {
+                          handleWorkspaceChange(workspace.id);
+                          setShowWorkspaceDropdown(false);
+                        }}
+                        className={`w-full px-4 py-3 text-left text-sm transition-all duration-200 flex items-center gap-3 hover:bg-background/30 ${
+                          selectedWorkspaceId === workspace.id ? 'bg-primary/10 text-primary' : 'text-foreground/90'
+                        }`}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span>{workspace.name}</span>
+                            {workspace.isDefault && (
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                selectedWorkspaceId === workspace.id 
+                                  ? 'bg-primary/20 text-primary' 
+                                  : 'bg-foreground/10 text-foreground/70'
+                              }`}>기본</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-foreground/60">
+                            📊 {workspace._count?.jobs || 0}개 작업
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="bg-background/50 rounded-lg p-1 flex gap-1 mb-6">
           <button
             className={`flex-1 capitalize py-2 px-3 rounded-md text-sm font-medium transition-colors duration-200 ${showFavoritesOnly ? 'bg-primary text-white' : 'hover:bg-white/5'}`}
@@ -1537,6 +1920,8 @@ export default function Library() {
                 onDeleteClick={handleDeleteClick}
                 onFavoriteToggle={handleFavoriteToggle}
                 onReuseInputs={handleReuseInputs}
+                onMoveToWorkspace={handleMoveToWorkspace}
+                availableWorkspaces={workspaces}
               />
             ))
           )}
@@ -1623,6 +2008,160 @@ export default function Library() {
                 {isDeleting ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    삭제 중...
+                  </>
+                ) : (
+                  '삭제'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 워크스페이스 관리 모달 */}
+      {showWorkspaceManager && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-secondary/95 to-secondary/90 backdrop-blur-xl rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto border border-border/50 shadow-2xl">
+            <div className="flex items-center justify-between p-6 border-b border-border/30">
+              <h3 className="text-xl font-semibold text-foreground">
+                🎨 워크스페이스 관리
+              </h3>
+              <button
+                onClick={() => setShowWorkspaceManager(false)}
+                className="p-2 hover:bg-background/50 rounded-xl transition-all duration-200 hover:scale-105"
+              >
+                <XMarkIcon className="w-5 h-5 text-foreground/70" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              {/* 새 워크스페이스 생성 */}
+              <div className="bg-gradient-to-r from-background/30 to-background/20 rounded-xl p-4 border border-border/30">
+                <h4 className="font-medium mb-3 text-foreground/90">✨ 새 워크스페이스 생성</h4>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newWorkspaceName}
+                    onChange={(e) => setNewWorkspaceName(e.target.value)}
+                    placeholder="워크스페이스 이름을 입력하세요"
+                    className="flex-1 bg-background/60 border border-border/50 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all duration-200 placeholder:text-foreground/40"
+                    onKeyPress={(e) => e.key === 'Enter' && handleCreateWorkspace()}
+                  />
+                  <button
+                    onClick={handleCreateWorkspace}
+                    disabled={!newWorkspaceName.trim()}
+                    className="px-4 py-3 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-lg hover:shadow-primary/25 hover:scale-105 disabled:hover:scale-100"
+                  >
+                    ✨ 생성
+                  </button>
+                </div>
+              </div>
+
+              {/* 기존 워크스페이스 목록 */}
+              <div>
+                <h4 className="font-medium mb-3 text-foreground/90">📂 워크스페이스 목록</h4>
+                <div className="bg-background/20 rounded-xl border border-border/30 overflow-hidden">
+                  <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                    {workspaces.map((workspace, index) => (
+                      <div
+                        key={workspace.id}
+                        className={`group flex items-center justify-between px-4 py-3 transition-all duration-200 hover:bg-background/30 ${
+                          index !== workspaces.length - 1 ? 'border-b border-border/20' : ''
+                        } ${
+                          selectedWorkspaceId === workspace.id ? 'bg-primary/5' : ''
+                        }`}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm text-foreground/90">
+                              {workspace.name}
+                            </span>
+                            {workspace.isDefault && (
+                              <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
+                                기본
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-foreground/60 mt-0.5">
+                            📊 {workspace._count?.jobs || 0}개 작업
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleWorkspaceChange(workspace.id)}
+                            className={`px-3 py-1.5 text-xs rounded-lg transition-all duration-200 font-medium ${
+                              selectedWorkspaceId === workspace.id
+                                ? 'bg-primary text-white shadow-sm'
+                                : 'bg-background/50 hover:bg-background/70 text-foreground/70 hover:text-foreground'
+                            }`}
+                          >
+                            {selectedWorkspaceId === workspace.id ? '선택됨' : '선택'}
+                          </button>
+                          {!workspace.isDefault && (
+                            <button
+                              onClick={() => handleDeleteWorkspace(workspace.id, workspace.name)}
+                              className="px-2 py-1.5 text-xs rounded-lg transition-all duration-200 font-medium bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300"
+                              title="워크스페이스 삭제"
+                            >
+                              🗑️
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 워크스페이스 삭제 확인 모달 */}
+      {deleteWorkspaceConfirm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-secondary/95 backdrop-blur-xl border border-border/50 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                <span className="text-red-400 text-xl">🗑️</span>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">워크스페이스 삭제</h3>
+                <p className="text-sm text-foreground/60">이 작업은 되돌릴 수 없습니다</p>
+              </div>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-foreground/90 mb-2">
+                <span className="font-medium text-red-400">"{deleteWorkspaceConfirm.name}"</span> 워크스페이스를 삭제하시겠습니까?
+              </p>
+              <div className="bg-background/30 rounded-lg p-3 text-sm text-foreground/70">
+                <p className="mb-1">⚠️ 삭제 시 다음이 적용됩니다:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li>워크스페이스 내 모든 작업이 기본 워크스페이스로 이동됩니다</li>
+                  <li>워크스페이스는 완전히 삭제됩니다</li>
+                  <li>이 작업은 되돌릴 수 없습니다</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleDeleteWorkspaceCancel}
+                disabled={isDeletingWorkspace}
+                className="flex-1 px-4 py-2 text-sm font-medium text-foreground/70 bg-background/50 hover:bg-background/70 rounded-lg transition-all duration-200 disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleDeleteWorkspaceConfirm}
+                disabled={isDeletingWorkspace}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isDeletingWorkspace ? (
+                  <>
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
                     삭제 중...
                   </>
                 ) : (

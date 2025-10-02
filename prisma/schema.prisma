@@ -13,6 +13,7 @@ datasource db {
 model Job {
   id            String    @id @default(uuid())
   userId        String
+  workspaceId   String?   // 워크스페이스 ID (선택적)
   status        String
   type          String
   prompt        String?
@@ -24,9 +25,13 @@ model Job {
   createdAt     DateTime  @default(now())
   completedAt   DateTime?
 
+  // 관계 설정
+  workspace     Workspace? @relation("WorkspaceJobs", fields: [workspaceId], references: [id])
+
   @@index([userId, createdAt(sort: Desc)]) // 사용자별 최신 순 정렬을 위한 복합 인덱스
   @@index([userId, status]) // 사용자별 상태별 조회를 위한 인덱스
   @@index([status, createdAt(sort: Desc)]) // 상태별 최신 순 정렬을 위한 인덱스
+  @@index([workspaceId, createdAt(sort: Desc)]) // 워크스페이스별 최신 순 정렬을 위한 인덱스
   @@map("jobs") // Map model name to table name
 }
 
@@ -95,4 +100,23 @@ model UsageStats {
 
   @@unique([userId, service, endpoint, date])
   @@map("usage_stats")
+}
+
+model Workspace {
+  id          String    @id @default(uuid())
+  userId      String
+  name        String
+  description String?
+  color       String?   // 워크스페이스 색상 테마
+  isDefault   Boolean   @default(false) // 기본 워크스페이스 여부
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @ updatedAt
+
+  // 관계 설정
+  jobs        Job[]     @relation("WorkspaceJobs")
+  
+  @@unique([userId, name]) // 사용자별 워크스페이스 이름은 고유해야 함
+  @@unique([userId, isDefault], map: "unique_default_workspace") // 사용자별 기본 워크스페이스는 하나뿐
+  @@index([userId])
+  @@map("workspaces")
 }
