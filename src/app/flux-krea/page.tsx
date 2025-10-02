@@ -27,6 +27,42 @@ export default function FluxKreaPage() {
   const [loraWeight, setLoraWeight] = useState(1.0);
   const [loraLoading, setLoraLoading] = useState(false);
 
+  // 입력값 자동 로드 기능
+  useEffect(() => {
+    const reuseData = localStorage.getItem('reuseInputs');
+    if (reuseData) {
+      try {
+        const data = JSON.parse(reuseData);
+        if (data.type === 'flux-krea') {
+          // 프롬프트 로드
+          if (data.prompt) {
+            setPrompt(data.prompt);
+          }
+          
+          // 설정값 로드
+          if (data.options) {
+            const options = data.options;
+            if (options.width) setWidth(options.width);
+            if (options.height) setHeight(options.height);
+            if (options.seed !== undefined) setSeed(options.seed);
+            if (options.guidance !== undefined) setGuidance(options.guidance);
+            if (options.model) setModel(options.model);
+            if (options.selectedLora) setSelectedLora(options.selectedLora);
+            if (options.loraWeight !== undefined) setLoraWeight(options.loraWeight);
+          }
+          
+          // 성공 메시지 표시
+          setMessage({ type: 'success', text: '이전 작업의 입력값이 자동으로 로드되었습니다!' });
+          
+          // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
+          localStorage.removeItem('reuseInputs');
+        }
+      } catch (error) {
+        console.error('입력값 로드 중 오류:', error);
+      }
+    }
+  }, []);
+
   // LoRA 파일 목록 가져오기
   const fetchLoraFiles = async () => {
     try {

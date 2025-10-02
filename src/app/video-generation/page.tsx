@@ -47,6 +47,64 @@ export default function Wan22Page() {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // URL에서 File 객체를 생성하는 헬퍼 함수
+  const createFileFromUrl = async (url: string, filename: string, mimeType: string): Promise<File> => {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new File([blob], filename, { type: mimeType });
+  };
+
+  // 입력값 자동 로드 기능
+  useEffect(() => {
+    const reuseData = localStorage.getItem('reuseInputs');
+    if (reuseData) {
+      try {
+        const data = JSON.parse(reuseData);
+        if (data.type === 'wan22') {
+          // 프롬프트 로드
+          if (data.prompt) {
+            setPrompt(data.prompt);
+          }
+          
+          // 이미지 로드 및 File 객체 생성
+          if (data.imagePath) {
+            setPreviewUrl(data.imagePath);
+            console.log('🔄 WAN 2.2 이미지 재사용:', data.imagePath);
+            
+            // URL에서 File 객체 생성
+            createFileFromUrl(data.imagePath, 'reused_image.jpg', 'image/jpeg')
+              .then(file => {
+                setImageFile(file);
+                console.log('✅ WAN 2.2 이미지 File 객체 생성 완료:', file.name);
+              })
+              .catch(error => {
+                console.error('❌ WAN 2.2 이미지 File 객체 생성 실패:', error);
+              });
+          }
+          
+          // 설정값 로드
+          if (data.options) {
+            const options = data.options;
+            if (options.width) setWidth(options.width);
+            if (options.height) setHeight(options.height);
+            if (options.seed !== undefined) setSeed(options.seed);
+            if (options.cfg !== undefined) setCfg(options.cfg);
+            if (options.length) setLength(options.length);
+            if (options.step) setStep(options.step);
+          }
+          
+          // 성공 메시지 표시
+          setMessage({ type: 'success', text: '이전 작업의 입력값이 자동으로 로드되었습니다!' });
+          
+          // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
+          localStorage.removeItem('reuseInputs');
+        }
+      } catch (error) {
+        console.error('입력값 로드 중 오류:', error);
+      }
+    }
+  }, []);
+
   // LoRA 파일 목록 가져오기
   const fetchLoraFiles = async () => {
     try {

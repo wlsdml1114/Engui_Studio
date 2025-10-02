@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { PhotoIcon, PlayIcon, Cog6ToothIcon, FilmIcon, SparklesIcon } from '@heroicons/react/24/outline';
 
 export default function WanAnimatePage() {
@@ -31,6 +31,82 @@ export default function WanAnimatePage() {
   
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+
+  // URL에서 File 객체를 생성하는 헬퍼 함수
+  const createFileFromUrl = async (url: string, filename: string, mimeType: string): Promise<File> => {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new File([blob], filename, { type: mimeType });
+  };
+
+  // 입력값 자동 로드 기능
+  useEffect(() => {
+    const reuseData = localStorage.getItem('reuseInputs');
+    if (reuseData) {
+      try {
+        const data = JSON.parse(reuseData);
+        if (data.type === 'wan-animate') {
+          // 프롬프트 로드
+          if (data.prompt) {
+            setPrompt(data.prompt);
+          }
+          
+          // 이미지 로드 및 File 객체 생성
+          if (data.imagePath) {
+            setImagePreviewUrl(data.imagePath);
+            console.log('🔄 WAN Animate 이미지 재사용:', data.imagePath);
+            
+            // URL에서 File 객체 생성
+            createFileFromUrl(data.imagePath, 'reused_image.jpg', 'image/jpeg')
+              .then(file => {
+                setImageFile(file);
+                console.log('✅ 이미지 File 객체 생성 완료:', file.name);
+              })
+              .catch(error => {
+                console.error('❌ 이미지 File 객체 생성 실패:', error);
+              });
+          }
+          
+          // 비디오 로드 및 File 객체 생성
+          if (data.videoPath) {
+            setVideoPreviewUrl(data.videoPath);
+            console.log('🔄 WAN Animate 비디오 재사용:', data.videoPath);
+            
+            // URL에서 File 객체 생성
+            createFileFromUrl(data.videoPath, 'reused_video.mp4', 'video/mp4')
+              .then(file => {
+                setVideoFile(file);
+                console.log('✅ 비디오 File 객체 생성 완료:', file.name);
+                
+                // 첫 번째 프레임 추출
+                extractFirstFrame(data.videoPath);
+              })
+              .catch(error => {
+                console.error('❌ 비디오 File 객체 생성 실패:', error);
+              });
+          }
+          
+          // 설정값 로드
+          if (data.options) {
+            const options = data.options;
+            if (options.seed !== undefined) setSeed(options.seed);
+            if (options.cfg !== undefined) setCfg(options.cfg);
+            if (options.steps !== undefined) setSteps(options.steps);
+            if (options.width !== undefined) setWidth(options.width);
+            if (options.height !== undefined) setHeight(options.height);
+          }
+          
+          // 성공 메시지 표시
+          setMessage({ type: 'success', text: '이전 작업의 입력값이 자동으로 로드되었습니다!' });
+          
+          // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
+          localStorage.removeItem('reuseInputs');
+        }
+      } catch (error) {
+        console.error('입력값 로드 중 오류:', error);
+      }
+    }
+  }, []);
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

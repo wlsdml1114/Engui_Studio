@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import useSWR from 'swr';
-import { XMarkIcon, PlayIcon, PhotoIcon, TrashIcon, StarIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, PlayIcon, PhotoIcon, TrashIcon, StarIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 interface JobItem {
   id: string;
@@ -24,11 +24,19 @@ interface LibraryItemProps {
   onItemClick: (item: JobItem) => void;
   onDeleteClick: (item: JobItem, e: React.MouseEvent) => void;
   onFavoriteToggle: (item: JobItem, e: React.MouseEvent) => void;
+  onReuseInputs: (item: JobItem) => void;
 }
 
 const fetcher = (url: string) => fetch(url).then(res => res.json());
 
-const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteClick, onFavoriteToggle }) => {
+const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteClick, onFavoriteToggle, onReuseInputs }) => {
+  const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number }>({
+    visible: false,
+    x: 0,
+    y: 0
+  });
+  const itemRef = useRef<HTMLDivElement>(null);
+
   // MultiTalk의 경우 options에서 입력 이미지 경로 추출
   const getThumbnailUrl = () => {
     // MultiTalk의 경우 입력 이미지를 썸네일로 사용
@@ -269,14 +277,54 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
     }
   };
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const rect = itemRef.current?.getBoundingClientRect();
+    if (rect) {
+      setContextMenu({
+        visible: true,
+        x: e.clientX,
+        y: e.clientY
+      });
+    }
+  };
+
+  const handleContextMenuAction = (action: () => void) => {
+    setContextMenu({ visible: false, x: 0, y: 0 });
+    action();
+  };
+
+  const handleReuseInputs = () => {
+    handleContextMenuAction(() => onReuseInputs(item));
+  };
+
+  // 컨텍스트 메뉴 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (contextMenu.visible && !itemRef.current?.contains(e.target as Node)) {
+        setContextMenu({ visible: false, x: 0, y: 0 });
+      }
+    };
+
+    if (contextMenu.visible) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [contextMenu.visible]);
+
   return (
-    <div 
-      className={`
-        relative bg-background/50 rounded-lg border border-border overflow-hidden cursor-pointer transition-all duration-200 hover:border-primary/50 hover:bg-background/70 group
-        ${item.status === 'completed' ? 'hover:shadow-lg hover:shadow-primary/20' : ''}
-      `}
-      onClick={handleClick}
-    >
+    <>
+      <div 
+        ref={itemRef}
+        className={`
+          relative bg-background/50 rounded-lg border border-border overflow-hidden cursor-pointer transition-all duration-200 hover:border-primary/50 hover:bg-background/70 group
+          ${item.status === 'completed' ? 'hover:shadow-lg hover:shadow-primary/20' : ''}
+        `}
+        onClick={handleClick}
+        onContextMenu={handleContextMenu}
+      >
       {/* 썸네일 */}
       <div className="relative aspect-video bg-background overflow-hidden">
         {thumbnailUrl ? (
@@ -364,7 +412,28 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
           {completedTime && <div>Completed: {completedTime}</div>}
         </div>
       </div>
+
+      {/* 컨텍스트 메뉴 */}
+      {contextMenu.visible && (
+        <div
+          className="fixed z-50 bg-secondary border border-border rounded-lg shadow-lg py-1 min-w-[180px]"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y,
+            transform: 'translate(-50%, -10px)'
+          }}
+        >
+          <button
+            onClick={handleReuseInputs}
+            className="w-full px-4 py-2 text-left text-sm hover:bg-background/50 transition-colors flex items-center gap-2"
+          >
+            <ArrowPathIcon className="w-4 h-4" />
+            입력값 재사용
+          </button>
+        </div>
+      )}
     </div>
+    </>
   );
 };
 
@@ -1179,6 +1248,69 @@ export default function Library() {
     }
   };
 
+  const handleReuseInputs = (item: JobItem) => {
+    try {
+      const options = item.options ? JSON.parse(item.options) : {};
+      
+      // 입력값 재사용을 위한 데이터 구성
+      const reuseData = {
+        type: item.type,
+        prompt: item.prompt || '',
+        options: options,
+        // 각 타입별로 필요한 입력값들 추출
+        ...(item.type === 'multitalk' && {
+          imagePath: options.imageWebPath || options.imageS3Url,
+          imageName: options.imageName
+        }),
+        ...(item.type === 'flux-kontext' && {
+          inputImagePath: options.inputImagePath,
+          inputImageName: options.inputImageName
+        }),
+        ...(item.type === 'wan22' && {
+          imagePath: options.imageWebPath || options.inputImagePath,
+          imageName: options.inputImageName
+        }),
+        ...(item.type === 'wan-animate' && {
+          imagePath: options.imageWebPath || options.s3ImagePath,
+          videoPath: options.videoWebPath || options.s3VideoPath,
+          hasImage: options.hasImage,
+          hasVideo: options.hasVideo
+        }),
+        ...(item.type === 'infinitetalk' && {
+          inputType: options.inputType,
+          imagePath: options.imageWebPath,
+          videoPath: options.videoWebPath,
+          imageFileName: options.imageFileName,
+          videoFileName: options.videoFileName
+        })
+      };
+
+      // 로컬 스토리지에 저장하여 다른 페이지에서 사용할 수 있도록 함
+      localStorage.setItem('reuseInputs', JSON.stringify(reuseData));
+      
+      // 해당 타입의 페이지로 이동
+      const pageMap: { [key: string]: string } = {
+        'multitalk': '/multitalk',
+        'flux-kontext': '/flux-kontext',
+        'flux-krea': '/flux-krea',
+        'wan22': '/wan22',
+        'wan-animate': '/wan-animate',
+        'infinitetalk': '/infinite-talk',
+        'video-upscale': '/video-upscale'
+      };
+
+      const targetPage = pageMap[item.type];
+      if (targetPage) {
+        window.location.href = targetPage;
+      } else {
+        alert('해당 타입의 페이지를 찾을 수 없습니다.');
+      }
+    } catch (error) {
+      console.error('입력값 재사용 중 오류:', error);
+      alert('입력값 재사용 중 오류가 발생했습니다.');
+    }
+  };
+
   const handleDeleteConfirm = async () => {
     if (!deleteConfirm) return;
 
@@ -1262,6 +1394,7 @@ export default function Library() {
                 onItemClick={handleItemClick}
                 onDeleteClick={handleDeleteClick}
                 onFavoriteToggle={handleFavoriteToggle}
+                onReuseInputs={handleReuseInputs}
               />
             ))
           )}

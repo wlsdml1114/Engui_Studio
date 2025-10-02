@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { VideoCameraIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
 
 export default function VideoUpscalePage() {
@@ -12,6 +12,54 @@ export default function VideoUpscalePage() {
   const [currentJobId, setCurrentJobId] = useState<string>('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // URL에서 File 객체를 생성하는 헬퍼 함수
+  const createFileFromUrl = async (url: string, filename: string, mimeType: string): Promise<File> => {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new File([blob], filename, { type: mimeType });
+  };
+
+  // 입력값 자동 로드 기능
+  useEffect(() => {
+    const reuseData = localStorage.getItem('reuseInputs');
+    if (reuseData) {
+      try {
+        const data = JSON.parse(reuseData);
+        if (data.type === 'video-upscale') {
+          // 비디오 로드 및 File 객체 생성
+          if (data.videoPath) {
+            setPreviewUrl(data.videoPath);
+            console.log('🔄 Video Upscale 비디오 재사용:', data.videoPath);
+            
+            // URL에서 File 객체 생성
+            createFileFromUrl(data.videoPath, 'reused_video.mp4', 'video/mp4')
+              .then(file => {
+                setVideoFile(file);
+                console.log('✅ Video Upscale 비디오 File 객체 생성 완료:', file.name);
+              })
+              .catch(error => {
+                console.error('❌ Video Upscale 비디오 File 객체 생성 실패:', error);
+              });
+          }
+          
+          // 설정값 로드
+          if (data.options) {
+            const options = data.options;
+            if (options.taskType) setTaskType(options.taskType);
+          }
+          
+          // 성공 메시지 표시
+          setMessage({ type: 'success', text: '이전 작업의 입력값이 자동으로 로드되었습니다!' });
+          
+          // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
+          localStorage.removeItem('reuseInputs');
+        }
+      } catch (error) {
+        console.error('입력값 로드 중 오류:', error);
+      }
+    }
+  }, []);
 
   const handleVideoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
