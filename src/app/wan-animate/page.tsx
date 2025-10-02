@@ -296,16 +296,24 @@ export default function WanAnimatePage() {
 
       console.log('🎯 WAN Animate에 드롭된 데이터:', dragData);
 
-      // 미디어 타입에 따라 처리
-      const mediaUrl = dragData.inputImagePath || dragData.imageUrl || dragData.videoUrl || dragData.thumbnailUrl;
+      // 미디어 타입 감지
+      const isVideo = dragData.mediaType === 'video' || dragData.jobType === 'multitalk' || 
+                     dragData.jobType === 'wan22' || dragData.jobType === 'wan-animate' || 
+                     dragData.jobType === 'infinitetalk' || dragData.jobType === 'video-upscale';
+      
+      // 미디어 타입에 따라 적절한 URL 선택
+      let mediaUrl;
+      if (isVideo) {
+        // 비디오인 경우 비디오 URL 우선
+        mediaUrl = dragData.videoUrl || dragData.resultUrl || dragData.mediaUrl || dragData.thumbnailUrl;
+      } else {
+        // 이미지인 경우 이미지 URL 우선
+        mediaUrl = dragData.inputImagePath || dragData.imageUrl || dragData.resultUrl || dragData.thumbnailUrl;
+      }
       
       if (mediaUrl) {
         console.log('🎬 미디어 드롭 처리:', mediaUrl);
-        
-        // 미디어 타입 감지
-        const isVideo = dragData.mediaType === 'video' || dragData.jobType === 'multitalk' || 
-                       dragData.jobType === 'wan22' || dragData.jobType === 'wan-animate' || 
-                       dragData.jobType === 'infinitetalk' || dragData.jobType === 'video-upscale';
+        console.log('🔍 미디어 타입:', isVideo ? '비디오' : '이미지');
         
         try {
           if (isVideo) {

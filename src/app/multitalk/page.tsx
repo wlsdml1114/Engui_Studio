@@ -221,8 +221,8 @@ export default function MultiTalkPage() {
             console.log('🎯 MultiTalk에 드롭된 데이터:', dragData);
 
             // 이미지 데이터 처리
-            if (dragData.inputImagePath || dragData.imageUrl || dragData.thumbnailUrl) {
-                const imageUrl = dragData.inputImagePath || dragData.imageUrl || dragData.thumbnailUrl;
+            if (dragData.inputImagePath || dragData.imageUrl || dragData.resultUrl || dragData.thumbnailUrl) {
+                const imageUrl = dragData.inputImagePath || dragData.imageUrl || dragData.resultUrl || dragData.thumbnailUrl;
                 
                 if (imageUrl) {
                     console.log('🖼️ 이미지 드롭 처리:', imageUrl);

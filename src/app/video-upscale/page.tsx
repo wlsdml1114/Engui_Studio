@@ -114,19 +114,27 @@ export default function VideoUpscalePage() {
       console.log('🎯 Video Upscale에 드롭된 데이터:', dragData);
 
       // 비디오 데이터 처리 (Video Upscale은 비디오만 지원)
-      const videoUrl = dragData.videoUrl || dragData.thumbnailUrl;
+      const videoUrl = dragData.videoUrl || dragData.resultUrl || dragData.mediaUrl || dragData.thumbnailUrl;
       
       if (videoUrl) {
         console.log('🎬 비디오 드롭 처리:', videoUrl);
+        console.log('🔍 드래그 데이터 상세:', {
+          videoUrl: dragData.videoUrl,
+          resultUrl: dragData.resultUrl,
+          thumbnailUrl: dragData.thumbnailUrl,
+          mediaUrl: dragData.mediaUrl,
+          jobType: dragData.jobType
+        });
         
         // 비디오 미리보기 설정
         setPreviewUrl(videoUrl);
         
         // URL에서 File 객체 생성
         try {
+          console.log('📥 비디오 파일 다운로드 시작:', videoUrl);
           const file = await createFileFromUrl(videoUrl, 'dropped_video.mp4', 'video/mp4');
           setVideoFile(file);
-          console.log('✅ 드롭된 비디오 File 객체 생성 완료');
+          console.log('✅ 드롭된 비디오 File 객체 생성 완료:', file.name, file.size, 'bytes');
           
           setMessage({ 
             type: 'success', 
@@ -134,9 +142,10 @@ export default function VideoUpscalePage() {
           });
         } catch (error) {
           console.error('❌ 드롭된 비디오 File 객체 생성 실패:', error);
+          console.error('❌ 실패한 URL:', videoUrl);
           setMessage({ 
             type: 'error', 
-            text: '드롭된 비디오를 처리하는 중 오류가 발생했습니다.' 
+            text: `드롭된 비디오를 처리하는 중 오류가 발생했습니다. URL: ${videoUrl}` 
           });
         }
       } else {

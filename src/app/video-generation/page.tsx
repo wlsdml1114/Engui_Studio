@@ -410,8 +410,10 @@ export default function Wan22Page() {
 
       console.log('🎯 WAN 2.2에 드롭된 데이터:', dragData);
 
-      // 이미지 데이터 처리 (WAN 2.2는 이미지 입력이 필요)
-      if (dragData.inputImagePath || dragData.imageUrl || dragData.thumbnailUrl) {
+      // WAN 2.2는 이미지만 지원하므로 이미지 결과물만 처리
+      const isImageResult = dragData.jobType === 'flux-kontext' || dragData.jobType === 'flux-krea';
+      
+      if (isImageResult && (dragData.inputImagePath || dragData.imageUrl || dragData.thumbnailUrl)) {
         const imageUrl = dragData.inputImagePath || dragData.imageUrl || dragData.thumbnailUrl;
         
         if (imageUrl) {
@@ -441,7 +443,7 @@ export default function Wan22Page() {
       } else {
         setMessage({ 
           type: 'error', 
-          text: '이 드래그된 항목에는 이미지 데이터가 없습니다.' 
+          text: `WAN 2.2는 이미지만 입력으로 받을 수 있습니다. ${dragData.jobType} 결과물은 비디오이므로 사용할 수 없습니다. FLUX KONTEXT나 FLUX KREA의 이미지 결과물을 드래그해주세요.` 
         });
         return;
       }
@@ -498,10 +500,10 @@ export default function Wan22Page() {
               />
             </div>
 
-            {/* 이미지/비디오 업로드 */}
+            {/* 이미지 업로드 */}
             <div>
               <label className="block text-sm font-medium mb-2">
-                이미지/비디오 파일 <span className="text-red-400">*</span>
+                이미지 파일 <span className="text-red-400">*</span>
               </label>
               <div 
                 className={`border-2 border-dashed rounded-lg p-6 text-center relative transition-all duration-200 ${
@@ -516,7 +518,7 @@ export default function Wan22Page() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*,video/*"
+                  accept="image/*"
                   onChange={handleImageUpload}
                   className="hidden"
                   disabled={isGenerating}
@@ -578,11 +580,11 @@ export default function Wan22Page() {
                   <>
                     <PhotoIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground mb-2">
-                      {isDragOver ? '🎯 여기에 놓으세요!' : '이미지 또는 비디오 파일을 선택하거나 드래그하세요'}
+                      {isDragOver ? '🎯 여기에 놓으세요!' : '이미지 파일을 선택하거나 드래그하세요'}
                     </p>
                     {isDragOver && (
                       <p className="text-xs text-primary mb-2">
-                        라이브러리의 결과물을 여기에 드래그하세요
+                        라이브러리의 이미지 결과물(FLUX KONTEXT, FLUX KREA)을 여기에 드래그하세요
                       </p>
                     )}
                     <button

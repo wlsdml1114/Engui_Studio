@@ -316,17 +316,30 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
       mediaType: item.type === 'flux-kontext' || item.type === 'flux-krea' ? 'image' : 'video',
       mediaUrl: item.resultUrl || thumbnailUrl,
       thumbnailUrl: thumbnailUrl,
+      // 실제 결과 URL (비디오의 경우 실제 비디오 파일)
+      resultUrl: item.resultUrl,
       // 각 타입별 추가 정보
-      ...(item.type === 'multitalk' && { inputImagePath: getThumbnailUrl() }),
+      ...(item.type === 'multitalk' && { 
+        inputImagePath: getThumbnailUrl(),
+        videoUrl: item.resultUrl // 실제 비디오 URL 추가
+      }),
       ...(item.type === 'flux-kontext' && { inputImagePath: getThumbnailUrl() }),
       ...(item.type === 'flux-krea' && { imageUrl: getThumbnailUrl() }),
-      ...(item.type === 'wan22' && { inputImagePath: getThumbnailUrl() }),
-      ...(item.type === 'wan-animate' && { imageUrl: getThumbnailUrl() }),
+      ...(item.type === 'wan22' && { 
+        inputImagePath: getThumbnailUrl(),
+        videoUrl: item.resultUrl // 실제 비디오 URL 추가
+      }),
+      ...(item.type === 'wan-animate' && { 
+        imageUrl: getThumbnailUrl(),
+        videoUrl: item.resultUrl // 실제 비디오 URL 추가
+      }),
       ...(item.type === 'infinitetalk' && { 
         inputType: 'video',
-        videoUrl: getThumbnailUrl()
+        videoUrl: item.resultUrl // 실제 비디오 URL 사용
       }),
-      ...(item.type === 'video-upscale' && { videoUrl: getThumbnailUrl() })
+      ...(item.type === 'video-upscale' && { 
+        videoUrl: item.resultUrl // 실제 비디오 URL 사용
+      })
     };
 
     // 드래그 데이터를 텍스트로 저장 (다른 페이지에서 접근 가능)
