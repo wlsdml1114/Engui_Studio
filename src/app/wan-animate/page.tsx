@@ -31,6 +31,7 @@ export default function WanAnimatePage() {
   
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // URL에서 File 객체를 생성하는 헬퍼 함수
   const createFileFromUrl = async (url: string, filename: string, mimeType: string): Promise<File> => {
@@ -253,6 +254,117 @@ export default function WanAnimatePage() {
     return adjustedPoints;
   };
 
+  // 드래그 앤 드롭 핸들러들
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    try {
+      // 드래그된 데이터를 찾기
+      let dragData = null;
+      
+      try {
+        const jsonData = e.dataTransfer.getData('application/json');
+        dragData = jsonData ? JSON.parse(jsonData) : null;
+      } catch {
+        try {
+          const textData = e.dataTransfer.getData('text/plain');
+          dragData = textData ? JSON.parse(textData) : null;
+        } catch {
+          console.log('❌ 드래그 데이터를 파싱할 수 없음');
+          return;
+        }
+      }
+
+      if (!dragData || dragData.type !== 'library-result') {
+        console.log('❌ 라이브러리 결과 데이터가 아님');
+        return;
+      }
+
+      console.log('🎯 WAN Animate에 드롭된 데이터:', dragData);
+
+      // 미디어 타입 감지
+      const isVideo = dragData.mediaType === 'video' || dragData.jobType === 'multitalk' || 
+                     dragData.jobType === 'wan22' || dragData.jobType === 'wan-animate' || 
+                     dragData.jobType === 'infinitetalk' || dragData.jobType === 'video-upscale';
+      
+      // 미디어 타입에 따라 적절한 URL 선택
+      let mediaUrl;
+      if (isVideo) {
+        // 비디오인 경우 비디오 URL 우선
+        mediaUrl = dragData.videoUrl || dragData.resultUrl || dragData.mediaUrl || dragData.thumbnailUrl;
+      } else {
+        // 이미지인 경우 이미지 URL 우선
+        mediaUrl = dragData.inputImagePath || dragData.imageUrl || dragData.resultUrl || dragData.thumbnailUrl;
+      }
+      
+      if (mediaUrl) {
+        console.log('🎬 미디어 드롭 처리:', mediaUrl);
+        console.log('🔍 미디어 타입:', isVideo ? '비디오' : '이미지');
+        
+        try {
+          if (isVideo) {
+            // 비디오 처리
+            setVideoPreviewUrl(mediaUrl);
+            const file = await createFileFromUrl(mediaUrl, 'dropped_video.mp4', 'video/mp4');
+            setVideoFile(file);
+            extractFirstFrame(mediaUrl);
+            console.log('✅ 드롭된 비디오 File 객체 생성 완료');
+          } else {
+            // 이미지 처리
+            setImagePreviewUrl(mediaUrl);
+            const file = await createFileFromUrl(mediaUrl, 'dropped_image.jpg', 'image/jpeg');
+            setImageFile(file);
+            console.log('✅ 드롭된 이미지 File 객체 생성 완료');
+          }
+          
+          setMessage({ 
+            type: 'success', 
+            text: `라이브러리에서 ${dragData.jobType} 결과물을 ${isVideo ? '비디오' : '이미지'}로 사용했습니다!` 
+          });
+        } catch (error) {
+          console.error('❌ 드롭된 미디어 File 객체 생성 실패:', error);
+          setMessage({ 
+            type: 'error', 
+            text: '드롭된 미디어를 처리하는 중 오류가 발생했습니다.' 
+          });
+        }
+      } else {
+        setMessage({ 
+          type: 'error', 
+          text: '이 드래그된 항목에는 미디어 데이터가 없습니다.' 
+        });
+        return;
+      }
+
+      // 프롬프트가 있으면 적용
+      if (dragData.prompt && dragData.prompt.trim()) {
+        setPrompt(dragData.prompt);
+        console.log('📝 프롬프트 자동 설정:', dragData.prompt);
+      }
+
+    } catch (error) {
+      console.error('❌ 드롭 처리 중 오류:', error);
+      setMessage({ 
+        type: 'error', 
+        text: '드롭된 데이터를 처리하는 중 오류가 발생했습니다.' 
+      });
+    }
+  };
+
   const generateVideo = async () => {
     if (!imageFile && !videoFile) {
       setMessage({ type: 'error', text: '이미지 또는 비디오 파일을 업로드해주세요.' });
@@ -386,13 +498,20 @@ export default function WanAnimatePage() {
                   className="hidden"
                 />
                 
-                <button
+                <div 
+                  className={`w-full p-4 border-2 border-dashed rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${
+                    isDragOver 
+                      ? 'border-primary bg-primary/10 border-solid' 
+                      : 'border-border hover:border-primary'
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
                   onClick={() => imageInputRef.current?.click()}
-                  className="w-full p-4 border-2 border-dashed border-border rounded-lg hover:border-primary transition-colors flex items-center justify-center gap-2"
                 >
                   <PhotoIcon className="w-6 h-6" />
-                  이미지 파일 선택
-                </button>
+                  <span>{isDragOver ? '🎯 여기에 놓으세요!' : '이미지 파일 선택'}</span>
+                </div>
 
                 {imagePreviewUrl && (
                   <div className="relative">
@@ -428,13 +547,20 @@ export default function WanAnimatePage() {
                   className="hidden"
                 />
                 
-                <button
+                <div 
+                  className={`w-full p-4 border-2 border-dashed rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${
+                    isDragOver 
+                      ? 'border-primary bg-primary/10 border-solid' 
+                      : 'border-border hover:border-primary'
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
                   onClick={() => videoInputRef.current?.click()}
-                  className="w-full p-4 border-2 border-dashed border-border rounded-lg hover:border-primary transition-colors flex items-center justify-center gap-2"
                 >
                   <FilmIcon className="w-6 h-6" />
-                  비디오 파일 선택
-                </button>
+                  <span>{isDragOver ? '🎯 여기에 놓으세요!' : '비디오 파일 선택'}</span>
+                </div>
 
                 {videoPreviewUrl && (
                   <div className="space-y-4">

@@ -12,6 +12,7 @@ export default function VideoUpscalePage() {
   const [currentJobId, setCurrentJobId] = useState<string>('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // URL에서 File 객체를 생성하는 헬퍼 함수
   const createFileFromUrl = async (url: string, filename: string, mimeType: string): Promise<File> => {
@@ -67,6 +68,100 @@ export default function VideoUpscalePage() {
       setVideoFile(file);
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
+    }
+  };
+
+  // 드래그 앤 드롭 핸들러들
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    try {
+      // 드래그된 데이터를 찾기
+      let dragData = null;
+      
+      try {
+        const jsonData = e.dataTransfer.getData('application/json');
+        dragData = jsonData ? JSON.parse(jsonData) : null;
+      } catch {
+        try {
+          const textData = e.dataTransfer.getData('text/plain');
+          dragData = textData ? JSON.parse(textData) : null;
+        } catch {
+          console.log('❌ 드래그 데이터를 파싱할 수 없음');
+          return;
+        }
+      }
+
+      if (!dragData || dragData.type !== 'library-result') {
+        console.log('❌ 라이브러리 결과 데이터가 아님');
+        return;
+      }
+
+      console.log('🎯 Video Upscale에 드롭된 데이터:', dragData);
+
+      // 비디오 데이터 처리 (Video Upscale은 비디오만 지원)
+      const videoUrl = dragData.videoUrl || dragData.resultUrl || dragData.mediaUrl || dragData.thumbnailUrl;
+      
+      if (videoUrl) {
+        console.log('🎬 비디오 드롭 처리:', videoUrl);
+        console.log('🔍 드래그 데이터 상세:', {
+          videoUrl: dragData.videoUrl,
+          resultUrl: dragData.resultUrl,
+          thumbnailUrl: dragData.thumbnailUrl,
+          mediaUrl: dragData.mediaUrl,
+          jobType: dragData.jobType
+        });
+        
+        // 비디오 미리보기 설정
+        setPreviewUrl(videoUrl);
+        
+        // URL에서 File 객체 생성
+        try {
+          console.log('📥 비디오 파일 다운로드 시작:', videoUrl);
+          const file = await createFileFromUrl(videoUrl, 'dropped_video.mp4', 'video/mp4');
+          setVideoFile(file);
+          console.log('✅ 드롭된 비디오 File 객체 생성 완료:', file.name, file.size, 'bytes');
+          
+          setMessage({ 
+            type: 'success', 
+            text: `라이브러리에서 ${dragData.jobType} 결과물을 비디오로 사용했습니다!` 
+          });
+        } catch (error) {
+          console.error('❌ 드롭된 비디오 File 객체 생성 실패:', error);
+          console.error('❌ 실패한 URL:', videoUrl);
+          setMessage({ 
+            type: 'error', 
+            text: `드롭된 비디오를 처리하는 중 오류가 발생했습니다. URL: ${videoUrl}` 
+          });
+        }
+      } else {
+        setMessage({ 
+          type: 'error', 
+          text: '이 드래그된 항목에는 비디오 데이터가 없습니다. Video Upscale은 비디오만 지원합니다.' 
+        });
+        return;
+      }
+
+    } catch (error) {
+      console.error('❌ 드롭 처리 중 오류:', error);
+      setMessage({ 
+        type: 'error', 
+        text: '드롭된 데이터를 처리하는 중 오류가 발생했습니다.' 
+      });
     }
   };
 
@@ -150,7 +245,16 @@ export default function VideoUpscalePage() {
               <label className="block text-sm font-medium mb-2">
                 비디오 파일 <span className="text-red-400">*</span>
               </label>
-              <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors">
+              <div 
+                className={`border-2 border-dashed rounded-lg p-6 text-center transition-all duration-200 ${
+                  isDragOver 
+                    ? 'border-primary bg-primary/10 border-solid' 
+                    : 'border-border hover:border-primary'
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -182,8 +286,13 @@ export default function VideoUpscalePage() {
                   <>
                     <VideoCameraIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground mb-2">
-                      비디오 파일을 선택하거나 드래그하세요
+                      {isDragOver ? '🎯 여기에 놓으세요!' : '비디오 파일을 선택하거나 드래그하세요'}
                     </p>
+                    {isDragOver && (
+                      <p className="text-xs text-primary mb-2">
+                        라이브러리의 비디오 결과물을 여기에 드래그하세요
+                      </p>
+                    )}
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
