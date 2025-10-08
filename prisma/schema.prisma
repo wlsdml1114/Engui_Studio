@@ -116,7 +116,6 @@ model Workspace {
   jobs        Job[]     @relation("WorkspaceJobs")
   
   @@unique([userId, name]) // 사용자별 워크스페이스 이름은 고유해야 함
-  @@unique([userId, isDefault], map: "unique_default_workspace") // 사용자별 기본 워크스페이스는 하나뿐
   @@index([userId])
   @@map("workspaces")
 }

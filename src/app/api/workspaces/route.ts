@@ -18,12 +18,7 @@ export async function GET(request: NextRequest) {
       orderBy: [
         { isDefault: 'desc' }, // 기본 워크스페이스를 먼저
         { createdAt: 'asc' }
-      ],
-      include: {
-        _count: {
-          select: { jobs: true }
-        }
-      }
+      ]
     });
 
     return NextResponse.json({ workspaces });
@@ -65,17 +60,21 @@ export async function POST(request: NextRequest) {
       where: { userId }
     });
 
+    // 첫 번째 워크스페이스면 기본으로 설정
+    const isDefault = workspaceCount === 0;
+
     const workspace = await prisma.workspace.create({
       data: {
         userId,
         name,
         description,
         color,
-        isDefault: workspaceCount === 0 // 첫 번째 워크스페이스는 기본값으로 설정
+        isDefault
       }
     });
 
-    console.log(`✅ Workspace created: ${workspace.id} (${workspace.name})`);
+    console.log(`✅ Workspace created: ${workspace.id} (${workspace.name}) ${isDefault ? '(기본 워크스페이스)' : ''}`);
+
     return NextResponse.json({ workspace });
   } catch (error) {
     console.error('❌ Workspace creation error:', error);

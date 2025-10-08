@@ -13,9 +13,6 @@ interface Workspace {
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
-  _count?: {
-    jobs: number;
-  };
 }
 
 interface JobItem {
@@ -494,7 +491,8 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
           }}
         >
           <button
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation(); // 이벤트 버블링 방지
               console.log('🖱️ 입력값 재사용 버튼 클릭됨');
               handleReuseInputs();
             }}
@@ -511,34 +509,38 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
               <div className="px-4 py-2 text-xs text-foreground/60 font-medium bg-background/20 mx-2 rounded-lg">
                 📂 워크스페이스로 이동
               </div>
-              {availableWorkspaces
-                .filter(ws => ws.id !== item.workspaceId)
-                .map((workspace) => (
-                  <button
-                    key={workspace.id}
-                    onClick={() => {
-                      onMoveToWorkspace(item.id, workspace.id);
-                      setContextMenu({ visible: false, x: 0, y: 0 });
-                    }}
-                    className="w-full px-4 py-3 text-left text-sm hover:bg-background/30 transition-all duration-200 flex items-center gap-3 rounded-lg mx-2 group"
-                  >
-                    {workspace.color ? (
-                      <div 
-                        className="w-3 h-3 rounded-full flex-shrink-0 shadow-sm ring-1 ring-white/20"
-                        style={{ backgroundColor: workspace.color }}
-                      />
-                    ) : (
-                      <div className="w-3 h-3 rounded-full bg-gradient-to-br from-primary/60 to-primary/40 flex-shrink-0 shadow-sm ring-1 ring-white/20" />
-                    )}
-                    <span className="text-foreground/90 group-hover:text-foreground transition-colors">
-                      {workspace.name}
-                    </span>
-                  </button>
-                ))}
+              <div className="max-h-40 overflow-y-auto custom-scrollbar">
+                {availableWorkspaces
+                  .filter(ws => ws.id !== item.workspaceId)
+                  .map((workspace) => (
+                    <button
+                      key={workspace.id}
+                      onClick={(e) => {
+                        e.stopPropagation(); // 이벤트 버블링 방지
+                        onMoveToWorkspace(item.id, workspace.id);
+                        setContextMenu({ visible: false, x: 0, y: 0 });
+                      }}
+                      className="w-full px-4 py-3 text-left text-sm hover:bg-background/30 transition-all duration-200 flex items-center gap-3 rounded-lg mx-2 group"
+                    >
+                      {workspace.color ? (
+                        <div 
+                          className="w-3 h-3 rounded-full flex-shrink-0 shadow-sm ring-1 ring-white/20"
+                          style={{ backgroundColor: workspace.color }}
+                        />
+                      ) : (
+                        <div className="w-3 h-3 rounded-full bg-gradient-to-br from-primary/60 to-primary/40 flex-shrink-0 shadow-sm ring-1 ring-white/20" />
+                      )}
+                      <span className="text-foreground/90 group-hover:text-foreground transition-colors">
+                        {workspace.name}
+                      </span>
+                    </button>
+                  ))}
+              </div>
               {/* 워크스페이스에서 제거 */}
               {item.workspaceId && (
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation(); // 이벤트 버블링 방지
                     fetch(`/api/workspaces/${item.workspaceId}/jobs/${item.id}`, {
                       method: 'DELETE'
                     }).then(() => {
@@ -1818,7 +1820,7 @@ export default function Library() {
                     const selectedWorkspace = workspaces.find(w => w.id === selectedWorkspaceId);
                     return (
                       <span className="text-foreground/90">
-                        {selectedWorkspace?.name} ({selectedWorkspace?._count?.jobs || 0})
+                        {selectedWorkspace?.name}
                       </span>
                     );
                   })()
@@ -1838,7 +1840,7 @@ export default function Library() {
 
             {/* 드롭다운 메뉴 */}
             {showWorkspaceDropdown && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-gradient-to-br from-secondary/95 to-secondary/90 backdrop-blur-xl border border-border/50 rounded-xl shadow-2xl z-50 overflow-hidden">
+              <div className="absolute top-full left-0 right-0 mt-2 bg-background border border-border rounded-xl shadow-2xl z-50 overflow-hidden">
                 <div className="max-h-60 overflow-y-auto custom-scrollbar">
                   <div className="py-2">
                     {/* 전체 작업 옵션 */}
@@ -1847,8 +1849,8 @@ export default function Library() {
                         handleWorkspaceChange(null);
                         setShowWorkspaceDropdown(false);
                       }}
-                      className={`w-full px-4 py-3 text-left text-sm transition-all duration-200 flex items-center gap-3 hover:bg-background/30 ${
-                        !selectedWorkspaceId ? 'bg-primary/10 text-primary' : 'text-foreground/90'
+                      className={`w-full px-4 py-3 text-left text-sm transition-all duration-200 flex items-center gap-3 hover:bg-primary/10 ${
+                        !selectedWorkspaceId ? 'bg-primary/15 text-primary font-semibold' : 'text-foreground hover:text-primary'
                       }`}
                     >
                       <span>📁 전체 작업</span>
@@ -1862,23 +1864,20 @@ export default function Library() {
                           handleWorkspaceChange(workspace.id);
                           setShowWorkspaceDropdown(false);
                         }}
-                        className={`w-full px-4 py-3 text-left text-sm transition-all duration-200 flex items-center gap-3 hover:bg-background/30 ${
-                          selectedWorkspaceId === workspace.id ? 'bg-primary/10 text-primary' : 'text-foreground/90'
+                        className={`w-full px-4 py-3 text-left text-sm transition-all duration-200 flex items-center gap-3 hover:bg-primary/10 ${
+                          selectedWorkspaceId === workspace.id ? 'bg-primary/15 text-primary font-semibold' : 'text-foreground hover:text-primary'
                         }`}
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <span>{workspace.name}</span>
                             {workspace.isDefault && (
-                              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                                 selectedWorkspaceId === workspace.id 
-                                  ? 'bg-primary/20 text-primary' 
-                                  : 'bg-foreground/10 text-foreground/70'
+                                  ? 'bg-primary/25 text-primary' 
+                                  : 'bg-foreground/15 text-foreground/80'
                               }`}>기본</span>
                             )}
-                          </div>
-                          <div className="text-xs text-foreground/60">
-                            📊 {workspace._count?.jobs || 0}개 작업
                           </div>
                         </div>
                       </button>
@@ -2082,9 +2081,6 @@ export default function Library() {
                                 기본
                               </span>
                             )}
-                          </div>
-                          <div className="text-xs text-foreground/60 mt-0.5">
-                            📊 {workspace._count?.jobs || 0}개 작업
                           </div>
                         </div>
                         <div className="flex items-center gap-2">

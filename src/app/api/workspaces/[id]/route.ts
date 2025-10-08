@@ -128,12 +128,7 @@ export async function DELETE(
     const workspaceId = params.id;
 
     const workspace = await prisma.workspace.findUnique({
-      where: { id: workspaceId },
-      include: {
-        _count: {
-          select: { jobs: true }
-        }
-      }
+      where: { id: workspaceId }
     });
 
     if (!workspace) {

@@ -102,11 +102,16 @@ export async function POST(request: NextRequest) {
         // Type assertion for settings
         const runpodSettings = settings.runpod as any;
 
+        // 현재 워크스페이스 ID 가져오기
+        const currentWorkspaceId = await settingsService.getCurrentWorkspaceId(userId);
+        console.log('🏗️ Current workspace ID for job:', currentWorkspaceId);
+
         // Create job record in database
         const job = await prisma.job.create({
             data: {
                 id: Math.random().toString(36).substring(2, 15),
                 userId,
+                workspaceId: currentWorkspaceId, // 워크스페이스 ID 추가
                 status: 'processing',
                 type: 'wan-animate',
                 prompt,
