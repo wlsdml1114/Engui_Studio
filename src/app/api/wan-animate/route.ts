@@ -88,6 +88,21 @@ export async function POST(request: NextRequest) {
             }, { status: 400 });
         }
 
+        // Validate width and height are multiples of 64
+        if (width % 64 !== 0) {
+            return NextResponse.json({
+                error: `Width must be a multiple of 64. Current value: ${width}. Suggested: ${Math.round(width / 64) * 64}`,
+                requiresSetup: false,
+            }, { status: 400 });
+        }
+
+        if (height % 64 !== 0) {
+            return NextResponse.json({
+                error: `Height must be a multiple of 64. Current value: ${height}. Suggested: ${Math.round(height / 64) * 64}`,
+                requiresSetup: false,
+            }, { status: 400 });
+        }
+
         // Load user settings
         console.log('📖 Loading user settings...');
         const { settings } = await settingsService.getSettings(userId);
