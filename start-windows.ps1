@@ -386,11 +386,40 @@ try {
 }
 Write-Host ""
 
-# Initialize database (only on first run)
+# Database migration and initialization
 Write-Host "[INFO] Checking database status..." -ForegroundColor Green
 if (Test-Path "prisma\db\database.db") {
     Write-Host "[OK] Database already exists." -ForegroundColor Green
-    Write-Host "[INFO] Using existing database." -ForegroundColor Green
+    Write-Host "[INFO] Checking for schema changes..." -ForegroundColor Green
+    
+    # Create backup before migration
+    $backupPath = "prisma\db\database_backup_$(Get-Date -Format 'yyyyMMdd_HHmmss').db"
+    Write-Host "[INFO] Creating database backup: $backupPath" -ForegroundColor Green
+    Copy-Item "prisma\db\database.db" $backupPath -Force
+    
+    try {
+        # Run migration to apply schema changes
+        Write-Host "[INFO] Running database migration..." -ForegroundColor Green
+        npx prisma db push
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "[OK] Database migration completed successfully." -ForegroundColor Green
+            Write-Host "[INFO] Backup saved at: $backupPath" -ForegroundColor Green
+        } else {
+            throw "prisma db push failed"
+        }
+    } catch {
+        Write-Host "[ERROR] Database migration failed." -ForegroundColor Red
+        Write-Host "[INFO] Restoring from backup..." -ForegroundColor Yellow
+        Copy-Item $backupPath "prisma\db\database.db" -Force
+        Write-Host ""
+        Write-Host "Solution:" -ForegroundColor Yellow
+        Write-Host "1. Check database connection settings" -ForegroundColor Yellow
+        Write-Host "2. Check Prisma schema for syntax errors" -ForegroundColor Yellow
+        Write-Host "3. Manual migration may be required" -ForegroundColor Yellow
+        Write-Host ""
+        Read-Host "Press Enter to exit"
+        exit 1
+    }
 } else {
     Write-Host "[INFO] Database does not exist." -ForegroundColor Green
     Write-Host "[INFO] Creating new database..." -ForegroundColor Green

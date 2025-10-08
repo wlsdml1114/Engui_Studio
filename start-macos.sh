@@ -172,11 +172,35 @@ fi
 echo "[OK] Prisma client generated successfully."
 echo ""
 
-# Initialize database (only on first run)
+# Database migration and initialization
 echo "[INFO] Checking database status..."
 if [ -f "prisma/db/database.db" ]; then
     echo "[OK] Database already exists."
-    echo "[INFO] Using existing database."
+    echo "[INFO] Checking for schema changes..."
+    
+    # Create backup before migration
+    backup_path="prisma/db/database_backup_$(date +%Y%m%d_%H%M%S).db"
+    echo "[INFO] Creating database backup: $backup_path"
+    cp "prisma/db/database.db" "$backup_path"
+    
+    # Run migration to apply schema changes
+    echo "[INFO] Running database migration..."
+    npx prisma db push
+    if [ $? -eq 0 ]; then
+        echo "[OK] Database migration completed successfully."
+        echo "[INFO] Backup saved at: $backup_path"
+    else
+        echo "[ERROR] Database migration failed."
+        echo "[INFO] Restoring from backup..."
+        cp "$backup_path" "prisma/db/database.db"
+        echo ""
+        echo "Solution:"
+        echo "1. Check database connection settings"
+        echo "2. Check Prisma schema for syntax errors"
+        echo "3. Manual migration may be required"
+        echo ""
+        exit 1
+    fi
 else
     echo "[INFO] Database does not exist."
     echo "[INFO] Creating new database..."
