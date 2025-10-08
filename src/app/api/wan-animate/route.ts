@@ -42,6 +42,8 @@ async function uploadToS3(file: File, fileName: string): Promise<string> {
 }
 
 export async function POST(request: NextRequest) {
+    let job: any = null; // job 변수를 함수 스코프에서 선언
+    
     try {
         console.log('🎬 Processing WAN Animate video generation request...');
 
@@ -56,14 +58,14 @@ export async function POST(request: NextRequest) {
         // 추가 설정값들
         let seed = parseInt(formData.get('seed') as string) || -1;
         const cfg = parseFloat(formData.get('cfg') as string) || 1.0;
-        const steps = parseInt(formData.get('steps') as string) || 6;
+        const steps = parseInt(formData.get('steps') as string) || 4;
         const width = parseInt(formData.get('width') as string) || 512;
         const height = parseInt(formData.get('height') as string) || 512;
         const fps = parseInt(formData.get('fps') as string) || 30;
         console.log('🎬 수신된 FPS:', fps);
-        const pointsStore = formData.get('points_store') as string || '';
-        const coordinates = formData.get('coordinates') as string || '';
-        const negCoordinates = formData.get('neg_coordinates') as string || '';
+        const pointsStore = formData.get('points_store') as string;
+        const coordinates = formData.get('coordinates') as string;
+        const negCoordinates = formData.get('neg_coordinates') as string;
 
         // Seed가 -1이면 랜덤 시드로 변환 (0 이상의 값)
         if (seed === -1) {
@@ -107,7 +109,7 @@ export async function POST(request: NextRequest) {
         console.log('🏗️ Current workspace ID for job:', currentWorkspaceId);
 
         // Create job record in database
-        const job = await prisma.job.create({
+        job = await prisma.job.create({
             data: {
                 id: Math.random().toString(36).substring(2, 15),
                 userId,
@@ -227,7 +229,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Prepare RunPod input with S3 paths
-        const runpodInput = {
+        const runpodInput: any = {
             prompt: prompt,
             image_path: s3ImagePath,
             video_path: s3VideoPath,
@@ -239,11 +241,18 @@ export async function POST(request: NextRequest) {
             width: width,
             height: height,
             fps: fps, // 비디오 FPS 추가
-            // JSON 문자열로 전송 (파싱하지 않음)
-            points_store: pointsStore || JSON.stringify({ positive: [], negative: [{ x: 0, y: 0 }] }),
-            coordinates: coordinates || JSON.stringify([]),
-            neg_coordinates: negCoordinates || JSON.stringify([])
         };
+
+        // 인물 선택이 있을 때만 포인트 관련 필드 추가
+        if (pointsStore) {
+            runpodInput.points_store = pointsStore;
+        }
+        if (coordinates) {
+            runpodInput.coordinates = coordinates;
+        }
+        if (negCoordinates) {
+            runpodInput.neg_coordinates = negCoordinates;
+        }
 
         console.log('🔧 Final RunPod input structure:');
         console.log('  - prompt:', runpodInput.prompt);
@@ -256,9 +265,15 @@ export async function POST(request: NextRequest) {
         console.log('  - width:', runpodInput.width);
         console.log('  - height:', runpodInput.height);
         console.log('  - fps:', runpodInput.fps);
-        console.log('  - points_store:', runpodInput.points_store);
-        console.log('  - coordinates:', runpodInput.coordinates);
-        console.log('  - neg_coordinates:', runpodInput.neg_coordinates);
+        if (runpodInput.points_store) {
+            console.log('  - points_store:', runpodInput.points_store);
+        }
+        if (runpodInput.coordinates) {
+            console.log('  - coordinates:', runpodInput.coordinates);
+        }
+        if (runpodInput.neg_coordinates) {
+            console.log('  - neg_coordinates:', runpodInput.neg_coordinates);
+        }
 
         // RunPod 입력 로그 출력
         console.log('🚀 Submitting job to RunPod...', runpodInput);
@@ -348,7 +363,7 @@ export async function POST(request: NextRequest) {
         console.error('❌ WAN Animate generation error:', error);
         
         // Job이 생성되었다면 상태를 failed로 업데이트
-        if (typeof job !== 'undefined') {
+        if (job) {
             try {
                 await prisma.job.update({
                     where: { id: job.id },
@@ -372,7 +387,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
             { 
                 error: `WAN Animate generation failed: ${error}`,
-                jobId: typeof job !== 'undefined' ? job.id : null,
+                jobId: job ? job.id : null,
                 status: 'failed'
             },
             { status: 500 }

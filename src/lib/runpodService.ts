@@ -64,12 +64,12 @@ interface WanAnimateInput {
   width: number;
   height: number;
   fps?: number;
-  points_store: {
+  points_store?: {
     positive: Array<{x: number, y: number}>;
     negative: Array<{x: number, y: number}>;
   };
-  coordinates: Array<{x: number, y: number}>;
-  neg_coordinates: Array<{x: number, y: number}>;
+  coordinates?: Array<{x: number, y: number}>;
+  neg_coordinates?: Array<{x: number, y: number}>;
 }
 
 interface InfiniteTalkInput {
@@ -185,7 +185,7 @@ class RunPodService {
         console.log('  - lora:', payload.input.lora);
         console.log('  - lora count:', payload.input.lora.length);
       }
-    } else if ('cfg' in input && 'points_store' in input) {
+    } else if ('cfg' in input && ('video_path' in input || 'positive_prompt' in input)) {
       // WanAnimate input
       payload = {
         input: {
@@ -219,7 +219,7 @@ class RunPodService {
       console.log('  - neg_coordinates:', payload.input.neg_coordinates);
       console.log('  - image_path:', payload.input.image_path || 'not set');
       console.log('  - video_path:', payload.input.video_path || 'not set');
-    } else if ('cfg' in input) {
+    } else if ('cfg' in input && !('video_path' in input) && !('positive_prompt' in input)) {
       // Wan22 input
       payload = {
         input: {

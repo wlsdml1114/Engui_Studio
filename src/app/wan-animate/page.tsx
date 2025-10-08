@@ -16,7 +16,7 @@ export default function WanAnimatePage() {
   // 추가 설정값들
   const [seed, setSeed] = useState(-1);
   const [cfg, setCfg] = useState(1.0);
-  const [steps, setSteps] = useState(6);
+  const [steps, setSteps] = useState(4);
   const [width, setWidth] = useState(512);
   const [height, setHeight] = useState(512);
   
@@ -416,6 +416,8 @@ export default function WanAnimatePage() {
         console.log('  - 조정된 포인트:', adjustedPoints);
         console.log('  - points_store:', JSON.stringify(pointsStore));
         console.log('  - coordinates:', JSON.stringify(adjustedPoints));
+      } else {
+        console.log('📍 인물을 선택하지 않았으므로 포인트 데이터를 전송하지 않습니다.');
       }
       
       if (imageFile) {
