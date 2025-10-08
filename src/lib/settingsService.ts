@@ -17,6 +17,12 @@ if (process.env.NODE_ENV !== 'production') {
 interface ServiceConfig {
   runpod: RunPodConfig;
   s3: S3Config;
+  workspace?: WorkspaceConfig;
+}
+
+interface WorkspaceConfig {
+  currentWorkspaceId?: string;
+  defaultWorkspaceId?: string;
 }
 
 interface RunPodConfig {
@@ -116,6 +122,10 @@ class SettingsService {
           bucketName: '',
           region: '',
           timeout: 3600 // 기본값 3600초 (1시간)
+        },
+        workspace: {
+          currentWorkspaceId: '',
+          defaultWorkspaceId: ''
         }
       };
 
@@ -152,6 +162,12 @@ class SettingsService {
             } else if (setting.configKey === 'timeout') {
               // timeout은 숫자로 변환
               settings.s3.timeout = parseInt(value) || 3600;
+            }
+          } else if (setting.serviceName === 'workspace') {
+            if (setting.configKey === 'currentWorkspaceId') {
+              settings.workspace.currentWorkspaceId = value;
+            } else if (setting.configKey === 'defaultWorkspaceId') {
+              settings.workspace.defaultWorkspaceId = value;
             }
           }
           
@@ -259,6 +275,20 @@ class SettingsService {
               configKey: key,
               configValue: String(value), // 모든 값을 문자열로 변환
               isEncrypted: this.isSensitiveKey('s3', key)
+            });
+          }
+        });
+      }
+
+      // Process workspace settings
+      if (settings.workspace) {
+        Object.entries(settings.workspace).forEach(([key, value]) => {
+          if (value !== undefined && value !== '') {
+            flatSettings.push({
+              serviceName: 'workspace',
+              configKey: key,
+              configValue: String(value),
+              isEncrypted: false
             });
           }
         });
@@ -392,6 +422,32 @@ class SettingsService {
 
   private getNestedValue(obj: any, path: string): any {
     return path.split('.').reduce((current, key) => current?.[key], obj);
+  }
+
+  // 권한 데이터를 위해 워크스페이스 ID 가져오기
+  async getCurrentWorkspaceId(userId: string): Promise<string | null> {
+    try {
+      const { settings } = await this.getSettings(userId);
+      return settings.workspace?.currentWorkspaceId || settings.workspace?.defaultWorkspaceId || null;
+    } catch (error) {
+      console.error('❌ Error getting current workspace ID:', error);
+      return null;
+    }
+  }
+
+  // 현재 워크스페이스 설정
+  async setCurrentWorkspaceId(userId: string, workspaceId: string): Promise<void> {
+    try {
+      const { settings } = await this.getSettings(userId);
+      if (!settings.workspace) {
+        settings.workspace = {};
+      }
+      settings.workspace.currentWorkspaceId = workspaceId;
+      await this.saveSettings(userId, settings);
+    } catch (error) {
+      console.error('❌ Error setting current workspace ID:', error);
+      throw error;
+    }
   }
 
   // Mask sensitive data for display

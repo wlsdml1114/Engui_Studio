@@ -16,7 +16,7 @@ export default function WanAnimatePage() {
   // 추가 설정값들
   const [seed, setSeed] = useState(-1);
   const [cfg, setCfg] = useState(1.0);
-  const [steps, setSteps] = useState(6);
+  const [steps, setSteps] = useState(4);
   const [width, setWidth] = useState(512);
   const [height, setHeight] = useState(512);
   
@@ -32,6 +32,12 @@ export default function WanAnimatePage() {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // 64의 배수 검증 함수
+  const isValidSize = (value: number) => value % 64 === 0;
+  
+  // 64의 배수로 조정하는 함수
+  const adjustToMultipleOf64 = (value: number) => Math.round(value / 64) * 64;
 
   // URL에서 File 객체를 생성하는 헬퍼 함수
   const createFileFromUrl = async (url: string, filename: string, mimeType: string): Promise<File> => {
@@ -416,6 +422,8 @@ export default function WanAnimatePage() {
         console.log('  - 조정된 포인트:', adjustedPoints);
         console.log('  - points_store:', JSON.stringify(pointsStore));
         console.log('  - coordinates:', JSON.stringify(adjustedPoints));
+      } else {
+        console.log('📍 인물을 선택하지 않았으므로 포인트 데이터를 전송하지 않습니다.');
       }
       
       if (imageFile) {
@@ -661,7 +669,7 @@ export default function WanAnimatePage() {
             {/* 생성 버튼 */}
             <button
               onClick={generateVideo}
-              disabled={isGenerating || (!imageFile && !videoFile) || !prompt.trim()}
+              disabled={isGenerating || (!imageFile && !videoFile) || !prompt.trim() || !isValidSize(width) || !isValidSize(height)}
               className="w-full py-4 bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
             >
               {isGenerating ? (
@@ -736,16 +744,23 @@ export default function WanAnimatePage() {
                     value={width}
                     onChange={(e) => setWidth(parseInt(e.target.value) || 512)}
                     placeholder="512"
-                    className="w-full p-2 border rounded-md bg-background"
+                    className={`w-full p-2 border rounded-md bg-background ${
+                      !isValidSize(width) ? 'border-red-500 focus:border-red-500' : ''
+                    }`}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    출력 비디오 너비
+                    출력 비디오 너비 (64의 배수여야 함)
                     {originalVideoSize && (
                       <span className="text-blue-400 ml-2">
                         (원본: {originalVideoSize.width}px)
                       </span>
                     )}
                   </p>
+                  {!isValidSize(width) && (
+                    <p className="text-xs text-red-400 mt-1">
+                      ⚠️ 64의 배수여야 합니다. 권장값: {adjustToMultipleOf64(width)}px
+                    </p>
+                  )}
                 </div>
 
                 {/* Height */}
@@ -756,16 +771,23 @@ export default function WanAnimatePage() {
                     value={height}
                     onChange={(e) => setHeight(parseInt(e.target.value) || 512)}
                     placeholder="512"
-                    className="w-full p-2 border rounded-md bg-background"
+                    className={`w-full p-2 border rounded-md bg-background ${
+                      !isValidSize(height) ? 'border-red-500 focus:border-red-500' : ''
+                    }`}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    출력 비디오 높이
+                    출력 비디오 높이 (64의 배수여야 함)
                     {originalVideoSize && (
                       <span className="text-blue-400 ml-2">
                         (원본: {originalVideoSize.height}px)
                       </span>
                     )}
                   </p>
+                  {!isValidSize(height) && (
+                    <p className="text-xs text-red-400 mt-1">
+                      ⚠️ 64의 배수여야 합니다. 권장값: {adjustToMultipleOf64(height)}px
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -779,6 +801,7 @@ export default function WanAnimatePage() {
                 <p>• 포인트를 클릭하면 삭제할 수 있습니다.</p>
                 <p>• 비디오는 원본 비율을 유지하여 표시됩니다.</p>
                 <p>• 출력 해상도는 원본과 다를 수 있으니 확인해주세요.</p>
+                <p className="text-yellow-300 font-medium">• ⚠️ Width와 Height는 반드시 64의 배수여야 합니다 (예: 512, 576, 640, 704, 768 등)</p>
               </div>
             </div>
           </div>

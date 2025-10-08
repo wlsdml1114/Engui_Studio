@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const skip = (page - 1) * limit;
     const onlyProcessing = searchParams.get('onlyProcessing') === 'true';
+    const workspaceId = searchParams.get('workspaceId'); // 워크스페이스 필터 추가
 
     if (jobId) {
       // 특정 작업 조회
@@ -29,8 +30,8 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({ success: true, job });
     } else {
-      // 캐시 키 생성
-      const cacheKey = `jobs-${userId}-${page}-${limit}-${onlyProcessing}`;
+      // 캐시 키 생성 (워크스페이스 필터 포함)
+      const cacheKey = `jobs-${userId}-${page}-${limit}-${onlyProcessing}-${workspaceId || 'all'}`;
       const cached = cache.get(cacheKey);
       
       // 캐시가 유효한지 확인
@@ -42,6 +43,17 @@ export async function GET(request: NextRequest) {
       const whereCondition: any = { userId };
       if (onlyProcessing) {
         whereCondition.status = 'processing';
+      }
+      
+      // 워크스페이스 필터링
+      if (workspaceId) {
+        if (workspaceId === 'unassigned') {
+          // 워크스페이스에 할당되지 않은 작업들
+          whereCondition.workspaceId = null;
+        } else {
+          // 특정 워크스페이스의 작업들
+          whereCondition.workspaceId = workspaceId;
+        }
       }
 
       // 페이지네이션과 함께 작업 조회 (필요한 필드만 선택)
@@ -62,6 +74,14 @@ export async function GET(request: NextRequest) {
             completedAt: true,
             isFavorite: true,
             options: true, // 입력 이미지 정보를 위해 options 필드 포함
+            workspaceId: true, // 워크스페이스 ID 추가
+            workspace: { // 워케이스 정보도 포함
+              select: {
+                id: true,
+                name: true,
+                color: true
+              }
+            }
           },
         }),
         prisma.job.count({ where: whereCondition })

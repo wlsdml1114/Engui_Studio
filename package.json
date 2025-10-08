@@ -6,7 +6,11 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:migrate": "prisma db push",
+    "db:generate": "prisma generate",
+    "db:backup": "node -e \"const {MigrationService} = require('./src/lib/migrationService.ts'); MigrationService.createBackup().then(path => console.log('Backup created:', path)).catch(console.error)\"",
+    "db:validate": "node -e \"const {MigrationService} = require('./src/lib/migrationService.ts'); MigrationService.validateDataIntegrity().then(result => console.log('Data integrity:', result)).catch(console.error)\""
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.893.0",
