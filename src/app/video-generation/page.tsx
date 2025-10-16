@@ -25,9 +25,10 @@ export default function Wan22Page() {
   const [width, setWidth] = useState(720);
   const [height, setHeight] = useState(480);
   const [seed, setSeed] = useState(-1);
-  const [cfg, setCfg] = useState(2.5);
+  const [cfg, setCfg] = useState(1);
   const [length, setLength] = useState(81);
   const [step, setStep] = useState(10);
+  const [contextOverlap, setContextOverlap] = useState(48);
   const [isGenerating, setIsGenerating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [currentJobId, setCurrentJobId] = useState<string>('');
@@ -114,6 +115,7 @@ export default function Wan22Page() {
             if (options.cfg !== undefined) setCfg(options.cfg);
             if (options.length) setLength(options.length);
             if (options.step) setStep(options.step);
+            if (options.contextOverlap !== undefined) setContextOverlap(options.contextOverlap);
           }
           
           // LoRA 설정을 나중에 적용하기 위해 저장
@@ -310,6 +312,7 @@ export default function Wan22Page() {
       formData.append('cfg', cfg.toString());
       formData.append('length', length.toString());
       formData.append('step', step.toString());
+      formData.append('contextOverlap', contextOverlap.toString());
       
       // LoRA pair 파라미터 추가
       console.log('🔍 Sending LoRA data:', { loraCount, validPairs });
@@ -733,6 +736,25 @@ export default function Wan22Page() {
                     />
                   </div>
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Context Overlap
+                    <span className="text-xs text-muted-foreground block mt-1">
+                      긴영상을 생성할때 overlap되는 구간 길이
+                    </span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="50"
+                    value={contextOverlap}
+                    onChange={(e) => setContextOverlap(parseInt(e.target.value) || 48)}
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    disabled={isGenerating}
+                    placeholder="48"
+                  />
+                </div>
               </div>
             </div>
 
@@ -745,11 +767,11 @@ export default function Wan22Page() {
               
               <div className="mb-4">
                 <label className="block text-sm font-medium mb-2">
-                  사용할 LoRA 개수 (0-3개)
+                  사용할 LoRA 개수 (0-4개)
                 </label>
                 <select
                   value={loraCount}
-                  onChange={(e) => setLoraCount(parseInt(e.target.value))}
+                  onChange={(e) => setLoraCount(Math.min(parseInt(e.target.value), 4))}
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   disabled={isGenerating}
                 >
@@ -757,6 +779,7 @@ export default function Wan22Page() {
                   <option value={1}>1개</option>
                   <option value={2}>2개</option>
                   <option value={3}>3개</option>
+                  <option value={4}>4개</option>
                 </select>
               </div>
 

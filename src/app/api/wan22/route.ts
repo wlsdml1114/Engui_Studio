@@ -54,13 +54,14 @@ export async function POST(request: NextRequest) {
         const width = parseInt(formData.get('width') as string);
         const height = parseInt(formData.get('height') as string);
         const seed = parseInt(formData.get('seed') as string);
-        const cfg = parseFloat(formData.get('cfg') as string);
+        const cfg = parseFloat(formData.get('cfg') as string) || 1; // 기본값: 1
         const length = parseInt(formData.get('length') as string) || 81; // 기본값: 81
         const step = parseInt(formData.get('step') as string) || 10; // 기본값: 10
+        const contextOverlap = parseInt(formData.get('contextOverlap') as string) || 48; // 기본값: 48
         
-        // LoRA pair 파라미터 추가
-        const loraCount = parseInt(formData.get('loraCount') as string) || 0;
-        console.log(`🔍 Received loraCount: ${loraCount}`);
+        // LoRA pair 파라미터 추가 (최대 4개)
+        const loraCount = Math.min(parseInt(formData.get('loraCount') as string) || 0, 4);
+        console.log(`🔍 Received loraCount: ${loraCount} (max 4)`);
         
         const loraPairs: Array<{high: string, low: string, high_weight: number, low_weight: number}> = [];
         
@@ -113,6 +114,36 @@ export async function POST(request: NextRequest) {
         // Type assertion for settings
         const runpodSettings = settings.runpod as any;
 
+        // 자격 로그(마스킹)
+        try {
+            console.log('🔐 RunPod credentials (masked):', {
+                endpointId: runpodSettings?.endpoints?.wan22,
+                apiKeyTail: runpodSettings?.apiKey ? String(runpodSettings.apiKey).slice(-6) : 'none',
+                apiKeyLen: runpodSettings?.apiKey ? String(runpodSettings.apiKey).length : 0,
+            });
+        } catch {}
+
+        // 사전 헬스 체크로 인증 상태 확인
+        try {
+            const healthUrl = `https://api.runpod.ai/v2/${runpodSettings.endpoints.wan22}/health`;
+            const healthResp = await fetch(healthUrl, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${runpodSettings.apiKey}`,
+                    'accept': 'application/json',
+                },
+            });
+            console.log('🩺 RunPod health preflight:', healthResp.status);
+            if (healthResp.status === 401) {
+                return NextResponse.json({
+                    error: 'RunPod 인증 실패(401). Settings의 API Key/Endpoint ID를 다시 저장해주세요.',
+                    details: 'Preflight /health returned 401 with current credentials.'
+                }, { status: 400 });
+            }
+        } catch (preErr) {
+            console.warn('⚠️ RunPod health preflight failed:', preErr);
+        }
+
         // 현재 워크스페이스 ID 가져오기
         const currentWorkspaceId = await settingsService.getCurrentWorkspaceId(userId);
         console.log('🏗️ Current workspace ID for job:', currentWorkspaceId);
@@ -127,7 +158,7 @@ export async function POST(request: NextRequest) {
                 type: 'wan22',
                 prompt,
                 options: JSON.stringify({ 
-                    width, height, seed, cfg, length, step,
+                    width, height, seed, cfg, length, step, contextOverlap,
                     loraCount, loraPairs 
                 }),
                 createdAt: new Date(),
@@ -183,6 +214,7 @@ export async function POST(request: NextRequest) {
             cfg: cfg,
             length: length,
             steps: step, // steps로 변경
+            context_overlap: contextOverlap, // context overlap 설정 추가
             // LoRA pair 설정 추가
             lora_pairs: loraPairs
         };
@@ -196,6 +228,7 @@ export async function POST(request: NextRequest) {
         console.log('  - cfg:', runpodInput.cfg);
         console.log('  - length:', runpodInput.length);
         console.log('  - steps:', runpodInput.steps);
+        console.log('  - context_overlap:', runpodInput.context_overlap);
         console.log('  - lora_pairs:', runpodInput.lora_pairs);
         console.log('📁 S3 이미지 경로 전달 완료: serverless에서 S3 경로 사용');
 
@@ -247,6 +280,7 @@ export async function POST(request: NextRequest) {
                     cfg,
                     length,
                     step,
+                    contextOverlap,
                     loraCount,
                     loraPairs,
                     runpodJobId,

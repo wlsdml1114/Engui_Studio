@@ -221,10 +221,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 현재 워크스페이스 ID 조회
+    const currentWorkspaceId = await settingsService.getCurrentWorkspaceId(userId);
+
     // 데이터베이스에 작업 생성
     const job = await prisma.job.create({
       data: {
         userId,
+        workspaceId: currentWorkspaceId,
         type: 'infinitetalk',
         status: 'processing',
         prompt,

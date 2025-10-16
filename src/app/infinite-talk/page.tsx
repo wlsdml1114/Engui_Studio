@@ -343,10 +343,7 @@ export default function InfiniteTalkPage() {
         // 백그라운드 처리이므로 즉시 완료 상태로 변경
         setIsGenerating(false);
         
-        // Library로 이동하여 새로운 작업 확인
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 1000);
+        // 리다이렉트 제거: 현재 페이지에 유지하며 작업 정보/메시지만 표시
         
         // 입력 초기화
         setPrompt('');
