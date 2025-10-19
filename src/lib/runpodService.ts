@@ -82,6 +82,7 @@ interface InfiniteTalkInput {
   wav_path_2?: string; // 다중 인물용 두 번째 오디오 (multi일 때)
   width: number;
   height: number;
+  network_volume?: boolean;
 }
 
 interface VideoUpscaleInput {
@@ -259,7 +260,8 @@ class RunPodService {
           wav_path: input.wav_path,
           ...(input.wav_path_2 && { wav_path_2: input.wav_path_2 }),
           width: input.width,
-          height: input.height
+          height: input.height,
+          ...(input.network_volume && { network_volume: true })
         }
       };
       

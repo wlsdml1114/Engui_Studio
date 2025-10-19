@@ -183,7 +183,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
         if (options.imageFileName) {
           // 실제 저장된 파일명으로 변환 (input/infinitetalk/input_${jobId}_${originalName})
           const actualFileName = `input/infinitetalk/input_${item.id}_${options.imageFileName}`;
-          const webPath = `/results/${encodeURIComponent(actualFileName)}`;
+          const webPath = `/results/${actualFileName}`; // 슬래시는 인코딩하지 않음
           console.log('🖼️ Using actual image file name for Infinite Talk thumbnail:', webPath);
           return webPath;
         }
@@ -192,7 +192,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
         if (options.videoFileName) {
           // 실제 저장된 파일명으로 변환 (input/infinitetalk/input_${jobId}_${originalName})
           const actualFileName = `input/infinitetalk/input_${item.id}_${options.videoFileName}`;
-          const webPath = `/results/${encodeURIComponent(actualFileName)}`;
+          const webPath = `/results/${actualFileName}`; // 슬래시는 인코딩하지 않음
           console.log('🎬 Using actual video file name for Infinite Talk thumbnail:', webPath);
           return webPath;
         }
@@ -1371,6 +1371,15 @@ export default function Library() {
     }
   );
 
+  // 다른 페이지에서 갱신 이벤트를 보내면 즉시 리페치
+  useEffect(() => {
+    const handler = () => {
+      mutate();
+    };
+    window.addEventListener('jobs:refresh', handler);
+    return () => window.removeEventListener('jobs:refresh', handler);
+  }, [mutate]);
+
   // 데이터 변수들 선언
   const jobs: JobItem[] = data?.jobs || [];
   const workspaces: Workspace[] = workspaceData?.workspaces || [];
@@ -1564,10 +1573,15 @@ export default function Library() {
           videoPath: options.videoWebPath,
           imageFileName: options.imageFileName,
           videoFileName: options.videoFileName,
-          audioPath: options.audioWebPath,
-          audioPath2: options.audioWebPath2,
+          // 원본 오디오 경로와 트림 정보 함께 저장 (UI가 복원하도록)
+          audioPath: options.originalAudioWebPath || options.audioWebPath,
+          audioPath2: options.originalAudioWebPath2 || options.audioWebPath2,
           audioFileName: options.audioFileName,
-          audioFileName2: options.audioFileName2
+          audioFileName2: options.audioFileName2,
+          audioTrimStartStr: options.audioTrimStartStr,
+          audioTrimEndStr: options.audioTrimEndStr,
+          audio2TrimStartStr: options.audio2TrimStartStr,
+          audio2TrimEndStr: options.audio2TrimEndStr
         }),
         ...(item.type === 'video-upscale' && {
           videoPath: options.videoWebPath || options.s3VideoPath,

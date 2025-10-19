@@ -11,6 +11,10 @@ export default function InfiniteTalkPage() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioFile2, setAudioFile2] = useState<File | null>(null);
+  const [audioStart, setAudioStart] = useState<string>('');
+  const [audioEnd, setAudioEnd] = useState<string>('');
+  const [audio2Start, setAudio2Start] = useState<string>('');
+  const [audio2End, setAudio2End] = useState<string>('');
   const [previewUrl, setPreviewUrl] = useState<string>('');
   const [audioPreviewUrl, setAudioPreviewUrl] = useState<string>('');
   const [audioPreviewUrl2, setAudioPreviewUrl2] = useState<string>('');
@@ -27,10 +31,17 @@ export default function InfiniteTalkPage() {
   const [isDragOver, setIsDragOver] = useState(false);
 
   // URL에서 File 객체를 생성하는 헬퍼 함수
-  const createFileFromUrl = async (url: string, filename: string, mimeType: string): Promise<File> => {
+  const createFileFromUrl = async (url: string, filename?: string, mimeType?: string): Promise<File> => {
     const response = await fetch(url);
     const blob = await response.blob();
-    return new File([blob], filename, { type: mimeType });
+    // 파일명/확장자 추론
+    const urlPath = url.split('?')[0];
+    const inferredName = filename || urlPath.split('/').pop() || 'file';
+    const ext = (inferredName.split('.').pop() || '').toLowerCase();
+    // MIME 추론
+    const headerType = response.headers.get('content-type') || '';
+    const inferredType = mimeType || blob.type || headerType || (ext === 'wav' ? 'audio/wav' : ext === 'mp3' ? 'audio/mpeg' : ext === 'ogg' ? 'audio/ogg' : ext === 'mp4' ? 'video/mp4' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'application/octet-stream');
+    return new File([blob], inferredName, { type: inferredType });
   };
 
   // 입력값 자동 로드 기능
@@ -82,13 +93,13 @@ export default function InfiniteTalkPage() {
               });
           }
           
-          // 오디오 1 로드 및 File 객체 생성
+          // 오디오 1 로드 및 File 객체 생성 (원본 오디오 우선)
           if (data.audioPath) {
             setAudioPreviewUrl(data.audioPath);
             console.log('🔄 Infinite Talk 오디오 1 재사용:', data.audioPath);
             
             // URL에서 File 객체 생성
-            createFileFromUrl(data.audioPath, 'reused_audio.mp3', 'audio/mpeg')
+            createFileFromUrl(data.audioPath)
               .then(file => {
                 setAudioFile(file);
                 console.log('✅ Infinite Talk 오디오 1 File 객체 생성 완료:', file.name);
@@ -96,15 +107,18 @@ export default function InfiniteTalkPage() {
               .catch(error => {
                 console.error('❌ Infinite Talk 오디오 1 File 객체 생성 실패:', error);
               });
+            // 트림 값 복원
+            if (data.audioTrimStartStr) setAudioStart(data.audioTrimStartStr);
+            if (data.audioTrimEndStr) setAudioEnd(data.audioTrimEndStr);
           }
           
-          // 오디오 2 로드 및 File 객체 생성
+          // 오디오 2 로드 및 File 객체 생성 (원본 오디오 우선)
           if (data.audioPath2) {
             setAudioPreviewUrl2(data.audioPath2);
             console.log('🔄 Infinite Talk 오디오 2 재사용:', data.audioPath2);
             
             // URL에서 File 객체 생성
-            createFileFromUrl(data.audioPath2, 'reused_audio2.mp3', 'audio/mpeg')
+            createFileFromUrl(data.audioPath2)
               .then(file => {
                 setAudioFile2(file);
                 console.log('✅ Infinite Talk 오디오 2 File 객체 생성 완료:', file.name);
@@ -112,6 +126,9 @@ export default function InfiniteTalkPage() {
               .catch(error => {
                 console.error('❌ Infinite Talk 오디오 2 File 객체 생성 실패:', error);
               });
+            // 트림 값 복원
+            if (data.audio2TrimStartStr) setAudio2Start(data.audio2TrimStartStr);
+            if (data.audio2TrimEndStr) setAudio2End(data.audio2TrimEndStr);
           }
           
           // 설정값 로드
@@ -317,9 +334,13 @@ export default function InfiniteTalkPage() {
       }
       
       formData.append('audio', audioFile);
+      if (audioStart.trim()) formData.append('audio_start', audioStart.trim());
+      if (audioEnd.trim()) formData.append('audio_end', audioEnd.trim());
       
       if (personCount === 'multi' && audioFile2) {
         formData.append('audio2', audioFile2);
+        if (audio2Start.trim()) formData.append('audio2_start', audio2Start.trim());
+        if (audio2End.trim()) formData.append('audio2_end', audio2End.trim());
       }
       
       formData.append('prompt', prompt);
@@ -342,6 +363,12 @@ export default function InfiniteTalkPage() {
         
         // 백그라운드 처리이므로 즉시 완료 상태로 변경
         setIsGenerating(false);
+        // 라이브러리 목록 즉시 갱신 요청 (썸네일/상태 반영)
+        try {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('jobs:refresh'));
+          }
+        } catch {}
         
         // 리다이렉트 제거: 현재 페이지에 유지하며 작업 정보/메시지만 표시
         
@@ -354,6 +381,10 @@ export default function InfiniteTalkPage() {
         setPreviewUrl('');
         setAudioPreviewUrl('');
         setAudioPreviewUrl2('');
+        setAudioStart('');
+        setAudioEnd('');
+        setAudio2Start('');
+        setAudio2End('');
         if (imageInputRef.current) imageInputRef.current.value = '';
         if (videoInputRef.current) videoInputRef.current.value = '';
         if (audioInputRef.current) audioInputRef.current.value = '';
@@ -763,6 +794,64 @@ export default function InfiniteTalkPage() {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Audio Trim Panel */}
+            <div className="bg-secondary p-6 rounded-lg border border-border">
+              <h3 className="text-lg font-semibold mb-4">오디오 트림</h3>
+              <p className="text-xs text-muted-foreground mb-3">원하는 구간만 잘라 사용할 수 있어요. hh:mm:ss(.ms), mm:ss 또는 초 단위 입력을 지원합니다.</p>
+
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">오디오 시작 시간</label>
+                  <input
+                    type="text"
+                    value={audioStart}
+                    onChange={(e) => setAudioStart(e.target.value)}
+                    placeholder="예: 12.5 또는 00:00:12.5"
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    disabled={isGenerating}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">오디오 종료 시간</label>
+                  <input
+                    type="text"
+                    value={audioEnd}
+                    onChange={(e) => setAudioEnd(e.target.value)}
+                    placeholder="예: 24 또는 00:00:24"
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    disabled={isGenerating}
+                  />
+                </div>
+              </div>
+
+              {personCount === 'multi' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">오디오2 시작 시간</label>
+                    <input
+                      type="text"
+                      value={audio2Start}
+                      onChange={(e) => setAudio2Start(e.target.value)}
+                      placeholder="예: 5 또는 00:00:05"
+                      className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                      disabled={isGenerating}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">오디오2 종료 시간</label>
+                    <input
+                      type="text"
+                      value={audio2End}
+                      onChange={(e) => setAudio2End(e.target.value)}
+                      placeholder="예: 15 또는 00:00:15"
+                      className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                      disabled={isGenerating}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Action Buttons */}

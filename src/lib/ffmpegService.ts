@@ -195,6 +195,89 @@ export class FFmpegService {
       return false;
     }
   }
+
+  /**
+   * 오디오 구간 트림
+   * - startSeconds, endSeconds 둘 다 초 단위. endSeconds가 없으면 start부터 끝까지
+   * - 입력이 잘못되면 에러를 던짐
+   */
+  async trimAudio(
+    inputPath: string,
+    outputPath: string,
+    startSeconds?: number,
+    endSeconds?: number
+  ): Promise<string> {
+    if (startSeconds == null && endSeconds == null) {
+      throw new Error('startSeconds 또는 endSeconds 중 하나는 제공되어야 합니다.');
+    }
+
+    if (startSeconds != null && startSeconds < 0) {
+      throw new Error('startSeconds는 0 이상이어야 합니다.');
+    }
+
+    if (endSeconds != null && endSeconds <= 0) {
+      throw new Error('endSeconds는 0보다 커야 합니다.');
+    }
+
+    if (startSeconds != null && endSeconds != null && endSeconds <= startSeconds) {
+      throw new Error('endSeconds는 startSeconds보다 커야 합니다.');
+    }
+
+    // 출력 디렉토리 생성
+    const outputDir = path.dirname(outputPath);
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    // ffmpeg 경로 결정 (로컬 우선)
+    let ffmpegCommand = this.ffmpegPath;
+    const localPath = path.join(process.cwd(), 'ffmpeg', 'ffmpeg.exe');
+    if (fs.existsSync(localPath)) {
+      ffmpegCommand = localPath;
+      console.log(`[FFmpeg] Using local FFmpeg for audio trim: ${localPath}`);
+    }
+
+    // 시간 옵션 구성
+    const timeArgs: string[] = [];
+    if (startSeconds != null) {
+      timeArgs.push(`-ss ${startSeconds}`);
+    }
+    if (endSeconds != null) {
+      if (startSeconds != null) {
+        // -t는 길이(duration). end - start로 계산
+        const duration = Math.max(0.001, endSeconds - startSeconds);
+        timeArgs.push(`-t ${duration}`);
+      } else {
+        // start 없이 end만 있으면 0부터 end까지
+        timeArgs.push(`-t ${endSeconds}`);
+      }
+    }
+
+    // 무손실에 가까운 복사 시도 (-c copy). 일부 포맷에서 컷 포인트 키프레임 이슈가 있으면 인코딩으로 폴백 필요할 수 있음
+    const command = `"${ffmpegCommand}" -y -i "${inputPath}" ${timeArgs.join(' ')} -c copy "${outputPath}"`;
+
+    try {
+      console.log(`[FFmpeg] Trimming audio: ${inputPath} -> ${outputPath}`);
+      console.log(`[FFmpeg] Command: ${command}`);
+      const { stdout, stderr } = await execAsync(command, {
+        timeout: 60000,
+        maxBuffer: 1024 * 1024 * 10
+      });
+
+      if (stderr && !stderr.includes('time=')) {
+        console.warn(`[FFmpeg] Trim warning: ${stderr}`);
+      }
+
+      if (!fs.existsSync(outputPath)) {
+        throw new Error('트림 결과 파일이 생성되지 않았습니다.');
+      }
+
+      return outputPath;
+    } catch (error) {
+      console.error('[FFmpeg] Error trimming audio:', error);
+      throw new Error(`오디오 트림 실패: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
 }
 
 // 싱글톤 인스턴스
