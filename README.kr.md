@@ -18,7 +18,7 @@ EnguiStudio는 RunPod Serverless 인프라를 활용하여 다양한 오픈소�
 
 <div align="center">
   <a href="https://runpod.io?ref=wvzldlmr">
-    <img src="https://cdn.prod.website-files.com/67d20fb9f56ff2ec6a7a657d/685b399e12c88ef52cbf1032_logo-white.svg" alt="RunPod" height="36" />
+    <img src="https://cdn.prod.website-files.com/67d20fb9f56ff2ec6a7a657d/685b399e12c88ef52cbf1032_logo-white.svg" alt="RunPod" height="72" />
   </a>
 </div>
 
