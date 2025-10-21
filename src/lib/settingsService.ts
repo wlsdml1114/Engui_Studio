@@ -18,11 +18,16 @@ interface ServiceConfig {
   runpod: RunPodConfig;
   s3: S3Config;
   workspace?: WorkspaceConfig;
+  ui?: UIConfig;
 }
 
 interface WorkspaceConfig {
   currentWorkspaceId?: string;
   defaultWorkspaceId?: string;
+}
+
+interface UIConfig {
+  language?: 'ko' | 'en';
 }
 
 interface RunPodConfig {
@@ -126,6 +131,9 @@ class SettingsService {
         workspace: {
           currentWorkspaceId: '',
           defaultWorkspaceId: ''
+        },
+        ui: {
+          language: 'ko' // 기본값 한국어
         }
       };
 
@@ -168,6 +176,10 @@ class SettingsService {
               settings.workspace.currentWorkspaceId = value;
             } else if (setting.configKey === 'defaultWorkspaceId') {
               settings.workspace.defaultWorkspaceId = value;
+            }
+          } else if (setting.serviceName === 'ui') {
+            if (setting.configKey === 'language') {
+              settings.ui.language = value as 'ko' | 'en';
             }
           }
           
@@ -286,6 +298,20 @@ class SettingsService {
           if (value !== undefined && value !== '') {
             flatSettings.push({
               serviceName: 'workspace',
+              configKey: key,
+              configValue: String(value),
+              isEncrypted: false
+            });
+          }
+        });
+      }
+
+      // Process UI settings
+      if (settings.ui) {
+        Object.entries(settings.ui).forEach(([key, value]) => {
+          if (value !== undefined && value !== '') {
+            flatSettings.push({
+              serviceName: 'ui',
               configKey: key,
               configValue: String(value),
               isEncrypted: false
@@ -446,6 +472,32 @@ class SettingsService {
       await this.saveSettings(userId, settings);
     } catch (error) {
       console.error('❌ Error setting current workspace ID:', error);
+      throw error;
+    }
+  }
+
+  // 언어 설정 가져오기
+  async getLanguagePreference(userId: string): Promise<'ko' | 'en'> {
+    try {
+      const { settings } = await this.getSettings(userId);
+      return settings.ui?.language || 'ko';
+    } catch (error) {
+      console.error('❌ Error getting language preference:', error);
+      return 'ko';
+    }
+  }
+
+  // 언어 설정 저장하기
+  async setLanguagePreference(userId: string, language: 'ko' | 'en'): Promise<void> {
+    try {
+      const { settings } = await this.getSettings(userId);
+      if (!settings.ui) {
+        settings.ui = {};
+      }
+      settings.ui.language = language;
+      await this.saveSettings(userId, settings);
+    } catch (error) {
+      console.error('❌ Error setting language preference:', error);
       throw error;
     }
   }

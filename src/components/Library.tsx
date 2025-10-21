@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from "react";
 import useSWR from 'swr';
 import { XMarkIcon, PlayIcon, PhotoIcon, TrashIcon, StarIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { useI18n } from '@/lib/i18n/context';
 
 interface Workspace {
   id: string;
@@ -54,6 +55,18 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
   });
   const [isDragging, setIsDragging] = useState(false);
   const itemRef = useRef<HTMLDivElement>(null);
+
+  const { t } = useI18n();
+
+  // Fallback function to handle cases where translation might not be available
+  const safeT = (key: string, params?: Record<string, string | number>) => {
+    try {
+      return t(key, params);
+    } catch (error) {
+      console.warn(`Translation error for key: ${key}`, error);
+      return key; // Return the key as fallback
+    }
+  };
 
   // MultiTalk의 경우 options에서 입력 이미지 경로 추출
   const getThumbnailUrl = () => {
@@ -442,7 +455,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
         <button
           onClick={(e) => onDeleteClick(item, e)}
           className="absolute top-2 right-2 p-1.5 bg-red-500/80 hover:bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-110 backdrop-blur-sm"
-          title="삭제"
+          title={safeT('common.delete')}
         >
           <TrashIcon className="w-3.5 h-3.5" />
         </button>
@@ -455,7 +468,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
               ? 'bg-yellow-500/90 hover:bg-yellow-400 text-white opacity-100' 
               : 'bg-gray-600/80 hover:bg-gray-500 text-white opacity-0 group-hover:opacity-100'
           }`}
-          title={item.isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+          title={item.isFavorite ? safeT('library.removeFavorite') : safeT('library.addFavorite')}
         >
           <StarIcon className={`w-3.5 h-3.5 ${item.isFavorite ? 'fill-current' : ''}`} />
         </button>
@@ -499,7 +512,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
             className="w-full px-4 py-3 text-left text-sm hover:bg-background/30 transition-all duration-200 flex items-center gap-3 rounded-lg mx-2 group"
           >
             <ArrowPathIcon className="w-4 h-4 text-primary group-hover:rotate-180 transition-transform duration-300" />
-            <span className="text-foreground/90">🔄 입력값 재사용</span>
+            <span className="text-foreground/90">🔄 {safeT('library.reuseInputs')}</span>
           </button>
           
           {/* 워크스페이스로 이동 */}
@@ -507,7 +520,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
             <>
               <div className="border-t border-border/30 my-2 mx-2"></div>
               <div className="px-4 py-2 text-xs text-foreground/60 font-medium bg-background/20 mx-2 rounded-lg">
-                📂 워크스페이스로 이동
+                📂 {safeT('library.moveToWorkspace')}
               </div>
               <div className="max-h-40 overflow-y-auto custom-scrollbar">
                 {availableWorkspaces
@@ -555,7 +568,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
                     <span className="text-red-400 text-xs">✕</span>
                   </div>
                   <span className="text-red-400 group-hover:text-red-300 transition-colors">
-                    워크스페이스에서 제거
+                    {safeT('library.removeFromWorkspace')}
                   </span>
                 </button>
               )}
@@ -569,8 +582,17 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
 };
 
 // 결과 모달 컴포넌트
-const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ item, onClose }) => {
+const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key: string, params?: Record<string, string | number>) => string }> = ({ item, onClose, t }) => {
   if (!item) return null;
+
+  const safeT = (key: string, params?: Record<string, string | number>) => {
+    try {
+      return t(key, params);
+    } catch (error) {
+      console.warn(`Translation error for key: ${key}`, error);
+      return key;
+    }
+  };
 
   const getOptions = () => {
     try {
@@ -647,21 +669,21 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
           
           {/* 작업 정보 */}
           <div>
-            <h4 className="font-medium mb-2">작업 정보</h4>
+            <h4 className="font-medium mb-2">{safeT('library.jobInfo')}</h4>
             <div className="bg-background/50 p-4 rounded-lg space-y-2">
               <div className="text-sm text-foreground/80">
                 <span className="font-medium">Job ID:</span> {item.id.substring(0, 8)}
               </div>
               <div className="text-sm text-foreground/80">
-                <span className="font-medium">생성 시간:</span> {new Date(item.createdAt).toLocaleString()}
+                <span className="font-medium">{safeT('library.createdAt')}:</span> {new Date(item.createdAt).toLocaleString()}
               </div>
               {item.completedAt && (
                 <span className="text-sm text-foreground/80">
-                  <span className="font-medium">완료 시간:</span> {new Date(item.completedAt).toLocaleString()}
+                  <span className="font-medium">{safeT('library.completedAt')}:</span> {new Date(item.completedAt).toLocaleString()}
                 </span>
               )}
               <div className="text-sm text-foreground/80">
-                <span className="font-medium">상태:</span> 
+                <span className="font-medium">{safeT('library.status')}:</span> 
                 <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
                   item.status === 'completed' ? 'bg-green-500/20 text-green-300' : 
                   item.status === 'failed' ? 'bg-red-500/20 text-red-300' : 'bg-yellow-500/20 text-yellow-300'
@@ -687,7 +709,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                     Your browser does not support the video tag.
                   </video>
                   <div className="text-sm text-foreground/60">
-                    💡 비디오가 재생되지 않는 경우, 직접 다운로드하여 확인해보세요.
+                    💡 {safeT('library.videoNotPlaying')}
                   </div>
                 </div>
               ) : item.type === 'flux-kontext' ? (
@@ -701,7 +723,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                     onLoad={() => console.log('✅ FLUX KONTEXT image loaded successfully:', resultUrl)}
                   />
                   <div className="text-sm text-foreground/60">
-                    🎨 FLUX KONTEXT로 생성된 이미지입니다.
+                    🎨 {safeT('library.fluxKontextImage')}
                   </div>
                 </div>
               ) : item.type === 'flux-krea' ? (
@@ -715,7 +737,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                     onLoad={() => console.log('✅ FLUX KREA image loaded successfully:', resultUrl)}
                   />
                   <div className="text-sm text-foreground/60">
-                    🎨 FLUX KREA로 생성된 이미지입니다.
+                    🎨 {safeT('library.fluxKreaImage')}
                   </div>
                 </div>
               ) : (
@@ -729,7 +751,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                     Your browser does not support the video tag.
                   </video>
                   <div className="text-sm text-foreground/60">
-                    💡 비디오가 재생되지 않는 경우, 직접 다운로드하여 확인해보세요.
+                    💡 {safeT('library.videoNotPlaying')}
                   </div>
                 </div>
               )}
@@ -738,12 +760,12 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
             <div className="text-center py-8">
               <div className="text-foreground/50 mb-4">
                 <PhotoIcon className="w-16 h-16 mx-auto mb-2" />
-                <p>결과물을 찾을 수 없습니다.</p>
+                <p>{safeT('library.resultNotFound')}</p>
               </div>
               <div className="text-sm text-foreground/40 space-y-1">
-                <p>• 작업이 아직 완료되지 않았을 수 있습니다.</p>
-                <p>• 결과 URL이 설정되지 않았을 수 있습니다.</p>
-                <p>• 잠시 후 다시 시도해보세요.</p>
+                <p>• {safeT('library.jobNotCompleted')}</p>
+                <p>• {safeT('library.resultUrlNotSet')}</p>
+                <p>• {safeT('library.tryAgainLater')}</p>
               </div>
             </div>
           )}
@@ -772,10 +794,10 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                       const errorDiv = document.createElement('div');
                       errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
                       errorDiv.innerHTML = `
-                        <div class="mb-2">⚠️ 입력 이미지를 불러올 수 없습니다</div>
+                        <div class="mb-2">${safeT('library.inputImageLoadError')}</div>
                         <div class="text-xs text-red-300">
-                          <p>웹 경로: ${options.imageWebPath}</p>
-                          <p>💡 파일이 public/results 폴더에 있는지 확인하세요</p>
+                          <p>${safeT('library.webPath')}: ${options.imageWebPath}</p>
+                          <p>${safeT('library.fileNotInPublicFolder')}</p>
                         </div>
                       `;
                       imgElement.parentNode?.appendChild(errorDiv);
@@ -788,7 +810,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
               ) : (
                 <div className="text-center py-8 text-foreground/50">
                   <PhotoIcon className="w-16 h-16 mx-auto mb-2" />
-                  <p>입력 이미지 정보를 찾을 수 없습니다.</p>
+                  <p>{safeT('library.inputImageInfo')}</p>
                 </div>
               )}
             </div>
@@ -834,12 +856,12 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                               const errorDiv = document.createElement('div');
                               errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
                               errorDiv.innerHTML = `
-                                <div class="mb-2">⚠️ 입력 이미지를 불러올 수 없습니다</div>
+                                <div class="mb-2">${safeT('library.inputImageLoadError')}</div>
                                 <div class="text-xs text-red-300">
-                                  <p>웹 경로: /results/${options.inputImageName}</p>
-                                  <p>실제 경로: ${options.inputImagePath}</p>
-                                  <p>파일명: ${options.inputImageName}</p>
-                                  <p>💡 파일은 존재하지만 웹 접근 경로 문제일 수 있습니다</p>
+                                  <p>${safeT('library.webPath')}: /results/${options.inputImageName}</p>
+                                  <p>${safeT('library.actualPath')}: ${options.inputImagePath}</p>
+                                  <p>${safeT('library.fileName')}: ${options.inputImageName}</p>
+                                  <p>${safeT('library.webAccessIssue')}</p>
                                 </div>
                               `;
                               imgElement.parentNode?.appendChild(errorDiv);
@@ -857,14 +879,14 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                   return (
                     <div className="text-center py-8 text-foreground/50">
                       <PhotoIcon className="w-16 h-16 mx-auto mb-2" />
-                      <p>입력 이미지 정보를 찾을 수 없습니다.</p>
+                      <p>{safeT('library.inputImageInfo')}</p>
                     </div>
                   );
                 } catch (e) {
                   return (
                     <div className="text-center py-8 text-foreground/50">
                       <PhotoIcon className="w-16 h-16 mx-auto mb-2" />
-                      <p>입력 이미지 정보를 파싱할 수 없습니다.</p>
+                      <p>{safeT('library.inputImageParseError')}</p>
                     </div>
                   );
                 }
@@ -910,10 +932,10 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                               const errorDiv = document.createElement('div');
                               errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
                               errorDiv.innerHTML = `
-                                <div class="mb-2">⚠️ WAN 2.2 입력 이미지를 불러올 수 없습니다</div>
+                                <div class="mb-2">${safeT('library.wan22InputImageError')}</div>
                                 <div class="text-xs text-red-300">
-                                  <p>웹 경로: ${options.imageWebPath}</p>
-                                  <p>💡 파일이 public/results 폴더에 있는지 확인하세요</p>
+                                  <p>${safeT('library.webPath')}: ${options.imageWebPath}</p>
+                                  <p>${safeT('library.fileNotInPublicFolder')}</p>
                                 </div>
                               `;
                               imgElement.parentNode?.appendChild(errorDiv);
@@ -986,12 +1008,12 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                               const errorDiv = document.createElement('div');
                               errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
                               errorDiv.innerHTML = `
-                                <div class="mb-2">⚠️ 입력 이미지를 불러올 수 없습니다</div>
+                                <div class="mb-2">${safeT('library.inputImageLoadError')}</div>
                                 <div class="text-xs text-red-300">
-                                  <p>웹 경로: /results/${options.inputImageName}</p>
-                                  <p>실제 경로: ${options.inputImagePath}</p>
-                                  <p>파일명: ${options.inputImageName}</p>
-                                  <p>💡 파일은 존재하지만 웹 접근 경로 문제일 수 있습니다</p>
+                                  <p>${safeT('library.webPath')}: /results/${options.inputImageName}</p>
+                                  <p>${safeT('library.actualPath')}: ${options.inputImagePath}</p>
+                                  <p>${safeT('library.fileName')}: ${options.inputImageName}</p>
+                                  <p>${safeT('library.webAccessIssue')}</p>
                                 </div>
                               `;
                               imgElement.parentNode?.appendChild(errorDiv);
@@ -1009,7 +1031,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                   return (
                     <div className="text-center py-8 text-foreground/50">
                       <PhotoIcon className="w-16 h-16 mx-auto mb-2" />
-                      <p>입력 이미지 정보를 찾을 수 없습니다.</p>
+                      <p>{safeT('library.inputImageInfo')}</p>
                       <div className="text-xs text-foreground/40 mt-2">
                         <p>Options: {JSON.stringify(options, null, 2)}</p>
                       </div>
@@ -1019,7 +1041,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                   return (
                     <div className="text-center py-8 text-foreground/50">
                       <PhotoIcon className="w-16 h-16 mx-auto mb-2" />
-                      <p>입력 이미지 정보를 파싱할 수 없습니다.</p>
+                      <p>{safeT('library.inputImageParseError')}</p>
                       <div className="text-xs text-foreground/40 mt-2">
                         <p>Error: {e instanceof Error ? e.message : String(e)}</p>
                       </div>
@@ -1059,11 +1081,11 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                                 const errorDiv = document.createElement('div');
                                 errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
                                 errorDiv.innerHTML = `
-                                  <div class="mb-2">⚠️ WAN Animate 입력 이미지를 불러올 수 없습니다</div>
+                                  <div class="mb-2">${safeT('library.wanAnimateInputImageError')}</div>
                                   <div class="text-xs text-red-300">
-                                    <p>웹 경로: ${options.imageWebPath || `/results/${options.s3ImagePath.split('/').pop()}`}</p>
-                                    <p>S3 경로: ${options.s3ImagePath}</p>
-                                    <p>💡 파일이 public/results 폴더에 있는지 확인하세요</p>
+                                    <p>${safeT('library.webPath')}: ${options.imageWebPath || `/results/${options.s3ImagePath.split('/').pop()}`}</p>
+                                    <p>${safeT('library.s3Path')}: ${options.s3ImagePath}</p>
+                                    <p>${safeT('library.fileNotInPublicFolder')}</p>
                                   </div>
                                 `;
                                 imgElement.parentNode?.appendChild(errorDiv);
@@ -1095,10 +1117,10 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                                 const errorDiv = document.createElement('div');
                                 errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
                                 errorDiv.innerHTML = `
-                                  <div class="mb-2">⚠️ WAN Animate 입력 비디오를 불러올 수 없습니다</div>
+                                  <div class="mb-2">${safeT('library.wanAnimateInputVideoError')}</div>
                                   <div class="text-xs text-red-300">
-                                    <p>S3 경로: ${options.s3VideoPath}</p>
-                                    <p>💡 파일이 public/results 폴더에 있는지 확인하세요</p>
+                                    <p>${safeT('library.s3Path')}: ${options.s3VideoPath}</p>
+                                    <p>${safeT('library.fileNotInPublicFolder')}</p>
                                   </div>
                                 `;
                                 videoElement.parentNode?.appendChild(errorDiv);
@@ -1169,10 +1191,10 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                             const errorDiv = document.createElement('div');
                             errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
                             errorDiv.innerHTML = `
-                              <div class="mb-2">⚠️ Infinite Talk 입력 비디오를 불러올 수 없습니다</div>
+                              <div class="mb-2">${safeT('library.infiniteTalkInputVideoError')}</div>
                               <div class="text-xs text-red-300">
-                                <p>웹 경로: ${options.videoWebPath}</p>
-                                <p>💡 파일이 public/results 폴더에 있는지 확인하세요</p>
+                                <p>${safeT('library.webPath')}: ${options.videoWebPath}</p>
+                                <p>${safeT('library.fileNotInPublicFolder')}</p>
                               </div>
                             `;
                             videoElement.parentNode?.appendChild(errorDiv);
@@ -1201,10 +1223,10 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                             const errorDiv = document.createElement('div');
                             errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
                             errorDiv.innerHTML = `
-                              <div class="mb-2">⚠️ Infinite Talk 입력 이미지를 불러올 수 없습니다</div>
+                              <div class="mb-2">${safeT('library.infiniteTalkInputImageError')}</div>
                               <div class="text-xs text-red-300">
-                                <p>웹 경로: ${options.imageWebPath}</p>
-                                <p>💡 파일이 public/results 폴더에 있는지 확인하세요</p>
+                                <p>${safeT('library.webPath')}: ${options.imageWebPath}</p>
+                                <p>${safeT('library.fileNotInPublicFolder')}</p>
                               </div>
                             `;
                             imgElement.parentNode?.appendChild(errorDiv);
@@ -1236,10 +1258,10 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                             const errorDiv = document.createElement('div');
                             errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
                             errorDiv.innerHTML = `
-                              <div class="mb-2">⚠️ Infinite Talk 입력 비디오를 불러올 수 없습니다</div>
+                              <div class="mb-2">${safeT('library.infiniteTalkInputVideoError')}</div>
                               <div class="text-xs text-red-300">
-                                <p>Fallback 경로: ${fallbackPath}</p>
-                                <p>💡 파일이 public/results 폴더에 있는지 확인하세요</p>
+                                <p>${safeT('library.fallbackPath')}: ${fallbackPath}</p>
+                                <p>${safeT('library.fileNotInPublicFolder')}</p>
                               </div>
                             `;
                             videoElement.parentNode?.appendChild(errorDiv);
@@ -1270,10 +1292,10 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
                             const errorDiv = document.createElement('div');
                             errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
                             errorDiv.innerHTML = `
-                              <div class="mb-2">⚠️ Infinite Talk 입력 이미지를 불러올 수 없습니다</div>
+                              <div class="mb-2">${safeT('library.infiniteTalkInputImageError')}</div>
                               <div class="text-xs text-red-300">
-                                <p>Fallback 경로: ${fallbackPath}</p>
-                                <p>💡 파일이 public/results 폴더에 있는지 확인하세요</p>
+                                <p>${safeT('library.fallbackPath')}: ${fallbackPath}</p>
+                                <p>${safeT('library.fileNotInPublicFolder')}</p>
                               </div>
                             `;
                             imgElement.parentNode?.appendChild(errorDiv);
@@ -1313,6 +1335,18 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void }> = ({ 
 };
 
 export default function Library() {
+  const { t } = useI18n();
+
+  // Fallback function to handle cases where translation might not be available
+  const safeT = (key: string, params?: Record<string, string | number>) => {
+    try {
+      return t(key, params);
+    } catch (error) {
+      console.warn(`Translation error for key: ${key}`, error);
+      return key;
+    }
+  };
+
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [selectedItem, setSelectedItem] = useState<JobItem | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<JobItem | null>(null);
@@ -1495,11 +1529,11 @@ export default function Library() {
       } else {
         const errorData = await response.json();
         console.error('Favorite toggle failed:', errorData);
-        alert('즐겨찾기 상태 변경에 실패했습니다.');
+        alert(safeT('library.favoriteToggleFailed'));
       }
     } catch (error) {
       console.error('Favorite toggle error:', error);
-      alert('즐겨찾기 상태 변경 중 오류가 발생했습니다.');
+      alert(safeT('library.favoriteToggleError'));
     }
   };
 
@@ -1614,7 +1648,7 @@ export default function Library() {
         window.location.href = targetPage;
       } else {
         console.error('❌ 페이지를 찾을 수 없음:', item.type);
-        alert('해당 타입의 페이지를 찾을 수 없습니다.');
+        alert(safeT('library.pageNotFound'));
       }
     } catch (error) {
       console.error('❌ 입력값 재사용 중 오류:', error);
@@ -1626,9 +1660,9 @@ export default function Library() {
       
       // localStorage 용량 초과 오류인 경우 특별 처리
       if (error instanceof Error && error.name === 'QuotaExceededError') {
-        alert('저장 공간이 부족합니다. 브라우저의 저장된 데이터를 정리한 후 다시 시도해주세요.');
+        alert(safeT('library.quotaExceeded'));
       } else {
-        alert('입력값 재사용 중 오류가 발생했습니다.');
+        alert(safeT('library.reuseError'));
       }
     }
   };
@@ -1653,11 +1687,11 @@ export default function Library() {
       } else {
         const errorData = await response.json();
         console.error('Delete failed:', errorData);
-        alert('삭제에 실패했습니다.');
+        alert(safeT('library.deleteFailed'));
       }
     } catch (error) {
       console.error('Delete error:', error);
-      alert('삭제 중 오류가 발생했습니다.');
+      alert(safeT('library.deleteError'));
     } finally {
       setIsDeleting(false);
     }
@@ -1713,11 +1747,11 @@ export default function Library() {
         setShowWorkspaceManager(false);
       } else {
         const errorData = await response.json();
-        alert(errorData.error || '워크스페이스 생성에 실패했습니다.');
+        alert(errorData.error || safeT('library.workspaceCreateFailed'));
       }
     } catch (error) {
       console.error('Workspace creation error:', error);
-      alert('워크스페이스 생성 중 오류가 발생했습니다.');
+      alert(safeT('library.workspaceCreateError'));
     }
   };
 
@@ -1732,11 +1766,11 @@ export default function Library() {
         await mutateWorkspaces(); // 워크스페이스 개수 업데이트
       } else {
         const errorData = await response.json();
-        alert(errorData.error || '작업 이동에 실패했습니다.');
+        alert(errorData.error || safeT('library.jobMoveFailed'));
       }
     } catch (error) {
       console.error('Job move error:', error);
-      alert('작업 이동 중 오류가 발생했습니다.');
+      alert(safeT('library.jobMoveError'));
     }
   };
 
@@ -1767,11 +1801,11 @@ export default function Library() {
       } else {
         const errorData = await response.json();
         console.error('❌ 워크스페이스 삭제 실패:', errorData);
-        alert(errorData.error || '워크스페이스 삭제에 실패했습니다.');
+        alert(errorData.error || safeT('library.workspaceDeleteFailed'));
       }
     } catch (error) {
       console.error('❌ 워크스페이스 삭제 오류:', error);
-      alert('워크스페이스 삭제 중 오류가 발생했습니다.');
+      alert(safeT('library.workspaceDeleteError'));
     } finally {
       setIsDeletingWorkspace(false);
     }
@@ -1785,7 +1819,7 @@ export default function Library() {
     <>
       <aside className="w-[450px] bg-secondary p-6 flex flex-col flex-shrink-0 border-l border-border">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold">Library</h2>
+          <h2 className="text-2xl font-bold">{safeT('library.title')}</h2>
           <div className="flex items-center gap-2">
             {processingJobs > 0 && (
               <div className="flex items-center gap-1 text-yellow-400">
@@ -1805,18 +1839,18 @@ export default function Library() {
         {/* 워크스페이스 선택기 */}
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
-            <h3 className="text-sm font-medium text-foreground/70">워크스페이스</h3>
+            <h3 className="text-sm font-medium text-foreground/70">{safeT('library.workspace')}</h3>
             <button
               onClick={() => setShowWorkspaceManager(true)}
               className="group relative text-xs text-foreground/60 hover:text-primary transition-all duration-200 px-3 py-1.5 rounded-lg hover:bg-primary/10 hover:shadow-sm border border-transparent hover:border-primary/20"
-              title="워크스페이스 관리"
+              title={safeT('library.workspaceManagement')}
             >
               <div className="flex items-center gap-1.5">
                 <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                <span className="font-medium">관리</span>
+                <span className="font-medium">{safeT('library.manage')}</span>
               </div>
               {/* 호버 시 미묘한 글로우 효과 */}
               <div className="absolute inset-0 rounded-lg bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 -z-10" />
@@ -1839,7 +1873,7 @@ export default function Library() {
                     );
                   })()
                 ) : (
-                  <span className="text-foreground/90">📁 전체 작업</span>
+                  <span className="text-foreground/90">📁 {safeT('library.allJobs')}</span>
                 )}
               </div>
               <svg 
@@ -1867,7 +1901,7 @@ export default function Library() {
                         !selectedWorkspaceId ? 'bg-primary/15 text-primary font-semibold' : 'text-foreground hover:text-primary'
                       }`}
                     >
-                      <span>📁 전체 작업</span>
+                      <span>📁 {safeT('library.allJobs')}</span>
                     </button>
 
                     {/* 워크스페이스 옵션들 */}
@@ -1890,7 +1924,7 @@ export default function Library() {
                                 selectedWorkspaceId === workspace.id 
                                   ? 'bg-primary/25 text-primary' 
                                   : 'bg-foreground/15 text-foreground/80'
-                              }`}>기본</span>
+                              }`}>{safeT('library.default')}</span>
                             )}
                           </div>
                         </div>
@@ -1908,21 +1942,21 @@ export default function Library() {
             className={`flex-1 capitalize py-2 px-3 rounded-md text-sm font-medium transition-colors duration-200 ${showFavoritesOnly ? 'bg-primary text-white' : 'hover:bg-white/5'}`}
             onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
           >
-            {showFavoritesOnly ? '전체 보기' : '즐겨찾기만 보기'}
+            {showFavoritesOnly ? safeT('library.showAll') : safeT('library.favoritesOnly')}
           </button>
         </div>
         
         {/* 마지막 업데이트 시간 표시 */}
         <div className="text-xs text-foreground/30 mb-2 text-center">
-          Last updated: {lastUpdate.toLocaleTimeString()}
+          {safeT('library.lastUpdated')} {lastUpdate.toLocaleTimeString()}
         </div>
         
-        {error && <div className="text-red-500 text-center">Failed to load jobs</div>}
-        {!data && <div className="text-center">Loading...</div>}
+        {error && <div className="text-red-500 text-center">{safeT('library.failedToLoadJobs')}</div>}
+        {!data && <div className="text-center">{safeT('library.loading')}</div>}
         <div className="flex-1 grid grid-cols-2 gap-3 overflow-y-auto pr-2 auto-rows-min library-scrollbar">
           {filteredJobs.length === 0 && !error && data ? (
             <p className="text-foreground/50 col-span-2 text-center">
-              {showFavoritesOnly ? '즐겨찾기된 항목이 없습니다.' : '작업 결과가 없습니다.'}
+              {showFavoritesOnly ? safeT('library.noFavorites') : safeT('library.noResults')}
             </p>
           ) : (
             filteredJobs.map((job) => (
@@ -1948,7 +1982,7 @@ export default function Library() {
               disabled={currentPage === 1}
               className="px-3 py-1 text-sm bg-secondary hover:bg-secondary/80 disabled:opacity-50 disabled:cursor-not-allowed rounded border border-border"
             >
-              이전
+              {safeT('library.previous')}
             </button>
             
             <div className="flex items-center gap-1">
@@ -1977,14 +2011,14 @@ export default function Library() {
               disabled={currentPage === totalPages}
               className="px-3 py-1 text-sm bg-secondary hover:bg-secondary/80 disabled:opacity-50 disabled:cursor-not-allowed rounded border border-border"
             >
-              다음
+              {safeT('library.next')}
             </button>
           </div>
         )}
       </aside>
       
       {/* 결과 모달 */}
-      <ResultModal item={selectedItem} onClose={handleCloseModal} />
+      <ResultModal item={selectedItem} onClose={handleCloseModal} t={t} />
       
       {/* 삭제 확인 모달 */}
       {deleteConfirm && (
@@ -1994,14 +2028,14 @@ export default function Library() {
               <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
                 <TrashIcon className="w-5 h-5 text-red-500" />
               </div>
-              <h3 className="text-lg font-semibold">결과물 삭제</h3>
+              <h3 className="text-lg font-semibold">{safeT('library.deleteConfirm')}</h3>
             </div>
             
             <p className="text-foreground/80 mb-6">
-              <strong>{deleteConfirm.type}</strong> 결과물을 삭제하시겠습니까?
+              <strong>{deleteConfirm.type}</strong> {safeT('library.deleteConfirmMessage')}
               <br />
               <span className="text-sm text-foreground/60">
-                이 작업은 되돌릴 수 없습니다.
+                {safeT('library.deleteConfirmWarning')}
               </span>
             </p>
             
@@ -2011,7 +2045,7 @@ export default function Library() {
                 disabled={isDeleting}
                 className="px-4 py-2 text-foreground/70 hover:text-foreground transition-colors disabled:opacity-50"
               >
-                취소
+                {safeT('library.cancel')}
               </button>
               <button
                 onClick={handleDeleteConfirm}
@@ -2021,10 +2055,10 @@ export default function Library() {
                 {isDeleting ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    삭제 중...
+                    {safeT('library.deleting')}
                   </>
                 ) : (
-                  '삭제'
+                  safeT('library.delete')
                 )}
               </button>
             </div>
@@ -2038,7 +2072,7 @@ export default function Library() {
           <div className="bg-gradient-to-br from-secondary/95 to-secondary/90 backdrop-blur-xl rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto border border-border/50 shadow-2xl">
             <div className="flex items-center justify-between p-6 border-b border-border/30">
               <h3 className="text-xl font-semibold text-foreground">
-                🎨 워크스페이스 관리
+                🎨 {safeT('library.workspaceManagement')}
               </h3>
               <button
                 onClick={() => setShowWorkspaceManager(false)}
@@ -2051,13 +2085,13 @@ export default function Library() {
             <div className="p-6 space-y-6">
               {/* 새 워크스페이스 생성 */}
               <div className="bg-gradient-to-r from-background/30 to-background/20 rounded-xl p-4 border border-border/30">
-                <h4 className="font-medium mb-3 text-foreground/90">✨ 새 워크스페이스 생성</h4>
+                <h4 className="font-medium mb-3 text-foreground/90">✨ {safeT('library.createWorkspace')}</h4>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={newWorkspaceName}
                     onChange={(e) => setNewWorkspaceName(e.target.value)}
-                    placeholder="워크스페이스 이름을 입력하세요"
+                    placeholder={safeT('library.workspaceNamePlaceholder')}
                     className="flex-1 bg-background/60 border border-border/50 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all duration-200 placeholder:text-foreground/40"
                     onKeyPress={(e) => e.key === 'Enter' && handleCreateWorkspace()}
                   />
@@ -2066,14 +2100,14 @@ export default function Library() {
                     disabled={!newWorkspaceName.trim()}
                     className="px-4 py-3 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-lg hover:shadow-primary/25 hover:scale-105 disabled:hover:scale-100"
                   >
-                    ✨ 생성
+                    {safeT('library.create')}
                   </button>
                 </div>
               </div>
 
               {/* 기존 워크스페이스 목록 */}
               <div>
-                <h4 className="font-medium mb-3 text-foreground/90">📂 워크스페이스 목록</h4>
+                <h4 className="font-medium mb-3 text-foreground/90">📂 {safeT('library.workspaceList')}</h4>
                 <div className="bg-background/20 rounded-xl border border-border/30 overflow-hidden">
                   <div className="max-h-60 overflow-y-auto custom-scrollbar">
                     {workspaces.map((workspace, index) => (
@@ -2092,7 +2126,7 @@ export default function Library() {
                             </span>
                             {workspace.isDefault && (
                               <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
-                                기본
+                                {safeT('library.default')}
                               </span>
                             )}
                           </div>
@@ -2106,7 +2140,7 @@ export default function Library() {
                                 : 'bg-background/50 hover:bg-background/70 text-foreground/70 hover:text-foreground'
                             }`}
                           >
-                            {selectedWorkspaceId === workspace.id ? '선택됨' : '선택'}
+                            {selectedWorkspaceId === workspace.id ? safeT('library.selected') : safeT('library.select')}
                           </button>
                           {!workspace.isDefault && (
                             <button
@@ -2137,14 +2171,14 @@ export default function Library() {
                 <span className="text-red-400 text-xl">🗑️</span>
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-foreground">워크스페이스 삭제</h3>
-                <p className="text-sm text-foreground/60">이 작업은 되돌릴 수 없습니다</p>
+                <h3 className="text-lg font-semibold text-foreground">{safeT('library.deleteWorkspace')}</h3>
+                <p className="text-sm text-foreground/60">{safeT('library.deleteWorkspaceWarning')}</p>
               </div>
             </div>
             
             <div className="mb-6">
               <p className="text-foreground/90 mb-2">
-                <span className="font-medium text-red-400">"{deleteWorkspaceConfirm.name}"</span> 워크스페이스를 삭제하시겠습니까?
+                {safeT('library.deleteWorkspaceConfirm', { name: deleteWorkspaceConfirm.name })}
               </p>
               <div className="bg-background/30 rounded-lg p-3 text-sm text-foreground/70">
                 <p className="mb-1">⚠️ 삭제 시 다음이 적용됩니다:</p>
@@ -2162,7 +2196,7 @@ export default function Library() {
                 disabled={isDeletingWorkspace}
                 className="flex-1 px-4 py-2 text-sm font-medium text-foreground/70 bg-background/50 hover:bg-background/70 rounded-lg transition-all duration-200 disabled:opacity-50"
               >
-                취소
+                {safeT('library.cancel')}
               </button>
               <button
                 onClick={handleDeleteWorkspaceConfirm}
@@ -2172,10 +2206,10 @@ export default function Library() {
                 {isDeletingWorkspace ? (
                   <>
                     <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                    삭제 중...
+                    {safeT('library.deleting')}
                   </>
                 ) : (
-                  '삭제'
+                  safeT('library.delete')
                 )}
               </button>
             </div>

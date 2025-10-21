@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { PhotoIcon, SparklesIcon, Cog6ToothIcon, PlayIcon, CpuChipIcon, FilmIcon } from '@heroicons/react/24/outline';
 import { thumbnailService, ThumbnailOptions } from '@/lib/thumbnailService';
+import { useI18n } from '@/lib/i18n/context';
 
 interface LoRAFile {
   key: string;
@@ -19,6 +20,7 @@ interface LoRAPair {
 }
 
 export default function Wan22Page() {
+  const { t } = useI18n();
   const [prompt, setPrompt] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
@@ -125,7 +127,7 @@ export default function Wan22Page() {
           }
           
           // 성공 메시지 표시
-          setMessage({ type: 'success', text: '이전 작업의 입력값이 자동으로 로드되었습니다!' });
+          setMessage({ type: 'success', text: t('messages.inputsLoaded') });
           
           // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
           localStorage.removeItem('reuseInputs');
@@ -191,7 +193,7 @@ export default function Wan22Page() {
       }
     } catch (err) {
       console.error('❌ Error fetching LoRA files:', err);
-      setMessage({ type: 'error', text: 'LoRA 파일을 불러오는 중 오류가 발생했습니다.' });
+      setMessage({ type: 'error', text: t('s3Storage.errors.fileListFailed') });
     } finally {
       setLoraLoading(false);
     }
@@ -253,7 +255,7 @@ export default function Wan22Page() {
   // 썸네일 생성 함수
   const generateThumbnail = async (file: File) => {
     if (!thumbnailStatus?.ffmpegAvailable) {
-      setMessage({ type: 'error', text: 'FFmpeg가 설치되지 않았습니다. 썸네일 생성 기능을 사용하려면 FFmpeg를 설치해주세요.' });
+      setMessage({ type: 'error', text: t('videoGeneration.ffmpegNotInstalled') });
       return;
     }
 
@@ -271,13 +273,13 @@ export default function Wan22Page() {
 
       if (result.success && result.thumbnail) {
         setThumbnailUrl(result.thumbnail);
-        setMessage({ type: 'success', text: '비디오 썸네일이 성공적으로 생성되었습니다.' });
+        setMessage({ type: 'success', text: t('videoGeneration.thumbnailGenerated') });
       } else {
-        setMessage({ type: 'error', text: result.error || '썸네일 생성에 실패했습니다.' });
+        setMessage({ type: 'error', text: result.error || t('videoGeneration.thumbnailGenerateFailed') });
       }
     } catch (error) {
       console.error('Thumbnail generation error:', error);
-      setMessage({ type: 'error', text: '썸네일 생성 중 오류가 발생했습니다.' });
+      setMessage({ type: 'error', text: t('videoGeneration.thumbnailError') });
     } finally {
       setIsGeneratingThumbnail(false);
     }
@@ -285,7 +287,7 @@ export default function Wan22Page() {
 
   const handleGenerate = async () => {
     if (!imageFile || !prompt.trim()) {
-      setMessage({ type: 'error', text: '이미지와 프롬프트를 모두 입력해주세요.' });
+      setMessage({ type: 'error', text: t('videoGeneration.inputRequired') });
       return;
     }
 
@@ -294,7 +296,7 @@ export default function Wan22Page() {
       pair.high && pair.low && pair.high_weight > 0 && pair.low_weight > 0
     );
     if (loraCount > 0 && validPairs.length !== loraCount) {
-      setMessage({ type: 'error', text: '모든 LoRA pair의 high/low 파일을 선택하고 가중치를 설정해주세요.' });
+      setMessage({ type: 'error', text: t('videoGeneration.loraPairsRequired') });
       return;
     }
 
@@ -334,7 +336,7 @@ export default function Wan22Page() {
 
       if (response.ok && data.success && data.jobId) {
         setCurrentJobId(data.jobId);
-        setMessage({ type: 'success', text: data.message || 'WAN 2.2 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.' });
+        setMessage({ type: 'success', text: data.message || t('videoGeneration.jobStarted') });
         
         // 백그라운드 처리이므로 즉시 완료 상태로 변경
         setIsGenerating(false);
@@ -342,11 +344,11 @@ export default function Wan22Page() {
         // 작업 정보는 유지하되 생성 중 상태는 해제
         // 사용자는 다른 작업을 할 수 있음
       } else {
-        throw new Error(data.error || '비디오 생성 요청에 실패했습니다.');
+        throw new Error(data.error || t('messages.error', { error: 'Video generation request failed' }));
       }
     } catch (error: any) {
       console.error('Video generation error:', error);
-      setMessage({ type: 'error', text: error.message || '비디오 생성 중 오류가 발생했습니다.' });
+      setMessage({ type: 'error', text: error.message || t('messages.error', { error: 'Video generation error occurred' }) });
       setIsGenerating(false);
     }
   };
@@ -431,22 +433,22 @@ export default function Wan22Page() {
             setImageFile(file);
             console.log('✅ 드롭된 이미지 File 객체 생성 완료');
             
-            setMessage({ 
-              type: 'success', 
-              text: `라이브러리에서 ${dragData.jobType} 결과물을 입력 이미지로 사용했습니다!` 
+            setMessage({
+              type: 'success',
+              text: t('videoGeneration.dragAndDrop.reusedAsInput', { jobType: dragData.jobType })
             });
           } catch (error) {
             console.error('❌ 드롭된 이미지 File 객체 생성 실패:', error);
-            setMessage({ 
-              type: 'error', 
-              text: '드롭된 이미지를 처리하는 중 오류가 발생했습니다.' 
+            setMessage({
+              type: 'error',
+              text: t('infiniteTalk.dragAndDrop.processError')
             });
           }
         }
       } else {
-        setMessage({ 
-          type: 'error', 
-          text: `WAN 2.2는 이미지만 입력으로 받을 수 있습니다. ${dragData.jobType} 결과물은 비디오이므로 사용할 수 없습니다. FLUX KONTEXT나 FLUX KREA의 이미지 결과물을 드래그해주세요.` 
+        setMessage({
+          type: 'error',
+          text: t('videoGeneration.dragAndDrop.imageOnly', { jobType: dragData.jobType })
         });
         return;
       }
@@ -459,9 +461,9 @@ export default function Wan22Page() {
 
     } catch (error) {
       console.error('❌ 드롭 처리 중 오류:', error);
-      setMessage({ 
-        type: 'error', 
-        text: '드롭된 데이터를 처리하는 중 오류가 발생했습니다.' 
+      setMessage({
+        type: 'error',
+        text: t('infiniteTalk.dragAndDrop.processError')
       });
     }
   };
@@ -472,7 +474,7 @@ export default function Wan22Page() {
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
           <PlayIcon className="w-8 h-8 text-purple-500" />
-          <h1 className="text-3xl font-bold text-foreground">WAN 2.2</h1>
+          <h1 className="text-3xl font-bold text-foreground">{t('videoGeneration.title')}</h1>
         </div>
 
         {/* Message Display */}
@@ -492,12 +494,12 @@ export default function Wan22Page() {
             {/* Prompt Input */}
             <div>
               <label className="block text-sm font-medium mb-2">
-                프롬프트 <span className="text-red-400">*</span>
+                {t('videoGeneration.prompt')}
               </label>
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="예: A person walking in a beautiful garden..."
+                placeholder={t('common.placeholder.prompt')}
                 className="w-full h-32 px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                 disabled={isGenerating}
               />
@@ -506,7 +508,7 @@ export default function Wan22Page() {
             {/* 이미지 업로드 */}
             <div>
               <label className="block text-sm font-medium mb-2">
-                이미지 파일 <span className="text-red-400">*</span>
+                {t('videoGeneration.imageFile')}
               </label>
               <div 
                 className={`border-2 border-dashed rounded-lg p-6 text-center relative transition-all duration-200 ${
@@ -539,7 +541,7 @@ export default function Wan22Page() {
                         <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
                           <div className="text-white text-center">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
-                            <p className="text-sm">썸네일 생성 중...</p>
+                            <p className="text-sm">{t('s3Storage.status.processing')}</p>
                           </div>
                         </div>
                       )}
@@ -548,7 +550,7 @@ export default function Wan22Page() {
                     {/* 생성된 썸네일 표시 */}
                     {thumbnailUrl && (
                       <div className="space-y-2">
-                        <p className="text-sm text-green-400 font-medium">생성된 썸네일:</p>
+                        <p className="text-sm text-green-400 font-medium">Generated Thumbnail:</p>
                         <img 
                           src={thumbnailUrl} 
                           alt="Thumbnail" 
@@ -560,7 +562,7 @@ export default function Wan22Page() {
                             onClick={() => thumbnailService.downloadThumbnail(thumbnailUrl, `thumbnail_${Date.now()}.jpg`)}
                             className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors"
                           >
-                            썸네일 다운로드
+                            {t('videoGeneration.thumbnailDownload')}
                           </button>
                         </div>
                       </div>
@@ -576,18 +578,18 @@ export default function Wan22Page() {
                       }}
                       className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
                     >
-                      파일 제거
+                      {t('videoGeneration.removeFile')}
                     </button>
                   </div>
                 ) : (
                   <>
                     <PhotoIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground mb-2">
-                      {isDragOver ? '🎯 여기에 놓으세요!' : '이미지 파일을 선택하거나 드래그하세요'}
+                      {isDragOver ? t('videoGeneration.dragAndDrop.dropHere') : t('videoGeneration.dragAndDrop.selectOrDrag')}
                     </p>
                     {isDragOver && (
                       <p className="text-xs text-primary mb-2">
-                        라이브러리의 이미지 결과물(FLUX KONTEXT, FLUX KREA)을 여기에 드래그하세요
+                        {t('videoGeneration.dragAndDrop.dragFromLibrary')}
                       </p>
                     )}
                     <button
@@ -596,25 +598,10 @@ export default function Wan22Page() {
                       disabled={isGenerating}
                       className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors disabled:opacity-50"
                     >
-                      파일 선택
+                      {t('videoGeneration.selectFile')}
                     </button>
                     
-                    {/* FFmpeg 상태 표시 */}
-                    {thumbnailStatus && (
-                      <div className="mt-4 p-3 rounded-lg border">
-                        <div className="flex items-center gap-2 mb-2">
-                          <FilmIcon className="w-4 h-4 text-blue-500" />
-                          <span className="text-sm font-medium">비디오 썸네일 기능</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          <p>FFmpeg 상태: {thumbnailStatus.ffmpegAvailable ? 
-                            <span className="text-green-400">사용 가능</span> : 
-                            <span className="text-red-400">설치 필요</span>
-                          }</p>
-                          <p>지원 형식: {thumbnailStatus.supportedFormats.join(', ')}</p>
-                        </div>
-                      </div>
-                    )}
+                    {/* FFmpeg 상태 표시 블록 제거 */}
                   </>
                 )}
               </div>
@@ -625,12 +612,12 @@ export default function Wan22Page() {
           <div className="space-y-6">
             {/* Settings */}
             <div className="bg-secondary p-6 rounded-lg border border-border">
-              <h3 className="text-lg font-semibold mb-4">설정</h3>
+              <h3 className="text-lg font-semibold mb-4">{t('common.settings')}</h3>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    가로 크기
+                    {t('common.width')}
                   </label>
                   <input
                     type="number"
@@ -641,12 +628,12 @@ export default function Wan22Page() {
                     step="64"
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     disabled={isGenerating}
-                    placeholder="720"
+                    placeholder={t('common.placeholder.width')}
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    세로 크기
+                    {t('common.height')}
                   </label>
                   <input
                     type="number"
@@ -657,33 +644,33 @@ export default function Wan22Page() {
                     step="64"
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     disabled={isGenerating}
-                    placeholder="480"
+                    placeholder={t('common.placeholder.height')}
                   />
                 </div>
               </div>
 
               <div className="mt-4 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Seed</label>
+                  <label className="block text-sm font-medium mb-2">{t('common.seed')}</label>
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => setSeed(-1)}
                       className={`px-3 py-1 rounded text-sm ${
-                        seed === -1 
-                          ? 'bg-primary text-white' 
+                        seed === -1
+                          ? 'bg-primary text-white'
                           : 'bg-background border border-border text-foreground hover:bg-background/80'
                       }`}
                       disabled={isGenerating}
                     >
-                      랜덤
+                      {t('videoGeneration.random')}
                     </button>
                   </div>
                   <input
                     type="number"
                     value={seed === -1 ? '' : seed}
                     onChange={(e) => setSeed(e.target.value === '' ? -1 : parseInt(e.target.value) )}
-                    placeholder="랜덤"
+                    placeholder={t('videoGeneration.random')}
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     disabled={isGenerating}
                   />
@@ -691,7 +678,7 @@ export default function Wan22Page() {
 
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Guidance (cfg)
+                    {t('common.guidance')} (cfg)
                   </label>
                   <input
                     type="number"
@@ -707,7 +694,7 @@ export default function Wan22Page() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-2">
-                      Length (16fps)
+                      {t('videoGeneration.length')}
                     </label>
                     <input
                       type="number"
@@ -722,7 +709,7 @@ export default function Wan22Page() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2">
-                      Step
+                      {t('common.steps')}
                     </label>
                     <input
                       type="number"
@@ -732,16 +719,16 @@ export default function Wan22Page() {
                       onChange={(e) => setStep(parseInt(e.target.value) || 10)}
                       className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                       disabled={isGenerating}
-                      placeholder="10"
+                      placeholder={t('common.placeholder.steps')}
                     />
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Context Overlap
+                    {t('videoGeneration.contextOverlap')}
                     <span className="text-xs text-muted-foreground block mt-1">
-                      긴영상을 생성할때 overlap되는 구간 길이
+                      {t('videoGeneration.contextOverlapDesc')}
                     </span>
                   </label>
                   <input
@@ -762,12 +749,12 @@ export default function Wan22Page() {
             <div className="bg-secondary p-6 rounded-lg border border-border">
               <div className="flex items-center gap-2 mb-4">
                 <CpuChipIcon className="w-5 h-5 text-purple-500" />
-                <h3 className="text-lg font-semibold">LoRA 모델 설정</h3>
+                <h3 className="text-lg font-semibold">{t('videoGeneration.loraSettings')}</h3>
               </div>
               
               <div className="mb-4">
                 <label className="block text-sm font-medium mb-2">
-                  사용할 LoRA 개수 (0-4개)
+                  {t('videoGeneration.lora.pairNumber', { index: '0-4' })}
                 </label>
                 <select
                   value={loraCount}
@@ -775,11 +762,11 @@ export default function Wan22Page() {
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   disabled={isGenerating}
                 >
-                  <option value={0}>0개 (LoRA 사용 안함)</option>
-                  <option value={1}>1개</option>
-                  <option value={2}>2개</option>
-                  <option value={3}>3개</option>
-                  <option value={4}>4개</option>
+                  <option value={0}>0 (No LoRA)</option>
+                  <option value={1}>1</option>
+                  <option value={2}>2</option>
+                  <option value={3}>3</option>
+                  <option value={4}>4</option>
                 </select>
               </div>
 
@@ -788,13 +775,13 @@ export default function Wan22Page() {
                 <div className="space-y-4">
                   {Array.from({ length: loraCount }, (_, index) => (
                     <div key={index} className="border border-border rounded-lg p-4 bg-background/50">
-                      <h4 className="font-medium mb-3 text-foreground">LoRA Pair {index + 1}</h4>
+                      <h4 className="font-medium mb-3 text-foreground">{t('videoGeneration.lora.pairNumber', { index: index + 1 })}</h4>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* High 파일 선택 */}
                         <div>
                           <label className="block text-sm font-medium mb-1 text-foreground">
-                            High 파일 🔺
+                            {t('videoGeneration.lora.highFile')}
                           </label>
                           <select
                             value={loraPairs[index]?.high || ''}
@@ -802,7 +789,7 @@ export default function Wan22Page() {
                             className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                             disabled={isGenerating || loraLoading}
                           >
-                            <option value="">High 파일을 선택하세요</option>
+                            <option value="">{t('videoGeneration.lora.selectHigh')}</option>
                             {highFiles.map((file) => (
                               <option key={file.key} value={file.name}>
                                 {file.name} ({(file.size / 1024 / 1024).toFixed(1)}MB)
@@ -814,7 +801,7 @@ export default function Wan22Page() {
                         {/* Low 파일 선택 */}
                         <div>
                           <label className="block text-sm font-medium mb-1 text-foreground">
-                            Low 파일 🔻
+                            {t('videoGeneration.lora.lowFile')}
                           </label>
                           <select
                             value={loraPairs[index]?.low || ''}
@@ -822,7 +809,7 @@ export default function Wan22Page() {
                             className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                             disabled={isGenerating || loraLoading}
                           >
-                            <option value="">Low 파일을 선택하세요</option>
+                            <option value="">{t('videoGeneration.lora.selectLow')}</option>
                             {lowFiles.map((file) => (
                               <option key={file.key} value={file.name}>
                                 {file.name} ({(file.size / 1024 / 1024).toFixed(1)}MB)
@@ -836,7 +823,7 @@ export default function Wan22Page() {
                         {/* High 가중치 설정 */}
                         <div>
                           <label className="block text-sm font-medium mb-1 text-foreground">
-                            High 가중치 (0.1 - 2.0)
+                            {t('videoGeneration.lora.highWeight')}
                           </label>
                           <input
                             type="number"
@@ -853,7 +840,7 @@ export default function Wan22Page() {
                         {/* Low 가중치 설정 */}
                         <div>
                           <label className="block text-sm font-medium mb-1 text-foreground">
-                            Low 가중치 (0.1 - 2.0)
+                            {t('videoGeneration.lora.lowWeight')}
                           </label>
                           <input
                             type="number"
@@ -879,7 +866,7 @@ export default function Wan22Page() {
                   disabled={loraLoading || isGenerating}
                   className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:opacity-50 text-white rounded-md transition-colors text-sm"
                 >
-                  {loraLoading ? '로딩 중...' : 'LoRA 목록 새로고침'}
+                  {loraLoading ? t('videoGeneration.lora.loading') : t('videoGeneration.loraRefresh')}
                 </button>
               </div>
 
@@ -887,13 +874,7 @@ export default function Wan22Page() {
               {loraFiles.length === 0 && !loraLoading && (
                 <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
                   <p className="text-blue-300 text-sm">
-                    사용 가능한 LoRA 파일이 없습니다. 
-                    <a href="/settings" className="text-blue-200 hover:underline ml-1">
-                      설정 페이지
-                    </a>에서 S3 스토리지를 먼저 설정하거나, 
-                    <a href="/s3-storage" className="text-blue-200 hover:underline ml-1">
-                      S3 스토리지
-                    </a>에서 .safetensors 파일을 업로드하세요.
+                    {t('videoGeneration.loraNotAvailable')}
                   </p>
                 </div>
               )}
@@ -906,7 +887,7 @@ export default function Wan22Page() {
                 disabled={isGenerating}
                 className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
               >
-                초기화
+                {t('common.reset')}
               </button>
               <button
                 onClick={handleGenerate}
@@ -916,12 +897,12 @@ export default function Wan22Page() {
                 {isGenerating ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    생성 중...
+                    {t('common.creating')}
                   </>
                 ) : (
                   <>
                     <PlayIcon className="w-5 h-5" />
-                    WAN 2.2 생성
+                    {t('videoGeneration.generateBtn')}
                   </>
                 )}
               </button>
@@ -930,22 +911,22 @@ export default function Wan22Page() {
             {/* Job Info */}
             {currentJobId && (
               <div className="bg-secondary p-6 rounded-lg border border-border">
-                <h3 className="text-lg font-semibold mb-4">작업 정보</h3>
+                <h3 className="text-lg font-semibold mb-4">{t('common.jobInfo')}</h3>
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <p><span className="font-medium">Job ID:</span> {currentJobId}</p>
-                  <p><span className="font-medium">상태:</span> 백그라운드 처리 중</p>
+                  <p><span className="font-medium">{t('s3Storage.status')}:</span> {t('s3Storage.status.processing')}</p>
                   <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
                     <p className="text-blue-300 text-sm">
-                      ✅ WAN 2.2 작업이 백그라운드에서 처리되고 있습니다.
+                      ✅ {t('videoGeneration.jobStarted')}
                     </p>
                     <p className="text-blue-200 text-xs mt-2">
-                      • 다른 작업을 자유롭게 수행할 수 있습니다
+                      {t('messages.jobInProgress')}
                     </p>
                     <p className="text-blue-200 text-xs">
-                      • Library에서 진행 상황을 확인하세요
+                      {t('messages.checkLibrary')}
                     </p>
                     <p className="text-blue-200 text-xs">
-                      • 작업 완료 시 자동으로 상태가 업데이트됩니다
+                      {t('messages.autoUpdate')}
                     </p>
                   </div>
                 </div>

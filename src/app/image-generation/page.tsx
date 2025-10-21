@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { useI18n } from '@/lib/i18n/context';
 
 export default function ImageGenerationPage() {
+  const { t } = useI18n();
   const [prompt, setPrompt] = useState('');
   const [style, setStyle] = useState('realistic');
   const [resolution, setResolution] = useState('1024x1024');
@@ -39,7 +41,7 @@ export default function ImageGenerationPage() {
       console.log('Image generation request sent:', data);
       
       // Show success message with job ID
-      setSuccess(`이미지 생성 요청이 성공적으로 접수되었습니다! Job ID: ${data.jobId}. 라이브러리에서 진행 상황을 확인하세요.`);
+      setSuccess(t('messages.generationRequestAccepted', { jobId: data.jobId }));
       
       // Reset form
       setPrompt('');
@@ -54,22 +56,23 @@ export default function ImageGenerationPage() {
 
   return (
     <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Image Generation</h1>
+      <h1 className="text-2xl font-bold mb-4">{t('common.generate')} {t('common.image')}</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="prompt" className="block text-sm font-medium text-gray-300">Prompt</label>
+          <label htmlFor="prompt" className="block text-sm font-medium text-gray-300">{t('common.prompt')}</label>
           <textarea
             id="prompt"
             rows={4}
             className="mt-1 block w-full rounded-md bg-gray-600 border-gray-500 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
+            placeholder={t('common.placeholder.prompt')}
             required
           />
         </div>
 
         <div>
-          <label htmlFor="style" className="block text-sm font-medium text-gray-300">Style</label>
+          <label htmlFor="style" className="block text-sm font-medium text-gray-300">{t('common.style')}</label>
           <select
             id="style"
             className="mt-1 block w-full rounded-md bg-gray-600 border-gray-500 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
@@ -83,7 +86,7 @@ export default function ImageGenerationPage() {
         </div>
 
         <div>
-          <label htmlFor="resolution" className="block text-sm font-medium text-gray-300">Resolution</label>
+          <label htmlFor="resolution" className="block text-sm font-medium text-gray-300">{t('common.resolution')}</label>
           <select
             id="resolution"
             className="mt-1 block w-full rounded-md bg-gray-600 border-gray-500 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
@@ -104,7 +107,7 @@ export default function ImageGenerationPage() {
 
         {error && (
           <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg">
-            <p className="text-sm">오류: {error}</p>
+            <p className="text-sm">{t('messages.error', { error })}</p>
           </div>
         )}
 
@@ -113,7 +116,7 @@ export default function ImageGenerationPage() {
           className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           disabled={loading}
         >
-          {loading ? 'Generating...' : 'Generate Image'}
+          {loading ? t('common.creating') : t('common.generate') + ' ' + t('common.image')}
         </button>
       </form>
     </div>

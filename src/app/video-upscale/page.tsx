@@ -2,8 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { VideoCameraIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
+import { useI18n } from '@/lib/i18n/context';
 
 export default function VideoUpscalePage() {
+  const { t } = useI18n();
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
   const [taskType, setTaskType] = useState<'upscale' | 'upscale_and_interpolation'>('upscale');
@@ -51,7 +53,7 @@ export default function VideoUpscalePage() {
           }
           
           // 성공 메시지 표시
-          setMessage({ type: 'success', text: '이전 작업의 입력값이 자동으로 로드되었습니다!' });
+          setMessage({ type: 'success', text: t('common.inputsLoaded') });
           
           // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
           localStorage.removeItem('reuseInputs');
@@ -136,38 +138,38 @@ export default function VideoUpscalePage() {
           setVideoFile(file);
           console.log('✅ 드롭된 비디오 File 객체 생성 완료:', file.name, file.size, 'bytes');
           
-          setMessage({ 
-            type: 'success', 
-            text: `라이브러리에서 ${dragData.jobType} 결과물을 비디오로 사용했습니다!` 
+          setMessage({
+            type: 'success',
+            text: t('videoUpscale.dragAndDrop.reusedAsVideo', { jobType: dragData.jobType })
           });
         } catch (error) {
           console.error('❌ 드롭된 비디오 File 객체 생성 실패:', error);
           console.error('❌ 실패한 URL:', videoUrl);
-          setMessage({ 
-            type: 'error', 
-            text: `드롭된 비디오를 처리하는 중 오류가 발생했습니다. URL: ${videoUrl}` 
+          setMessage({
+            type: 'error',
+            text: t('videoUpscale.dropVideoError', { url: videoUrl })
           });
         }
       } else {
-        setMessage({ 
-          type: 'error', 
-          text: '이 드래그된 항목에는 비디오 데이터가 없습니다. Video Upscale은 비디오만 지원합니다.' 
+        setMessage({
+          type: 'error',
+          text: t('videoUpscale.noVideoData')
         });
         return;
       }
 
     } catch (error) {
       console.error('❌ 드롭 처리 중 오류:', error);
-      setMessage({ 
-        type: 'error', 
-        text: '드롭된 데이터를 처리하는 중 오류가 발생했습니다.' 
+      setMessage({
+        type: 'error',
+        text: t('videoUpscale.dropError')
       });
     }
   };
 
   const handleUpscale = async () => {
     if (!videoFile) {
-      setMessage({ type: 'error', text: '비디오 파일을 선택해주세요.' });
+      setMessage({ type: 'error', text: t('videoUpscale.videoRequired') });
       return;
     }
 
@@ -189,16 +191,16 @@ export default function VideoUpscalePage() {
 
       if (response.ok && data.success && data.jobId) {
         setCurrentJobId(data.jobId);
-        setMessage({ type: 'success', text: data.message || '비디오 업스케일 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.' });
+        setMessage({ type: 'success', text: data.message || t('videoUpscale.jobStarted') });
         
         // 백그라운드 처리이므로 즉시 완료 상태로 변경
         setIsProcessing(false);
       } else {
-        throw new Error(data.error || '비디오 업스케일 요청에 실패했습니다.');
+        throw new Error(data.error || t('videoUpscale.upscaleRequestFailed'));
       }
     } catch (error: any) {
       console.error('Video upscale error:', error);
-      setMessage({ type: 'error', text: error.message || '비디오 업스케일 중 오류가 발생했습니다.' });
+      setMessage({ type: 'error', text: error.message || t('videoUpscale.upscaleError') });
       setIsProcessing(false);
     }
   };
@@ -223,7 +225,7 @@ export default function VideoUpscalePage() {
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
           <ArrowUpIcon className="w-8 h-8 text-purple-500" />
-          <h1 className="text-3xl font-bold text-foreground">Video Upscale</h1>
+          <h1 className="text-3xl font-bold text-foreground">{t('videoUpscale.title')}</h1>
         </div>
 
         {/* Message Display */}
@@ -243,7 +245,7 @@ export default function VideoUpscalePage() {
             {/* 비디오 업로드 */}
             <div>
               <label className="block text-sm font-medium mb-2">
-                비디오 파일 <span className="text-red-400">*</span>
+                {t('videoUpscale.videoFile')}
               </label>
               <div 
                 className={`border-2 border-dashed rounded-lg p-6 text-center transition-all duration-200 ${
@@ -279,18 +281,18 @@ export default function VideoUpscalePage() {
                       }}
                       className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
                     >
-                      비디오 제거
+                      {t('videoUpscale.removeVideo')}
                     </button>
                   </div>
                 ) : (
                   <>
                     <VideoCameraIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground mb-2">
-                      {isDragOver ? '🎯 여기에 놓으세요!' : '비디오 파일을 선택하거나 드래그하세요'}
+                      {isDragOver ? t('videoUpscale.dragAndDrop.dropHere') : t('videoUpscale.dragAndDrop.selectOrDrag')}
                     </p>
                     {isDragOver && (
                       <p className="text-xs text-primary mb-2">
-                        라이브러리의 비디오 결과물을 여기에 드래그하세요
+                        {t('videoUpscale.dragAndDrop.dragFromLibrary')}
                       </p>
                     )}
                     <button
@@ -299,7 +301,7 @@ export default function VideoUpscalePage() {
                       disabled={isProcessing}
                       className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors disabled:opacity-50"
                     >
-                      비디오 선택
+                      {t('videoUpscale.selectVideo')}
                     </button>
                   </>
                 )}
@@ -309,7 +311,7 @@ export default function VideoUpscalePage() {
             {/* Task Type Selection */}
             <div>
               <label className="block text-sm font-medium mb-3">
-                작업 타입 <span className="text-red-400">*</span>
+                {t('videoUpscale.jobType')}
               </label>
               <div className="grid grid-cols-1 gap-3">
                 <button
@@ -323,7 +325,7 @@ export default function VideoUpscalePage() {
                   }`}
                 >
                   <ArrowUpIcon className="w-5 h-5" />
-                  Upscale
+                  {t('videoUpscale.upscale')}
                 </button>
                 <button
                   type="button"
@@ -336,7 +338,7 @@ export default function VideoUpscalePage() {
                   }`}
                 >
                   <ArrowUpIcon className="w-5 h-5" />
-                  Upscale & Interpolation
+                  {t('videoUpscale.upscaleInterpolation')}
                 </button>
               </div>
             </div>
@@ -346,16 +348,16 @@ export default function VideoUpscalePage() {
           <div className="space-y-6">
             {/* Settings */}
             <div className="bg-secondary p-6 rounded-lg border border-border">
-              <h3 className="text-lg font-semibold mb-4">설정</h3>
-              
+              <h3 className="text-lg font-semibold mb-4">{t('videoUpscale.settings')}</h3>
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    작업 타입 설명
+                    {t('videoUpscale.jobTypeDesc')}
                   </label>
                   <div className="text-sm text-muted-foreground bg-background p-3 rounded-lg">
-                    <p><strong>Upscale:</strong> 비디오 해상도를 높입니다</p>
-                    <p><strong>Upscale & Interpolation:</strong> 비디오 해상도를 높이고 프레임 보간을 수행합니다</p>
+                    <p><strong>{t('videoUpscale.upscale')}:</strong> {t('videoUpscale.upscaleDesc')}</p>
+                    <p><strong>{t('videoUpscale.upscaleInterpolation')}:</strong> {t('videoUpscale.upscaleInterpolationDesc')}</p>
                   </div>
                 </div>
               </div>
@@ -368,7 +370,7 @@ export default function VideoUpscalePage() {
                 disabled={isProcessing}
                 className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
               >
-                초기화
+                {t('videoUpscale.resetBtn')}
               </button>
               <button
                 onClick={handleUpscale}
@@ -378,12 +380,12 @@ export default function VideoUpscalePage() {
                 {isProcessing ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    처리 중...
+                    {t('videoUpscale.processingBtn')}
                   </>
                 ) : (
                   <>
                     <ArrowUpIcon className="w-5 h-5" />
-                    비디오 업스케일
+                    {t('videoUpscale.upscaleBtn')}
                   </>
                 )}
               </button>
@@ -392,22 +394,22 @@ export default function VideoUpscalePage() {
             {/* Job Info */}
             {currentJobId && (
               <div className="bg-secondary p-6 rounded-lg border border-border">
-                <h3 className="text-lg font-semibold mb-4">작업 정보</h3>
+                <h3 className="text-lg font-semibold mb-4">{t('videoUpscale.jobInfo')}</h3>
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <p><span className="font-medium">Job ID:</span> {currentJobId}</p>
-                  <p><span className="font-medium">상태:</span> 백그라운드 처리 중</p>
+                  <p><span className="font-medium">{t('common.status')}</span> {t('videoUpscale.statusProcessing')}</p>
                   <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
                     <p className="text-blue-300 text-sm">
-                      ✅ 비디오 업스케일 작업이 백그라운드에서 처리되고 있습니다.
+                      {t('videoUpscale.jobInfoText')}
                     </p>
                     <p className="text-blue-200 text-xs mt-2">
-                      • 다른 작업을 자유롭게 수행할 수 있습니다
+                      {t('videoUpscale.canPerformOtherTasks')}
                     </p>
                     <p className="text-blue-200 text-xs">
-                      • Library에서 진행 상황을 확인하세요
+                      {t('videoUpscale.checkLibrary')}
                     </p>
                     <p className="text-blue-200 text-xs">
-                      • 작업 완료 시 자동으로 상태가 업데이트됩니다
+                      {t('videoUpscale.autoUpdateStatus')}
                     </p>
                   </div>
                 </div>
