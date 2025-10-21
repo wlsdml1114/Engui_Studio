@@ -16,6 +16,12 @@
 
 EnguiStudio is a platform that enables easy access to various open-source AI models through a web interface using RunPod Serverless infrastructure. Experience cutting-edge AI technology without complex setup.
 
+<div align="center">
+  <a href="https://runpod.io?ref=wvzldlmr">
+    <img src="https://cdn.prod.website-files.com/67d20fb9f56ff2ec6a7a657d/685b399e12c88ef52cbf1032_logo-white.svg" alt="RunPod" height="36" />
+  </a>
+</div>
+
 ## ✨ Key Features & Quick Deploy
 
 - **🎬 Video Generation**: WAN 2.2 video generation model with LoRA support
