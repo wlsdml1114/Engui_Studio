@@ -2,8 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { PhotoIcon, PlayIcon, Cog6ToothIcon, FilmIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { useI18n } from '@/lib/i18n/context';
 
 export default function WanAnimatePage() {
+  const { t } = useI18n();
   const [prompt, setPrompt] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -104,7 +106,7 @@ export default function WanAnimatePage() {
           }
           
           // 성공 메시지 표시
-          setMessage({ type: 'success', text: '이전 작업의 입력값이 자동으로 로드되었습니다!' });
+          setMessage({ type: 'success', text: t('settings.inputsLoaded') });
           
           // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
           localStorage.removeItem('reuseInputs');
@@ -337,21 +339,24 @@ export default function WanAnimatePage() {
             console.log('✅ 드롭된 이미지 File 객체 생성 완료');
           }
           
-          setMessage({ 
-            type: 'success', 
-            text: `라이브러리에서 ${dragData.jobType} 결과물을 ${isVideo ? '비디오' : '이미지'}로 사용했습니다!` 
+          setMessage({
+            type: 'success',
+            text: t('wanAnimate.dragAndDrop.reusedAsMedia', {
+              jobType: dragData.jobType,
+              isVideo: isVideo ? t('common.video') : t('common.image')
+            })
           });
         } catch (error) {
           console.error('❌ 드롭된 미디어 File 객체 생성 실패:', error);
-          setMessage({ 
-            type: 'error', 
-            text: '드롭된 미디어를 처리하는 중 오류가 발생했습니다.' 
+          setMessage({
+            type: 'error',
+            text: t('common.error.processingMedia')
           });
         }
       } else {
-        setMessage({ 
-          type: 'error', 
-          text: '이 드래그된 항목에는 미디어 데이터가 없습니다.' 
+        setMessage({
+          type: 'error',
+          text: t('common.error.noMediaData')
         });
         return;
       }
@@ -364,21 +369,21 @@ export default function WanAnimatePage() {
 
     } catch (error) {
       console.error('❌ 드롭 처리 중 오류:', error);
-      setMessage({ 
-        type: 'error', 
-        text: '드롭된 데이터를 처리하는 중 오류가 발생했습니다.' 
+      setMessage({
+        type: 'error',
+        text: t('common.error.processingDroppedData')
       });
     }
   };
 
   const generateVideo = async () => {
     if (!imageFile && !videoFile) {
-      setMessage({ type: 'error', text: '이미지 또는 비디오 파일을 업로드해주세요.' });
+      setMessage({ type: 'error', text: t('wanAnimate.inputRequired') });
       return;
     }
 
     if (!prompt.trim()) {
-      setMessage({ type: 'error', text: '프롬프트를 입력해주세요.' });
+      setMessage({ type: 'error', text: t('wanAnimate.promptRequired') });
       return;
     }
 
@@ -443,13 +448,13 @@ export default function WanAnimatePage() {
 
       if (data.success) {
         setCurrentJobId(data.jobId);
-        setMessage({ type: 'success', text: `비디오 생성이 시작되었습니다. Job ID: ${data.jobId}` });
+        setMessage({ type: 'success', text: t('wanAnimate.generationStarted', { jobId: data.jobId }) });
       } else {
-        setMessage({ type: 'error', text: data.error || '비디오 생성에 실패했습니다.' });
+        setMessage({ type: 'error', text: data.error || t('common.error.generationFailed') });
       }
     } catch (error) {
       console.error('Error generating video:', error);
-      setMessage({ type: 'error', text: '비디오 생성 중 오류가 발생했습니다.' });
+      setMessage({ type: 'error', text: t('common.error.generationError') });
     } finally {
       setIsGenerating(false);
     }
@@ -460,7 +465,7 @@ export default function WanAnimatePage() {
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center gap-3 mb-8">
           <PlayIcon className="w-8 h-8 text-primary" />
-          <h1 className="text-3xl font-bold">WAN Animate</h1>
+          <h1 className="text-3xl font-bold">{t('wanAnimate.title')}</h1>
         </div>
 
         {message && (
@@ -480,12 +485,12 @@ export default function WanAnimatePage() {
             <div className="bg-secondary p-6 rounded-lg border border-border">
               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                 <SparklesIcon className="w-5 h-5 text-primary" />
-                프롬프트
+                {t('wanAnimate.prompt')}
               </h2>
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="원하는 애니메이션을 설명하는 프롬프트를 입력하세요..."
+                placeholder={t('common.placeholder.prompt')}
                 className="w-full h-32 p-3 border rounded-md bg-background resize-none"
               />
             </div>
@@ -494,7 +499,7 @@ export default function WanAnimatePage() {
             <div className="bg-secondary p-6 rounded-lg border border-border">
               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                 <PhotoIcon className="w-5 h-5 text-primary" />
-                이미지 업로드
+                {t('wanAnimate.imageUpload')}
               </h2>
               
               <div className="space-y-4">
@@ -506,10 +511,10 @@ export default function WanAnimatePage() {
                   className="hidden"
                 />
                 
-                <div 
+                <div
                   className={`w-full p-4 border-2 border-dashed rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${
-                    isDragOver 
-                      ? 'border-primary bg-primary/10 border-solid' 
+                    isDragOver
+                      ? 'border-primary bg-primary/10 border-solid'
                       : 'border-border hover:border-primary'
                   }`}
                   onDragOver={handleDragOver}
@@ -518,7 +523,7 @@ export default function WanAnimatePage() {
                   onClick={() => imageInputRef.current?.click()}
                 >
                   <PhotoIcon className="w-6 h-6" />
-                  <span>{isDragOver ? '🎯 여기에 놓으세요!' : '이미지 파일 선택'}</span>
+                  <span>{isDragOver ? t('wanAnimate.dragAndDrop.dropHere') : t('wanAnimate.dragAndDrop.selectImage')}</span>
                 </div>
 
                 {imagePreviewUrl && (
@@ -543,7 +548,7 @@ export default function WanAnimatePage() {
             <div className="bg-secondary p-6 rounded-lg border border-border">
               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                 <FilmIcon className="w-5 h-5 text-primary" />
-                비디오 업로드
+                {t('wanAnimate.videoUpload')}
               </h2>
               
               <div className="space-y-4">
@@ -555,10 +560,10 @@ export default function WanAnimatePage() {
                   className="hidden"
                 />
                 
-                <div 
+                <div
                   className={`w-full p-4 border-2 border-dashed rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${
-                    isDragOver 
-                      ? 'border-primary bg-primary/10 border-solid' 
+                    isDragOver
+                      ? 'border-primary bg-primary/10 border-solid'
                       : 'border-border hover:border-primary'
                   }`}
                   onDragOver={handleDragOver}
@@ -567,7 +572,7 @@ export default function WanAnimatePage() {
                   onClick={() => videoInputRef.current?.click()}
                 >
                   <FilmIcon className="w-6 h-6" />
-                  <span>{isDragOver ? '🎯 여기에 놓으세요!' : '비디오 파일 선택'}</span>
+                  <span>{isDragOver ? t('wanAnimate.dragAndDrop.dropHere') : t('wanAnimate.dragAndDrop.selectVideo')}</span>
                 </div>
 
                 {videoPreviewUrl && (
@@ -591,9 +596,9 @@ export default function WanAnimatePage() {
                         {/* 비디오 정보 표시 */}
                         {originalVideoSize && (
                           <div className="text-xs text-muted-foreground bg-gray-800 p-2 rounded">
-                            <p>비디오 해상도: {originalVideoSize.width} × {originalVideoSize.height}</p>
-                            {videoFps && <p>추정 FPS: {videoFps}</p>}
-                            <p>출력 해상도: {width} × {height}</p>
+                            <p>{t('common.videoSection.resolution')}: {originalVideoSize.width} × {originalVideoSize.height}</p>
+                            {videoFps && <p>{t('common.videoSection.estimatedFps')}: {videoFps}</p>}
+                            <p>{t('common.videoSection.outputResolution')}: {width} × {height}</p>
                           </div>
                         )}
                         
@@ -601,16 +606,16 @@ export default function WanAnimatePage() {
                           onClick={handlePersonSelection}
                           className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                         >
-                          인물 선택
+                          {t('wanAnimate.selectPerson')}
                         </button>
                         
                         {showPersonSelection && (
                           <div className="space-y-2">
                             <div className="text-sm text-muted-foreground bg-blue-900/30 p-3 rounded-lg">
-                              <p className="font-medium text-blue-300 mb-1">인물 선택 가이드</p>
-                              <p>• 이미지를 클릭하여 포인트를 선택하세요</p>
-                              <p>• 선택된 포인트를 클릭하면 삭제됩니다</p>
-                              <p>• 현재 {selectedPoints.length}개 포인트가 선택되었습니다</p>
+                              <p className="font-medium text-blue-300 mb-1">{t('wanAnimate.personSelection.title')}</p>
+                              <p>{t('wanAnimate.personSelection.clickToSelect')}</p>
+                              <p>{t('wanAnimate.personSelection.clickToDelete')}</p>
+                              <p>{t('wanAnimate.personSelection.currentPoints', { count: selectedPoints.length })}</p>
                             </div>
                             <div className="relative">
                               <img
@@ -648,13 +653,13 @@ export default function WanAnimatePage() {
                                 onClick={finishPersonSelection}
                                 className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
                               >
-                                선택 완료 ({selectedPoints.length}개 포인트)
+                                {t('wanAnimate.completeSelection', { count: selectedPoints.length })}
                               </button>
                               <button
                                 onClick={() => setSelectedPoints([])}
                                 className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
                               >
-                                초기화
+                                {t('common.reset')}
                               </button>
                             </div>
                           </div>
@@ -675,12 +680,12 @@ export default function WanAnimatePage() {
               {isGenerating ? (
                 <>
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  생성 중...
+                  {t('common.creating')}
                 </>
               ) : (
                 <>
                   <PlayIcon className="w-5 h-5" />
-                  애니메이션 생성
+                  {t('wanAnimate.generateBtn')}
                 </>
               )}
             </button>
@@ -692,13 +697,13 @@ export default function WanAnimatePage() {
             <div className="bg-secondary p-6 rounded-lg border border-border">
               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                 <Cog6ToothIcon className="w-5 h-5 text-primary" />
-                고급 설정
+                {t('wanAnimate.advancedSettings')}
               </h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Seed */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">Seed</label>
+                  <label className="block text-sm font-medium mb-2">{t('common.seed')}</label>
                   <input
                     type="number"
                     value={seed}
@@ -706,12 +711,12 @@ export default function WanAnimatePage() {
                     placeholder="-1 (랜덤)"
                     className="w-full p-2 border rounded-md bg-background"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">-1은 랜덤 시드</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t('wanAnimate.randomSeed')}</p>
                 </div>
 
                 {/* CFG */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">CFG Scale</label>
+                  <label className="block text-sm font-medium mb-2">{t('wanAnimate.cfgScale')}</label>
                   <input
                     type="number"
                     step="0.1"
@@ -720,12 +725,12 @@ export default function WanAnimatePage() {
                     placeholder="1.0"
                     className="w-full p-2 border rounded-md bg-background"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">프롬프트 준수도 (1.0-20.0)</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t('wanAnimate.guidanceDesc')}</p>
                 </div>
 
                 {/* Steps */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">Steps</label>
+                  <label className="block text-sm font-medium mb-2">{t('common.steps')}</label>
                   <input
                     type="number"
                     value={steps}
@@ -733,12 +738,12 @@ export default function WanAnimatePage() {
                     placeholder="6"
                     className="w-full p-2 border rounded-md bg-background"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">생성 단계 수</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t('wanAnimate.stepsDesc')}</p>
                 </div>
 
                 {/* Width */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">Width</label>
+                  <label className="block text-sm font-medium mb-2">{t('common.width')}</label>
                   <input
                     type="number"
                     value={width}
@@ -749,23 +754,23 @@ export default function WanAnimatePage() {
                     }`}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    출력 비디오 너비 (64의 배수여야 함)
+                    {t('wanAnimate.widthDesc')}
                     {originalVideoSize && (
                       <span className="text-blue-400 ml-2">
-                        (원본: {originalVideoSize.width}px)
+                        ({t('common.videoSection.original')}: {originalVideoSize.width}px)
                       </span>
                     )}
                   </p>
                   {!isValidSize(width) && (
                     <p className="text-xs text-red-400 mt-1">
-                      ⚠️ 64의 배수여야 합니다. 권장값: {adjustToMultipleOf64(width)}px
+                      ⚠️ {t('common.size.mustBeMultipleOf64')}. {t('common.size.recommended')}: {adjustToMultipleOf64(width)}px
                     </p>
                   )}
                 </div>
 
                 {/* Height */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">Height</label>
+                  <label className="block text-sm font-medium mb-2">{t('common.height')}</label>
                   <input
                     type="number"
                     value={height}
@@ -776,16 +781,16 @@ export default function WanAnimatePage() {
                     }`}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    출력 비디오 높이 (64의 배수여야 함)
+                    {t('wanAnimate.heightDesc')}
                     {originalVideoSize && (
                       <span className="text-blue-400 ml-2">
-                        (원본: {originalVideoSize.height}px)
+                        ({t('common.videoSection.original')}: {originalVideoSize.height}px)
                       </span>
                     )}
                   </p>
                   {!isValidSize(height) && (
                     <p className="text-xs text-red-400 mt-1">
-                      ⚠️ 64의 배수여야 합니다. 권장값: {adjustToMultipleOf64(height)}px
+                      ⚠️ {t('common.size.mustBeMultipleOf64')}. {t('common.size.recommended')}: {adjustToMultipleOf64(height)}px
                     </p>
                   )}
                 </div>
@@ -794,14 +799,14 @@ export default function WanAnimatePage() {
 
             {/* 사용 안내 */}
             <div className="bg-blue-900/30 border border-blue-500/50 p-6 rounded-lg">
-              <h3 className="text-lg font-semibold mb-3 text-blue-300">사용 안내</h3>
+              <h3 className="text-lg font-semibold mb-3 text-blue-300">{t('wanAnimate.userGuide')}</h3>
               <div className="space-y-2 text-sm text-blue-200">
-                <p>• 비디오 업로드 시 "인물 선택" 버튼으로 포인트를 지정할 수 있습니다.</p>
-                <p>• 이미지를 클릭하여 원하는 위치에 포인트를 추가하세요.</p>
-                <p>• 포인트를 클릭하면 삭제할 수 있습니다.</p>
-                <p>• 비디오는 원본 비율을 유지하여 표시됩니다.</p>
-                <p>• 출력 해상도는 원본과 다를 수 있으니 확인해주세요.</p>
-                <p className="text-yellow-300 font-medium">• ⚠️ Width와 Height는 반드시 64의 배수여야 합니다 (예: 512, 576, 640, 704, 768 등)</p>
+                <p>• {t('wanAnimate.videoUploadNote')}</p>
+                <p>• {t('wanAnimate.clickToAddPoint')}</p>
+                <p>• {t('wanAnimate.clickToRemovePoint')}</p>
+                <p>• {t('wanAnimate.videoRatioNote')}</p>
+                <p>• {t('wanAnimate.resolutionNote')}</p>
+                <p className="text-yellow-300 font-medium">• {t('wanAnimate.sizeWarning')}</p>
               </div>
             </div>
           </div>

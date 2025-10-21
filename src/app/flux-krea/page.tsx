@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { PhotoIcon, SparklesIcon, CpuChipIcon } from '@heroicons/react/24/outline';
+import { useI18n } from '@/lib/i18n/context';
 
 interface LoRAFile {
   key: string;
@@ -11,6 +12,7 @@ interface LoRAFile {
 }
 
 export default function FluxKreaPage() {
+  const { t } = useI18n();
   const [prompt, setPrompt] = useState('');
   const [width, setWidth] = useState(1024);
   const [height, setHeight] = useState(1024);
@@ -82,7 +84,7 @@ export default function FluxKreaPage() {
           }
           
           // 성공 메시지 표시
-          setMessage({ type: 'success', text: '이전 작업의 입력값이 자동으로 로드되었습니다!' });
+          setMessage({ type: 'success', text: t('messages.inputsLoaded') });
           
           // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
           localStorage.removeItem('reuseInputs');
@@ -101,12 +103,12 @@ export default function FluxKreaPage() {
       // 먼저 볼륨 목록을 가져와서 첫 번째 볼륨을 사용
       const volumesResponse = await fetch('/api/s3-storage/volumes');
       if (!volumesResponse.ok) {
-        throw new Error('볼륨 목록을 가져올 수 없습니다.');
+        throw new Error(t('s3Storage.errors.fileListFailed'));
       }
       const volumes = await volumesResponse.json();
       
       if (volumes.length === 0) {
-        throw new Error('사용 가능한 볼륨이 없습니다.');
+        throw new Error(t('s3Storage.errors.volumeInitFailed'));
       }
       
       const volume = volumes[0].name;
@@ -139,7 +141,7 @@ export default function FluxKreaPage() {
       }
     } catch (err) {
       console.error('❌ Error fetching LoRA files:', err);
-      setMessage({ type: 'error', text: 'LoRA 파일을 불러오는 중 오류가 발생했습니다.' });
+      setMessage({ type: 'error', text: t('s3Storage.errors.fileListFailed') });
     } finally {
       setLoraLoading(false);
     }
@@ -152,7 +154,7 @@ export default function FluxKreaPage() {
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
-      setMessage({ type: 'error', text: '프롬프트를 입력해주세요.' });
+      setMessage({ type: 'error', text: t('fluxKrea.inputRequired') });
       return;
     }
 
@@ -187,7 +189,7 @@ export default function FluxKreaPage() {
 
       if (response.ok && data.success && data.jobId) {
         setCurrentJobId(data.jobId);
-        setMessage({ type: 'success', text: data.message || 'Flux Krea 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.' });
+        setMessage({ type: 'success', text: data.message || t('fluxKrea.jobStarted') });
         
         // 백그라운드 처리이므로 즉시 완료 상태로 변경
         setIsGenerating(false);
@@ -195,11 +197,11 @@ export default function FluxKreaPage() {
         // 작업 정보는 유지하되 생성 중 상태는 해제
         // 사용자는 다른 작업을 할 수 있음
       } else {
-        throw new Error(data.error || '이미지 생성 요청에 실패했습니다.');
+        throw new Error(data.error || t('common.error.processingDroppedData'));
       }
     } catch (error: any) {
       console.error('Image generation error:', error);
-      setMessage({ type: 'error', text: error.message || '이미지 생성 중 오류가 발생했습니다.' });
+      setMessage({ type: 'error', text: error.message || t('common.error.generationError') });
       setIsGenerating(false);
     }
   };
@@ -226,7 +228,7 @@ export default function FluxKreaPage() {
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
           <PhotoIcon className="w-8 h-8 text-purple-500" />
-          <h1 className="text-3xl font-bold text-foreground">FLUX KREA</h1>
+          <h1 className="text-3xl font-bold text-foreground">{t('fluxKrea.title')}</h1>
         </div>
 
         {/* Message Display */}
@@ -246,12 +248,12 @@ export default function FluxKreaPage() {
             {/* Prompt Input */}
             <div>
               <label className="block text-sm font-medium mb-2">
-                프롬프트 <span className="text-red-400">*</span>
+                {t('common.prompt')} <span className="text-red-400">*</span>
               </label>
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="예: A beautiful landscape with mountains and a lake..."
+                placeholder={t('common.placeholder.prompt')}
                 className="w-full h-32 px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                 disabled={isGenerating}
               />
@@ -262,12 +264,12 @@ export default function FluxKreaPage() {
           <div className="space-y-6">
             {/* Settings */}
             <div className="bg-secondary p-6 rounded-lg border border-border">
-              <h3 className="text-lg font-semibold mb-4">설정</h3>
+              <h3 className="text-lg font-semibold mb-4">{t('common.settings')}</h3>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    가로 크기
+                    {t('common.width')}
                   </label>
                   <input
                     type="number"
@@ -278,12 +280,12 @@ export default function FluxKreaPage() {
                     step="64"
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     disabled={isGenerating}
-                    placeholder="1024"
+                    placeholder={t('common.placeholder.width')}
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    세로 크기
+                    {t('common.height')}
                   </label>
                   <input
                     type="number"
@@ -294,14 +296,14 @@ export default function FluxKreaPage() {
                     step="64"
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     disabled={isGenerating}
-                    placeholder="1024"
+                    placeholder={t('common.placeholder.height')}
                   />
                 </div>
               </div>
 
               <div className="mt-4 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Seed</label>
+                  <label className="block text-sm font-medium mb-2">{t('common.seed')}</label>
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -313,14 +315,14 @@ export default function FluxKreaPage() {
                       }`}
                       disabled={isGenerating}
                     >
-                      랜덤
+                      {t('videoGeneration.random')}
                     </button>
                   </div>
                   <input
                     type="number"
                     value={seed === -1 ? '' : seed}
                     onChange={(e) => setSeed(e.target.value === '' ? -1 : parseInt(e.target.value) )}
-                    placeholder="랜덤"
+                    placeholder={t('videoGeneration.random')}
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     disabled={isGenerating}
                   />
@@ -328,7 +330,7 @@ export default function FluxKreaPage() {
 
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Guidance
+                    {t('common.guidance')}
                   </label>
                   <input
                     type="number"
@@ -344,13 +346,13 @@ export default function FluxKreaPage() {
 
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Model (선택사항)
+                    {t('fluxKrea.model')}
                   </label>
                   <input
                     type="text"
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
-                    placeholder="모델명을 입력하세요"
+                    placeholder={t('fluxKrea.modelPlaceholder')}
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     disabled={isGenerating}
                   />
@@ -362,14 +364,14 @@ export default function FluxKreaPage() {
             <div className="bg-secondary p-6 rounded-lg border border-border">
               <div className="flex items-center gap-2 mb-4">
                 <CpuChipIcon className="w-5 h-5 text-purple-500" />
-                <h3 className="text-lg font-semibold">LoRA 모델 설정</h3>
+                <h3 className="text-lg font-semibold">{t('videoGeneration.loraSettings')}</h3>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* LoRA 파일 선택 */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-foreground">
-                    LoRA 파일 (선택사항)
+                    {t('fluxKrea.loraOptional')}
                   </label>
                   <select
                     value={selectedLora}
@@ -377,7 +379,7 @@ export default function FluxKreaPage() {
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     disabled={isGenerating || loraLoading}
                   >
-                    <option value="">LoRA 사용 안함</option>
+                    <option value="">{t('fluxKrea.noLora')}</option>
                     {loraFiles.map((file) => (
                       <option key={file.key} value={file.name}>
                         {file.name} ({(file.size / 1024 / 1024).toFixed(1)}MB)
@@ -389,7 +391,7 @@ export default function FluxKreaPage() {
                 {/* LoRA 가중치 설정 */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-foreground">
-                    LoRA 가중치 (0.1 - 2.0)
+                    {t('fluxKrea.loraWeight')}
                   </label>
                   <input
                     type="number"
@@ -411,7 +413,7 @@ export default function FluxKreaPage() {
                   disabled={loraLoading || isGenerating}
                   className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:opacity-50 text-white rounded-md transition-colors text-sm"
                 >
-                  {loraLoading ? '로딩 중...' : 'LoRA 목록 새로고침'}
+                  {loraLoading ? t('common.loading') : t('videoGeneration.loraRefresh')}
                 </button>
               </div>
 
@@ -419,13 +421,7 @@ export default function FluxKreaPage() {
               {loraFiles.length === 0 && !loraLoading && (
                 <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
                   <p className="text-blue-300 text-sm">
-                    사용 가능한 LoRA 파일이 없습니다. 
-                    <a href="/settings" className="text-blue-200 hover:underline ml-1">
-                      설정 페이지
-                    </a>에서 S3 스토리지를 먼저 설정하거나, 
-                    <a href="/s3-storage" className="text-blue-200 hover:underline ml-1">
-                      S3 스토리지
-                    </a>에서 .safetensors 파일을 업로드하세요.
+                    {t('fluxKrea.loraNotAvailable')}
                   </p>
                 </div>
               )}
@@ -438,7 +434,7 @@ export default function FluxKreaPage() {
                 disabled={isGenerating}
                 className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
               >
-                초기화
+                {t('common.reset')}
               </button>
               <button
                 onClick={handleGenerate}
@@ -448,12 +444,12 @@ export default function FluxKreaPage() {
                 {isGenerating ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    생성 중...
+                    {t('common.creating')}
                   </>
                 ) : (
                   <>
                     <SparklesIcon className="w-5 h-5" />
-                    FLUX KREA 생성
+                    {t('fluxKrea.generateBtn')}
                   </>
                 )}
               </button>
@@ -462,22 +458,22 @@ export default function FluxKreaPage() {
             {/* Job Info */}
             {currentJobId && (
               <div className="bg-secondary p-6 rounded-lg border border-border">
-                <h3 className="text-lg font-semibold mb-4">작업 정보</h3>
+                <h3 className="text-lg font-semibold mb-4">{t('common.jobInfo')}</h3>
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <p><span className="font-medium">Job ID:</span> {currentJobId}</p>
-                  <p><span className="font-medium">상태:</span> 백그라운드 처리 중</p>
+                  <p><span className="font-medium">{t('common.status')}:</span> {t('videoUpscale.statusProcessing')}</p>
                   <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
                     <p className="text-blue-300 text-sm">
-                      ✅ Flux Krea 작업이 백그라운드에서 처리되고 있습니다.
+                      ✅ {t('fluxKrea.jobStarted')}
                     </p>
                     <p className="text-blue-200 text-xs mt-2">
-                      • 다른 작업을 자유롭게 수행할 수 있습니다
+                      {t('messages.jobInProgress')}
                     </p>
                     <p className="text-blue-200 text-xs">
-                      • Library에서 진행 상황을 확인하세요
+                      {t('messages.checkLibrary')}
                     </p>
                     <p className="text-blue-200 text-xs">
-                      • 작업 완료 시 자동으로 상태가 업데이트됩니다
+                      {t('messages.autoUpdate')}
                     </p>
                   </div>
                 </div>

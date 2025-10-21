@@ -2,8 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { PhotoIcon, MicrophoneIcon, SpeakerWaveIcon, ChatBubbleLeftRightIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
+import { useI18n } from '@/lib/i18n/context';
 
 export default function MultiTalkPage() {
+    const { t } = useI18n();
     const [image, setImage] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [audio1, setAudio1] = useState<File | null>(null);
@@ -60,7 +62,7 @@ export default function MultiTalkPage() {
                     }
                     
                     // 성공 메시지 표시
-                    setSuccess('이전 작업의 입력값이 자동으로 로드되었습니다!');
+                    setSuccess(t('messages.inputsLoaded'));
                     
                     // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
                     localStorage.removeItem('reuseInputs');
@@ -101,19 +103,19 @@ export default function MultiTalkPage() {
         setSuccess(null);
 
         if (!image) {
-            setError('이미지를 선택해주세요.');
+            setError(t('multitalk.imageRequired'));
             setLoading(false);
             return;
         }
 
         if (!audio1) {
-            setError('최소 하나의 오디오 파일을 선택해주세요.');
+            setError(t('multitalk.audioRequired'));
             setLoading(false);
             return;
         }
 
         if (audioMode === 'dual' && !audio2) {
-            setError('듀얼 모드에서는 두 개의 오디오 파일이 필요합니다.');
+            setError(t('multitalk.dualAudioRequired'));
             setLoading(false);
             return;
         }
@@ -146,7 +148,7 @@ export default function MultiTalkPage() {
             console.log('MultiTalk generation request sent:', data);
 
             // Show success message with job ID
-            setSuccess(`MultiTalk 생성 요청이 성공적으로 접수되었습니다! Job ID: ${data.jobId} (RunPod: ${data.runpodJobId}). 라이브러리에서 진행 상황을 확인하세요.`);
+            setSuccess(t('multitalk.jobSubmitted', { jobId: data.jobId, runpodJobId: data.runpodJobId }));
 
             // Reset form
             setImage(null);
@@ -234,10 +236,10 @@ export default function MultiTalkPage() {
                         setImage(file);
                         console.log('✅ 드롭된 이미지 File 객체 생성 완료');
                         
-                        setSuccess(`라이브러리에서 ${dragData.jobType} 결과물을 이미지로 사용했습니다!`);
+                        setSuccess(t('multitalk.dragAndDrop.reusedAsImage', { jobType: dragData.jobType }));
                     } catch (error) {
                         console.error('❌ 드롭된 이미지 File 객체 생성 실패:', error);
-                        setError('드롭된 이미지를 처리하는 중 오류가 발생했습니다.');
+                        setError(t('common.error.processingDroppedData'));
                     }
                 }
             }
@@ -250,7 +252,7 @@ export default function MultiTalkPage() {
 
         } catch (error) {
             console.error('❌ 드롭 처리 중 오류:', error);
-            setError('드롭된 데이터를 처리하는 중 오류가 발생했습니다.');
+            setError(t('common.error.processingDroppedData'));
         }
     };
 
@@ -260,7 +262,7 @@ export default function MultiTalkPage() {
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-8">
                     <ChatBubbleLeftRightIcon className="w-8 h-8 text-primary" />
-                    <h1 className="text-3xl font-bold">MultiTalk</h1>
+                    <h1 className="text-3xl font-bold">{t('multitalk.title')}</h1>
                 </div>
 
                 {/* Message Display */}
@@ -281,18 +283,18 @@ export default function MultiTalkPage() {
                         {/* Prompt Input */}
                         <div>
                             <label className="block text-sm font-medium mb-2">
-                                프롬프트 <span className="text-red-400">*</span>
+                                {t('common.prompt')} <span className="text-red-400">*</span>
                             </label>
                             <textarea
                                 value={prompt}
                                 onChange={(e) => setPrompt(e.target.value)}
-                                placeholder="예: a person talking naturally..."
+                                placeholder={t('common.placeholder.prompt')}
                                 className="w-full h-32 px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                                 disabled={loading}
                             />
                             {audioMode === 'dual' && (
                                 <p className="text-xs text-blue-300 mt-1">
-                                    💡 듀얼 오디오 모드에서는 audio_type이 자동으로 'para'로 설정됩니다.
+                                    {t('multitalk.dualAudioTip')}
                                 </p>
                             )}
                         </div>
@@ -300,7 +302,7 @@ export default function MultiTalkPage() {
                         {/* 이미지 업로드 */}
                         <div>
                             <label className="block text-sm font-medium mb-2">
-                                이미지 파일 <span className="text-red-400">*</span>
+                                {t('videoGeneration.imageFile')} <span className="text-red-400">*</span>
                             </label>
                             <div 
                                 className={`border-2 border-dashed rounded-lg p-6 text-center relative transition-all duration-200 ${
@@ -336,18 +338,18 @@ export default function MultiTalkPage() {
                                             }}
                                             className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
                                         >
-                                            이미지 제거
+                                            {t('multitalk.removeImage')}
                                         </button>
                                     </div>
                                 ) : (
                                     <>
                                         <PhotoIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                                         <p className="text-sm text-muted-foreground mb-2">
-                                            {isDragOver ? '🎯 여기에 놓으세요!' : '이미지 파일을 선택하거나 드래그하세요'}
+                                            {isDragOver ? t('multitalk.dragAndDrop.dropHere') : t('multitalk.dragAndDrop.selectOrDrag')}
                                         </p>
                                         {isDragOver && (
                                             <p className="text-xs text-primary mb-2">
-                                                라이브러리의 결과물을 여기에 드래그하세요
+                                                {t('multitalk.dragAndDrop.dragFromLibrary')}
                                             </p>
                                         )}
                                         <button
@@ -356,7 +358,7 @@ export default function MultiTalkPage() {
                                             disabled={loading}
                                             className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors disabled:opacity-50"
                                         >
-                                            이미지 선택
+                                            {t('multitalk.selectImage')}
                                         </button>
                                     </>
                                 )}
@@ -366,7 +368,7 @@ export default function MultiTalkPage() {
                         {/* 오디오 업로드 */}
                         <div>
                             <label className="block text-sm font-medium mb-2">
-                                오디오 파일 <span className="text-red-400">*</span>
+                                {t('multitalk.audioFile')} <span className="text-red-400">*</span>
                             </label>
                             <div className="space-y-4">
                                 {/* 오디오 1 */}
@@ -393,14 +395,14 @@ export default function MultiTalkPage() {
                                                 }}
                                                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
                                             >
-                                                오디오 1 제거
+                                                {t('multitalk.removeAudio1')}
                                             </button>
                                         </div>
                                     ) : (
                                         <>
                                             <MicrophoneIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                                             <p className="text-sm text-muted-foreground mb-2">
-                                                첫 번째 오디오 파일을 선택하세요
+                                                {t('multitalk.selectAudio1')}
                                             </p>
                                             <button
                                                 type="button"
@@ -408,7 +410,7 @@ export default function MultiTalkPage() {
                                                 disabled={loading}
                                                 className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors disabled:opacity-50"
                                             >
-                                                오디오 1 선택
+                                                {t('multitalk.selectAudio1')}
                                             </button>
                                         </>
                                     )}
@@ -439,14 +441,14 @@ export default function MultiTalkPage() {
                                                     }}
                                                     className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
                                                 >
-                                                    오디오 2 제거
+                                                    {t('multitalk.removeAudio2')}
                                                 </button>
                                             </div>
                                         ) : (
                                             <>
                                                 <SpeakerWaveIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                                                 <p className="text-sm text-muted-foreground mb-2">
-                                                    두 번째 오디오 파일을 선택하세요
+                                                    {t('multitalk.selectAudio2')}
                                                 </p>
                                                 <button
                                                     type="button"
@@ -454,7 +456,7 @@ export default function MultiTalkPage() {
                                                     disabled={loading}
                                                     className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors disabled:opacity-50"
                                                 >
-                                                    오디오 2 선택
+                                                    {t('multitalk.selectAudio2')}
                                                 </button>
                                             </>
                                         )}
@@ -468,11 +470,11 @@ export default function MultiTalkPage() {
                     <div className="space-y-6">
                         {/* Settings */}
                         <div className="bg-secondary p-6 rounded-lg border border-border">
-                            <h3 className="text-lg font-semibold mb-4">설정</h3>
-                            
+                            <h3 className="text-lg font-semibold mb-4">{t('common.settings')}</h3>
+
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium mb-2">오디오 모드</label>
+                                    <label className="block text-sm font-medium mb-2">{t('multitalk.audioMode')}</label>
                                     <div className="flex gap-2">
                                         <button
                                             type="button"
@@ -484,25 +486,25 @@ export default function MultiTalkPage() {
                                             }`}
                                             disabled={loading}
                                         >
-                                            싱글 모드
+                                            {t('multitalk.singleMode')}
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => setAudioMode('dual')}
                                             className={`px-4 py-2 rounded text-sm ${
-                                                audioMode === 'dual' 
-                                                    ? 'bg-primary text-white' 
+                                                audioMode === 'dual'
+                                                    ? 'bg-primary text-white'
                                                     : 'bg-background border border-border text-foreground hover:bg-background/80'
                                             }`}
                                             disabled={loading}
                                         >
-                                            듀얼 모드
+                                            {t('multitalk.dualMode')}
                                         </button>
                                     </div>
                                     <p className="text-xs text-foreground/60 mt-1">
-                                        {audioMode === 'single' 
-                                            ? '💡 하나의 오디오 파일로 비디오 생성' 
-                                            : '💡 두 개의 오디오 파일로 대화형 비디오 생성'
+                                        {audioMode === 'single'
+                                            ? t('multitalk.singleAudioTip')
+                                            : t('multitalk.dualAudioTip2')
                                         }
                                     </p>
                                 </div>
@@ -516,7 +518,7 @@ export default function MultiTalkPage() {
                                 disabled={loading}
                                 className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
                             >
-                                초기화
+                                {t('common.reset')}
                             </button>
                             <button
                                 onClick={handleSubmit}
@@ -526,12 +528,12 @@ export default function MultiTalkPage() {
                                 {loading ? (
                                     <>
                                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                        생성 중...
+                                        {t('common.creating')}
                                     </>
                                 ) : (
                                     <>
                                         <ChatBubbleLeftRightIcon className="w-5 h-5" />
-                                        MultiTalk 생성
+                                        {t('multitalk.generateBtn')}
                                     </>
                                 )}
                             </button>

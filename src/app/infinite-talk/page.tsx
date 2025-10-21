@@ -2,8 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { MicrophoneIcon, PhotoIcon, MusicalNoteIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
+import { useI18n } from '@/lib/i18n/context';
 
 export default function InfiniteTalkPage() {
+  const { t } = useI18n();
   const [prompt, setPrompt] = useState('');
   const [inputType, setInputType] = useState<'image' | 'video'>('image');
   const [personCount, setPersonCount] = useState<'single' | 'multi'>('single');
@@ -140,7 +142,7 @@ export default function InfiniteTalkPage() {
           }
           
           // 성공 메시지 표시
-          setMessage({ type: 'success', text: '이전 작업의 입력값이 자동으로 로드되었습니다!' });
+          setMessage({ type: 'success', text: t('messages.inputsLoaded') });
           
           // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
           localStorage.removeItem('reuseInputs');
@@ -265,21 +267,24 @@ export default function InfiniteTalkPage() {
             console.log('✅ 드롭된 이미지 File 객체 생성 완료');
           }
           
-          setMessage({ 
-            type: 'success', 
-            text: `라이브러리에서 ${dragData.jobType} 결과물을 ${isVideo ? '비디오' : '이미지'}로 사용했습니다!` 
+          setMessage({
+            type: 'success',
+            text: t('infiniteTalk.dragAndDrop.reusedAsMedia', {
+              jobType: dragData.jobType,
+              isVideo: isVideo ? t('common.video') : t('common.image')
+            })
           });
         } catch (error) {
           console.error('❌ 드롭된 미디어 File 객체 생성 실패:', error);
-          setMessage({ 
-            type: 'error', 
-            text: '드롭된 미디어를 처리하는 중 오류가 발생했습니다.' 
+          setMessage({
+            type: 'error',
+            text: t('infiniteTalk.dragAndDrop.processError')
           });
         }
       } else {
-        setMessage({ 
-          type: 'error', 
-          text: '이 드래그된 항목에는 미디어 데이터가 없습니다.' 
+        setMessage({
+          type: 'error',
+          text: t('common.error.noMediaData')
         });
         return;
       }
@@ -292,9 +297,9 @@ export default function InfiniteTalkPage() {
 
     } catch (error) {
       console.error('❌ 드롭 처리 중 오류:', error);
-      setMessage({ 
-        type: 'error', 
-        text: '드롭된 데이터를 처리하는 중 오류가 발생했습니다.' 
+      setMessage({
+        type: 'error',
+        text: t('common.error.processingDroppedData')
       });
     }
   };
@@ -302,19 +307,19 @@ export default function InfiniteTalkPage() {
   const handleGenerate = async () => {
     // 입력 검증
     if (inputType === 'image' && !imageFile) {
-      setMessage({ type: 'error', text: '이미지 파일을 선택해주세요.' });
+      setMessage({ type: 'error', text: t('multitalk.imageRequired') });
       return;
     }
     if (inputType === 'video' && !videoFile) {
-      setMessage({ type: 'error', text: '비디오 파일을 선택해주세요.' });
+      setMessage({ type: 'error', text: t('videoUpscale.videoRequired') });
       return;
     }
     if (!audioFile || !prompt.trim()) {
-      setMessage({ type: 'error', text: '오디오 파일과 프롬프트를 입력해주세요.' });
+      setMessage({ type: 'error', text: t('multitalk.audioRequired') });
       return;
     }
     if (personCount === 'multi' && !audioFile2) {
-      setMessage({ type: 'error', text: '다중 인물 모드에서는 두 번째 오디오 파일이 필요합니다.' });
+      setMessage({ type: 'error', text: t('multitalk.dualAudioRequired') });
       return;
     }
 
@@ -356,9 +361,9 @@ export default function InfiniteTalkPage() {
 
       if (response.ok && data.success && data.jobId) {
         setCurrentJobId(data.jobId);
-        setMessage({ 
-          type: 'success', 
-          text: data.message || 'Infinite Talk 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.' 
+        setMessage({
+          type: 'success',
+          text: data.message || t('infiniteTalk.jobStarted')
         });
         
         // 백그라운드 처리이므로 즉시 완료 상태로 변경
@@ -390,12 +395,12 @@ export default function InfiniteTalkPage() {
         if (audioInputRef.current) audioInputRef.current.value = '';
         if (audioInputRef2.current) audioInputRef2.current.value = '';
       } else {
-        const errorMessage = data.error || 'Infinite Talk 생성에 실패했습니다.';
+        const errorMessage = data.error || t('messages.error', { error: 'Infinite Talk generation failed' });
         throw new Error(errorMessage);
       }
     } catch (error) {
       console.error('Generation error:', error);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.' });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : t('messages.error', { error: 'Unknown error occurred' }) });
     } finally {
       setIsGenerating(false);
     }
@@ -444,12 +449,12 @@ export default function InfiniteTalkPage() {
             {/* Prompt Input */}
             <div>
               <label className="block text-sm font-medium mb-2">
-                프롬프트 <span className="text-red-400">*</span>
+                {t('common.prompt')} <span className="text-red-400">*</span>
               </label>
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="예: A person is talking about technology..."
+                placeholder={t('infiniteTalk.placeholder.prompt')}
                 className="w-full h-32 px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                 disabled={isGenerating}
               />
@@ -458,7 +463,7 @@ export default function InfiniteTalkPage() {
             {/* Media Upload (Image or Video) */}
             <div>
               <label className="block text-sm font-medium mb-2">
-                {inputType === 'image' ? '이미지 파일' : '비디오 파일'} <span className="text-red-400">*</span>
+                {inputType === 'image' ? t('infiniteTalk.imageFile') : t('infiniteTalk.videoFile')} <span className="text-red-400">*</span>
               </label>
               <div 
                 className={`border-2 border-dashed rounded-lg p-6 text-center transition-all duration-200 ${
@@ -496,18 +501,18 @@ export default function InfiniteTalkPage() {
                           }}
                           className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
                         >
-                          이미지 제거
+                          {t('infiniteTalk.removeImage')}
                         </button>
                       </div>
                     ) : (
                       <>
                         <PhotoIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                         <p className="text-sm text-muted-foreground mb-2">
-                          {isDragOver ? '🎯 여기에 놓으세요!' : '이미지 파일을 선택하거나 드래그하세요'}
+                          {isDragOver ? t('infiniteTalk.dragAndDrop.dropHere') : t('infiniteTalk.dragAndDrop.selectOrDragImage')}
                         </p>
                         {isDragOver && (
                           <p className="text-xs text-primary mb-2">
-                            라이브러리의 결과물을 여기에 드래그하세요
+                            {t('infiniteTalk.dragAndDrop.dragImageFromLibrary')}
                           </p>
                         )}
                         <button
@@ -516,7 +521,7 @@ export default function InfiniteTalkPage() {
                           disabled={isGenerating}
                           className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors disabled:opacity-50"
                         >
-                          이미지 선택
+                          {t('infiniteTalk.selectImage')}
                         </button>
                       </>
                     )}
@@ -547,18 +552,18 @@ export default function InfiniteTalkPage() {
                           }}
                           className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
                         >
-                          비디오 제거
+                          {t('infiniteTalk.removeVideo')}
                         </button>
                       </div>
                     ) : (
                       <>
                         <VideoCameraIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                         <p className="text-sm text-muted-foreground mb-2">
-                          {isDragOver ? '🎯 여기에 놓으세요!' : '비디오 파일을 선택하거나 드래그하세요'}
+                          {isDragOver ? t('infiniteTalk.dragAndDrop.dropHere') : t('infiniteTalk.dragAndDrop.selectOrDragVideo')}
                         </p>
                         {isDragOver && (
                           <p className="text-xs text-primary mb-2">
-                            라이브러리의 비디오 결과물을 여기에 드래그하세요
+                            {t('infiniteTalk.dragAndDrop.dragVideoFromLibrary')}
                           </p>
                         )}
                         <button
@@ -567,7 +572,7 @@ export default function InfiniteTalkPage() {
                           disabled={isGenerating}
                           className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors disabled:opacity-50"
                         >
-                          비디오 선택
+                          {t('infiniteTalk.selectVideo')}
                         </button>
                       </>
                     )}
@@ -579,7 +584,7 @@ export default function InfiniteTalkPage() {
             {/* Audio Upload */}
             <div>
               <label className="block text-sm font-medium mb-2">
-                첫 번째 오디오 파일 <span className="text-red-400">*</span>
+                {t('infiniteTalk.firstAudioFile')} <span className="text-red-400">*</span>
               </label>
               <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors">
                 <input
@@ -607,14 +612,14 @@ export default function InfiniteTalkPage() {
                       }}
                       className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
                     >
-                      오디오 제거
+                      {t('infiniteTalk.removeAudio')}
                     </button>
                   </div>
                 ) : (
                   <>
                     <MusicalNoteIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground mb-2">
-                      오디오 파일을 선택하거나 드래그하세요 (WAV 권장)
+                      {t('infiniteTalk.dragAndDrop.selectOrDragAudio')}
                     </p>
                     <button
                       type="button"
@@ -622,7 +627,7 @@ export default function InfiniteTalkPage() {
                       disabled={isGenerating}
                       className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors disabled:opacity-50"
                     >
-                      오디오 선택
+                      {t('infiniteTalk.selectAudio')}
                     </button>
                   </>
                 )}
@@ -633,7 +638,7 @@ export default function InfiniteTalkPage() {
             {personCount === 'multi' && (
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  두 번째 오디오 파일 <span className="text-red-400">*</span>
+                  {t('infiniteTalk.secondAudioFile')} <span className="text-red-400">*</span>
                 </label>
                 <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors">
                   <input
@@ -661,14 +666,14 @@ export default function InfiniteTalkPage() {
                         }}
                         className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
                       >
-                        오디오 제거
+                        {t('infiniteTalk.removeAudio')}
                       </button>
                     </div>
                   ) : (
                     <>
                       <MusicalNoteIcon className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                       <p className="text-sm text-muted-foreground mb-2">
-                        두 번째 오디오 파일을 선택하거나 드래그하세요 (WAV 권장)
+                        {t('infiniteTalk.dragAndDrop.selectOrDragAudio2')}
                       </p>
                       <button
                         type="button"
@@ -676,7 +681,7 @@ export default function InfiniteTalkPage() {
                         disabled={isGenerating}
                         className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors disabled:opacity-50"
                       >
-                        두 번째 오디오 선택
+                        {t('infiniteTalk.selectSecondAudio')}
                       </button>
                     </>
                   )}
@@ -689,12 +694,12 @@ export default function InfiniteTalkPage() {
           <div className="space-y-6">
             {/* Settings */}
             <div className="bg-secondary p-6 rounded-lg border border-border">
-              <h3 className="text-lg font-semibold mb-4">설정</h3>
-              
+              <h3 className="text-lg font-semibold mb-4">{t('common.settings')}</h3>
+
               {/* Input Type Selection */}
               <div className="mb-6">
                 <label className="block text-sm font-medium mb-3">
-                  입력 타입 <span className="text-red-400">*</span>
+                  {t('infiniteTalk.inputType')} <span className="text-red-400">*</span>
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
@@ -708,7 +713,7 @@ export default function InfiniteTalkPage() {
                     }`}
                   >
                     <PhotoIcon className="w-5 h-5" />
-                    이미지
+                    {t('infiniteTalk.image')}
                   </button>
                   <button
                     type="button"
@@ -721,7 +726,7 @@ export default function InfiniteTalkPage() {
                     }`}
                   >
                     <VideoCameraIcon className="w-5 h-5" />
-                    비디오
+                    {t('infiniteTalk.video')}
                   </button>
                 </div>
               </div>
@@ -729,7 +734,7 @@ export default function InfiniteTalkPage() {
               {/* Person Count Selection */}
               <div className="mb-6">
                 <label className="block text-sm font-medium mb-3">
-                  인물 수 <span className="text-red-400">*</span>
+                  {t('infiniteTalk.personCount')} <span className="text-red-400">*</span>
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
@@ -742,7 +747,7 @@ export default function InfiniteTalkPage() {
                         : 'bg-background border-border hover:border-primary text-foreground'
                     }`}
                   >
-                    단일 인물
+                    {t('infiniteTalk.singlePerson')}
                   </button>
                   <button
                     type="button"
@@ -754,7 +759,7 @@ export default function InfiniteTalkPage() {
                         : 'bg-background border-border hover:border-primary text-foreground'
                     }`}
                   >
-                    다중 인물
+                    {t('infiniteTalk.multiPerson')}
                   </button>
                 </div>
               </div>
@@ -763,7 +768,7 @@ export default function InfiniteTalkPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    가로 크기
+                    {t('common.width')}
                   </label>
                   <input
                     type="number"
@@ -779,7 +784,7 @@ export default function InfiniteTalkPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    세로 크기
+                    {t('common.height')}
                   </label>
                   <input
                     type="number"
@@ -798,28 +803,28 @@ export default function InfiniteTalkPage() {
 
             {/* Audio Trim Panel */}
             <div className="bg-secondary p-6 rounded-lg border border-border">
-              <h3 className="text-lg font-semibold mb-4">오디오 트림</h3>
-              <p className="text-xs text-muted-foreground mb-3">원하는 구간만 잘라 사용할 수 있어요. hh:mm:ss(.ms), mm:ss 또는 초 단위 입력을 지원합니다.</p>
+              <h3 className="text-lg font-semibold mb-4">{t('infiniteTalk.audioTrim')}</h3>
+              <p className="text-xs text-muted-foreground mb-3">{t('infiniteTalk.audioTrimDesc')}</p>
 
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <div>
-                  <label className="block text-xs text-muted-foreground mb-1">오디오 시작 시간</label>
+                  <label className="block text-xs text-muted-foreground mb-1">{t('infiniteTalk.audioStartTime')}</label>
                   <input
                     type="text"
                     value={audioStart}
                     onChange={(e) => setAudioStart(e.target.value)}
-                    placeholder="예: 12.5 또는 00:00:12.5"
+                    placeholder={t('infiniteTalk.placeholder.time')}
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     disabled={isGenerating}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-muted-foreground mb-1">오디오 종료 시간</label>
+                  <label className="block text-xs text-muted-foreground mb-1">{t('infiniteTalk.audioEndTime')}</label>
                   <input
                     type="text"
                     value={audioEnd}
                     onChange={(e) => setAudioEnd(e.target.value)}
-                    placeholder="예: 24 또는 00:00:24"
+                    placeholder={t('infiniteTalk.placeholder.endTime')}
                     className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     disabled={isGenerating}
                   />
@@ -829,23 +834,23 @@ export default function InfiniteTalkPage() {
               {personCount === 'multi' && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs text-muted-foreground mb-1">오디오2 시작 시간</label>
+                    <label className="block text-xs text-muted-foreground mb-1">{t('infiniteTalk.audio2StartTime')}</label>
                     <input
                       type="text"
                       value={audio2Start}
                       onChange={(e) => setAudio2Start(e.target.value)}
-                      placeholder="예: 5 또는 00:00:05"
+                      placeholder={t('infiniteTalk.placeholder.startTime')}
                       className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                       disabled={isGenerating}
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-muted-foreground mb-1">오디오2 종료 시간</label>
+                    <label className="block text-xs text-muted-foreground mb-1">{t('infiniteTalk.audio2EndTime')}</label>
                     <input
                       type="text"
                       value={audio2End}
                       onChange={(e) => setAudio2End(e.target.value)}
-                      placeholder="예: 15 또는 00:00:15"
+                      placeholder={t('infiniteTalk.placeholder.endTime2')}
                       className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                       disabled={isGenerating}
                     />
@@ -861,7 +866,7 @@ export default function InfiniteTalkPage() {
                 disabled={isGenerating}
                 className="flex-1 px-6 py-3 bg-gray-600 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
               >
-                초기화
+                {t('common.reset')}
               </button>
               <button
                 onClick={handleGenerate}
@@ -878,12 +883,12 @@ export default function InfiniteTalkPage() {
                 {isGenerating ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    생성 중...
+                    {t('common.creating')}
                   </>
                 ) : (
                   <>
                     <MicrophoneIcon className="w-5 h-5" />
-                    Infinite Talk 생성
+                    {t('infiniteTalk.generateBtn')}
                   </>
                 )}
               </button>
@@ -892,22 +897,22 @@ export default function InfiniteTalkPage() {
             {/* Job Info */}
             {currentJobId && (
               <div className="bg-secondary p-6 rounded-lg border border-border">
-                <h3 className="text-lg font-semibold mb-4">작업 정보</h3>
+                <h3 className="text-lg font-semibold mb-4">{t('common.jobInfo')}</h3>
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <p><span className="font-medium">Job ID:</span> {currentJobId}</p>
-                  <p><span className="font-medium">상태:</span> 백그라운드 처리 중</p>
+                  <p><span className="font-medium">{t('common.status')}:</span> {t('common.processing')}</p>
                   <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
                     <p className="text-blue-300 text-sm">
-                      ✅ Infinite Talk 작업이 백그라운드에서 처리되고 있습니다.
+                      ✅ {t('infiniteTalk.jobStarted')}
                     </p>
                     <p className="text-blue-200 text-xs mt-2">
-                      • 다른 작업을 자유롭게 수행할 수 있습니다
+                      {t('messages.jobInProgress')}
                     </p>
                     <p className="text-blue-200 text-xs">
-                      • Library에서 진행 상황을 확인하세요
+                      {t('messages.checkLibrary')}
                     </p>
                     <p className="text-blue-200 text-xs">
-                      • 작업 완료 시 자동으로 상태가 업데이트됩니다
+                      {t('messages.autoUpdate')}
                     </p>
                   </div>
                 </div>
