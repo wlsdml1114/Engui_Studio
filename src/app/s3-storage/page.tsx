@@ -1,18 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useI18n } from '@/lib/i18n/context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Upload, 
-  Download, 
-  Trash2, 
-  Folder, 
-  File, 
+import {
+  Upload,
+  Download,
+  Trash2,
+  Folder,
+  File,
   RefreshCw,
   HardDrive,
   Settings,
@@ -30,6 +31,7 @@ interface S3File {
 
 
 export default function S3StoragePage() {
+  const { t } = useI18n();
   const [files, setFiles] = useState<S3File[]>([]);
   const [currentPath, setCurrentPath] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -55,7 +57,7 @@ export default function S3StoragePage() {
       }
     } catch (error) {
       console.error('Failed to initialize volume:', error);
-      setError('볼륨을 초기화할 수 없습니다.');
+      setError(t('s3Storage.errors.volumeInitFailed'));
     }
   };
 
@@ -74,16 +76,16 @@ export default function S3StoragePage() {
         setCurrentPath(path);
       } else {
         const errorData = await response.json();
-        setError(errorData.error || '파일 목록을 가져올 수 없습니다.');
+        setError(errorData.error || t('s3Storage.errors.fetchFilesFailed'));
       }
     } catch (error) {
       console.error('Failed to fetch files:', error);
       
       // 502 에러인 경우 특별한 메시지 표시
       if (error instanceof Error && error.message.includes('502')) {
-        setError('RunPod S3 서버가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.');
+        setError(t('s3Storage.errors.serverUnstable'));
       } else {
-        setError('파일 목록을 가져올 수 없습니다.');
+        setError(t('s3Storage.errors.fetchFilesFailed'));
       }
     } finally {
       setIsLoading(false);
@@ -97,12 +99,12 @@ export default function S3StoragePage() {
     setIsLoading(true);
     setError(null);
     setUploadProgress(0);
-    setUploadStatus('업로드 준비 중...');
+    setUploadStatus(t('s3Storage.status.preparing'));
 
     console.log('🔍 Frontend - currentPath:', currentPath);
     console.log('🔍 Frontend - uploadFile:', uploadFile.name);
-    
-    setUploadStatus('파일 업로드 중...');
+
+    setUploadStatus(t('s3Storage.status.uploading'));
     
     const formData = new FormData();
     formData.append('file', uploadFile);
@@ -125,10 +127,10 @@ export default function S3StoragePage() {
     // 업로드 완료
     xhr.addEventListener('load', () => {
       setUploadXHR(null);
-      
+
       if (xhr.status === 200) {
         // 서버 처리 중 시뮬레이션 (20% → 100%)
-        setUploadStatus('서버에서 처리 중...');
+        setUploadStatus(t('s3Storage.status.processing'));
         setUploadProgress(20);
         
         // 서버 처리 시뮬레이션
@@ -140,7 +142,7 @@ export default function S3StoragePage() {
               setUploadProgress(80);
               setTimeout(() => {
                 setUploadProgress(100);
-                setUploadStatus('업로드 완료!');
+                setUploadStatus(t('s3Storage.status.complete'));
                 
                 // 성공 알림 표시
                 setTimeout(() => {
@@ -156,7 +158,7 @@ export default function S3StoragePage() {
         
         simulateServerProcessing();
       } else {
-        setUploadStatus('업로드 실패');
+        setUploadStatus(t('s3Storage.status.failed'));
         setUploadProgress(0);
         
         try {
@@ -164,13 +166,13 @@ export default function S3StoragePage() {
           console.error('Upload error:', errorData);
           
           // 경로 충돌 에러인 경우 특별한 메시지 표시
-          if (errorData.error && errorData.error.includes('경로 충돌')) {
+          if (errorData.error && (errorData.error.includes('경로 충돌') || errorData.error.includes('path conflict'))) {
             setError(errorData.error);
           } else {
-            setError(errorData.error || '파일 업로드에 실패했습니다.');
+            setError(errorData.error || t('s3Storage.errors.uploadFailed'));
           }
         } catch {
-          setError('파일 업로드에 실패했습니다.');
+          setError(t('s3Storage.errors.uploadFailed'));
         }
       }
       setIsLoading(false);
@@ -180,9 +182,9 @@ export default function S3StoragePage() {
     xhr.addEventListener('error', () => {
       setUploadXHR(null);
       console.error('Upload failed');
-      setUploadStatus('업로드 실패');
+      setUploadStatus(t('s3Storage.status.failed'));
       setUploadProgress(0);
-      setError('파일 업로드에 실패했습니다.');
+      setError(t('s3Storage.errors.uploadFailed'));
       setIsLoading(false);
     });
 
@@ -190,7 +192,7 @@ export default function S3StoragePage() {
     xhr.addEventListener('abort', () => {
       setUploadXHR(null);
       console.log('Upload aborted');
-      setUploadStatus('업로드 중단됨');
+      setUploadStatus(t('s3Storage.status.cancelled'));
       setUploadProgress(0);
       setIsLoading(false);
     });
@@ -230,17 +232,17 @@ export default function S3StoragePage() {
         document.body.removeChild(a);
       } else {
         const errorData = await response.json();
-        setError(errorData.error || '파일 다운로드에 실패했습니다.');
+        setError(errorData.error || t('s3Storage.errors.downloadFailed'));
       }
     } catch (error) {
       console.error('Failed to download file:', error);
-      setError('파일 다운로드에 실패했습니다.');
+      setError(t('s3Storage.errors.downloadFailed'));
     }
   };
 
   // 파일 삭제
   const handleDelete = async (fileKey: string) => {
-    if (!selectedVolume || !confirm('정말로 이 파일을 삭제하시겠습니까?')) return;
+    if (!selectedVolume || !confirm(t('s3Storage.warnings.deleteFile'))) return;
 
     setIsLoading(true);
     setError(null);
@@ -261,11 +263,11 @@ export default function S3StoragePage() {
         fetchFiles(currentPath); // 목록 새로고침
       } else {
         const errorData = await response.json();
-        setError(errorData.error || '파일 삭제에 실패했습니다.');
+        setError(errorData.error || t('s3Storage.errors.deleteFailed'));
       }
     } catch (error) {
       console.error('Failed to delete file:', error);
-      setError('파일 삭제에 실패했습니다.');
+      setError(t('s3Storage.errors.deleteFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -277,7 +279,7 @@ export default function S3StoragePage() {
 
     setIsLoading(true);
     setError(null);
-    setUploadStatus('폴더 생성 중...');
+    setUploadStatus(t('s3Storage.status.creatingFolder'));
 
     try {
       // 현재 경로가 있으면 끝에 슬래시 추가, 없으면 빈 문자열
@@ -298,7 +300,7 @@ export default function S3StoragePage() {
       });
 
       if (response.ok) {
-        setUploadStatus('폴더 생성 완료!');
+        setUploadStatus(t('s3Storage.status.folderCreated'));
         setTimeout(() => {
           setNewFolderName('');
           setShowCreateFolder(false);
@@ -308,13 +310,13 @@ export default function S3StoragePage() {
       } else {
         const errorData = await response.json();
         console.error('Folder creation error:', errorData);
-        setUploadStatus('폴더 생성 실패');
-        setError(errorData.error || '폴더 생성에 실패했습니다.');
+        setUploadStatus(t('s3Storage.status.folderCreateFailed'));
+        setError(errorData.error || t('s3Storage.errors.createFolderFailed'));
       }
     } catch (error) {
       console.error('Failed to create folder:', error);
-      setUploadStatus('폴더 생성 실패');
-      setError('폴더 생성에 실패했습니다.');
+      setUploadStatus(t('s3Storage.status.folderCreateFailed'));
+      setError(t('s3Storage.errors.createFolderFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -348,7 +350,7 @@ export default function S3StoragePage() {
   // 파일 타입 확인
   const getFileType = (file: S3File) => {
     if (file.type === 'directory') return 'directory';
-    
+
     const ext = file.extension?.toLowerCase();
     if (['.pt', '.pth', '.ckpt', '.safetensors'].includes(ext || '')) {
       return 'model';
@@ -373,9 +375,9 @@ export default function S3StoragePage() {
     <div className="container mx-auto p-6 space-y-6 h-screen overflow-y-auto custom-scrollbar">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">S3 Storage Management</h1>
+          <h1 className="text-3xl font-bold">{t('s3Storage.title')}</h1>
           <p className="text-muted-foreground">
-            RunPod Network Volume의 모델과 LoRA 파일을 관리하세요
+            {t('s3Storage.subtitle')}
           </p>
         </div>
         <Button 
@@ -384,7 +386,7 @@ export default function S3StoragePage() {
           variant="outline"
         >
           <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-          새로고침
+          {t('s3Storage.refresh')}
         </Button>
       </div>
 
@@ -394,7 +396,7 @@ export default function S3StoragePage() {
             <AlertCircle className="w-5 h-5 text-red-400 mr-2" />
             <span className="text-red-300 flex-1">{error}</span>
           </div>
-          {error.includes('경로 충돌') && (
+          {error.includes('경로 충돌') || error.includes('path conflict') && (
             <div className="mt-3 flex items-center space-x-2">
               <Button
                 variant="outline"
@@ -408,14 +410,14 @@ export default function S3StoragePage() {
                 className="text-red-400 hover:text-red-300 border-red-500/50 hover:border-red-400"
               >
                 <Trash2 className="w-4 h-4 mr-1" />
-                충돌 파일 삭제
+                {t('s3Storage.deleteConflictFile')}
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setError(null)}
               >
-                닫기
+                {t('s3Storage.close')}
               </Button>
             </div>
           )}
@@ -424,8 +426,8 @@ export default function S3StoragePage() {
 
       <Tabs defaultValue="browse" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="browse">파일 탐색</TabsTrigger>
-          <TabsTrigger value="upload">업로드</TabsTrigger>
+          <TabsTrigger value="browse">{t('s3Storage.fileExplorer')}</TabsTrigger>
+          <TabsTrigger value="upload">{t('s3Storage.upload')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="browse" className="space-y-4">
@@ -434,9 +436,9 @@ export default function S3StoragePage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-lg">파일 목록</CardTitle>
+                  <CardTitle className="text-lg">{t('s3Storage.fileList')}</CardTitle>
                   <CardDescription>
-                    {files.length}개의 항목
+                    {files.length} {t('s3Storage.itemsCount')}
                   </CardDescription>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -453,7 +455,7 @@ export default function S3StoragePage() {
                         fetchFiles(parentPath);
                       }}
                     >
-                      상위 폴더
+                      {t('s3Storage.parentFolder')}
                     </Button>
                   )}
                   <Button
@@ -462,7 +464,7 @@ export default function S3StoragePage() {
                     onClick={() => setShowCreateFolder(!showCreateFolder)}
                   >
                     <Folder className="w-4 h-4 mr-1" />
-                    폴더 생성
+                    {t('s3Storage.createFolder')}
                   </Button>
                 </div>
               </div>
@@ -471,7 +473,7 @@ export default function S3StoragePage() {
               <div className="px-6 pb-4">
                 <div className="flex items-center space-x-2">
                   <Input
-                    placeholder="폴더 이름을 입력하세요"
+                    placeholder={t('s3Storage.formLabels.folderName')}
                     value={newFolderName}
                     onChange={(e) => setNewFolderName(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleCreateFolder()}
@@ -482,7 +484,7 @@ export default function S3StoragePage() {
                     disabled={!newFolderName.trim() || isLoading}
                     size="sm"
                   >
-                    생성
+                    {t('s3Storage.create')}
                   </Button>
                   <Button
                     variant="outline"
@@ -492,15 +494,15 @@ export default function S3StoragePage() {
                     }}
                     size="sm"
                   >
-                    취소
+                    {t('s3Storage.cancel')}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  S3에서는 폴더가 자동으로 생성됩니다. 파일을 업로드하면 해당 경로의 폴더가 자동으로 만들어집니다.
+                  {t('s3Storage.folderHelperText')}
                 </p>
-                {uploadStatus && uploadStatus.includes('폴더') && (
+                {uploadStatus && (uploadStatus.includes('폴더') || uploadStatus.includes('folder')) && (
                   <div className="mt-2 flex items-center text-sm">
-                    {uploadStatus.includes('완료') ? (
+                    {uploadStatus.includes('완료') || uploadStatus.includes('complete') || uploadStatus.includes('created') ? (
                       <div className="flex items-center text-green-400">
                         <CheckCircle className="w-4 h-4 mr-1" />
                         {uploadStatus}
@@ -519,11 +521,11 @@ export default function S3StoragePage() {
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <RefreshCw className="w-6 h-6 animate-spin mr-2" />
-                  <span>로딩 중...</span>
+                  <span>{t('s3Storage.loading')}</span>
                 </div>
               ) : files.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  파일이 없습니다
+                  {t('s3Storage.noFiles')}
                 </div>
               ) : (
                 <div className="space-y-2 max-h-[600px] overflow-y-auto custom-scrollbar">
@@ -571,7 +573,7 @@ export default function S3StoragePage() {
                             </Badge>
                           </div>
                           <div className="text-sm text-muted-foreground truncate">
-                            {file.type === 'file' ? formatFileSize(file.size) : '폴더'} • {' '}
+                            {file.type === 'file' ? formatFileSize(file.size) : 'directory'} • {' '}
                             {file.lastModified.toLocaleString()}
                           </div>
                         </div>
@@ -606,14 +608,14 @@ export default function S3StoragePage() {
         <TabsContent value="upload" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">파일 업로드</CardTitle>
+              <CardTitle className="text-lg">{t('s3Storage.fileUpload')}</CardTitle>
               <CardDescription>
-                모델이나 LoRA 파일을 네트워크 볼륨에 업로드하세요
+                {t('s3Storage.uploadDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="file-upload">파일 선택</Label>
+                <Label htmlFor="file-upload">{t('s3Storage.selectFile')}</Label>
                 <Input
                   id="file-upload"
                   type="file"
@@ -622,14 +624,14 @@ export default function S3StoragePage() {
                 />
               </div>
               <div>
-                <Label>업로드 위치</Label>
+                <Label>{t('s3Storage.uploadLocation')}</Label>
                 <div className="mt-1">
                   <code className="bg-gray-800 px-2 py-1 rounded text-sm text-gray-300 border border-gray-600">
                     {currentPath ? `/${currentPath}/` : '/'}
                   </code>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  파일이 이 위치에 업로드됩니다
+                  {t('s3Storage.uploadLocationHelper')}
                 </p>
               </div>
               {/* 업로드 진행 상황 표시 */}
@@ -650,7 +652,7 @@ export default function S3StoragePage() {
                   {uploadProgress === 100 && (
                     <div className="flex items-center text-green-400 text-sm">
                       <CheckCircle className="w-4 h-4 mr-1" />
-                      업로드가 완료되었습니다!
+                      {t('s3Storage.uploadComplete')}
                     </div>
                   )}
                 </div>
@@ -663,15 +665,15 @@ export default function S3StoragePage() {
                   className="flex-1"
                 >
                   <Upload className="w-4 h-4 mr-2" />
-                  {isLoading ? '업로드 중...' : '업로드'}
+                  {isLoading ? t('s3Storage.uploading') : t('s3Storage.upload')}
                 </Button>
                 {isLoading && uploadXHR && (
-                  <Button 
+                  <Button
                     onClick={handleCancelUpload}
                     variant="outline"
                     className="px-4"
                   >
-                    취소
+                    {t('s3Storage.cancel')}
                   </Button>
                 )}
               </div>

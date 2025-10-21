@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { PhotoIcon, SparklesIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
+import { useI18n } from '@/lib/i18n/context';
 
 interface FluxKontextSettings {
   width: number;
@@ -11,6 +12,7 @@ interface FluxKontextSettings {
 }
 
 export default function FluxKontextPage() {
+  const { t } = useI18n();
   const [prompt, setPrompt] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
@@ -83,7 +85,7 @@ export default function FluxKontextPage() {
           }
           
           // 성공 메시지 표시
-          setMessage({ type: 'success', text: '이전 작업의 입력값이 자동으로 로드되었습니다!' });
+          setMessage({ type: 'success', text: t('messages.inputsLoaded') });
           
           // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
           localStorage.removeItem('reuseInputs');
@@ -105,7 +107,7 @@ export default function FluxKontextPage() {
 
   const handleGenerate = async () => {
     if (!imageFile || !prompt.trim()) {
-      setMessage({ type: 'error', text: '이미지와 프롬프트를 모두 입력해주세요.' });
+      setMessage({ type: 'error', text: t('fluxKontext.inputRequired') });
       return;
     }
 
@@ -131,7 +133,7 @@ export default function FluxKontextPage() {
 
       if (response.ok && data.success && data.jobId) {
         setCurrentJobId(data.jobId);
-        setMessage({ type: 'success', text: 'FLUX KONTEXT 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.' });
+        setMessage({ type: 'success', text: t('fluxKontext.jobStarted') });
         
         // 백그라운드 처리이므로 즉시 완료 상태로 변경
         setIsGenerating(false);
@@ -139,23 +141,23 @@ export default function FluxKontextPage() {
         // 작업 정보는 유지하되 생성 중 상태는 해제
         // 사용자는 다른 작업을 할 수 있음
       } else {
-        const errorMessage = data.error || '이미지 생성에 실패했습니다.';
+        const errorMessage = data.error || t('common.error.generationFailed');
         console.error('FLUX KONTEXT API error:', { response: response.status, data });
         setMessage({ type: 'error', text: errorMessage });
         setIsGenerating(false);
       }
     } catch (error) {
       console.error('FLUX KONTEXT generation error:', error);
-      let errorMessage = '이미지 생성 중 오류가 발생했습니다.';
-      
+      let errorMessage = t('common.error.generationError');
+
       if (error instanceof Error) {
         if (error.name === 'TypeError' && error.message.includes('fetch')) {
-          errorMessage = '네트워크 연결을 확인해주세요.';
+          errorMessage = t('messages.error', { error: 'Network connection failed' });
         } else {
-          errorMessage = `오류: ${error.message}`;
+          errorMessage = t('messages.error', { error: error.message });
         }
       }
-      
+
       setMessage({ type: 'error', text: errorMessage });
       setIsGenerating(false);
     }
@@ -230,22 +232,22 @@ export default function FluxKontextPage() {
             setImageFile(file);
             console.log('✅ 드롭된 이미지 File 객체 생성 완료');
             
-            setMessage({ 
-              type: 'success', 
-              text: `라이브러리에서 ${dragData.jobType} 결과물을 입력 이미지로 사용했습니다!` 
+            setMessage({
+              type: 'success',
+              text: t('fluxKontext.dragAndDrop.reusedAsInput', { jobType: dragData.jobType })
             });
           } catch (error) {
             console.error('❌ 드롭된 이미지 File 객체 생성 실패:', error);
-            setMessage({ 
-              type: 'error', 
-              text: '드롭된 이미지를 처리하는 중 오류가 발생했습니다.' 
+            setMessage({
+              type: 'error',
+              text: t('common.error.processingDroppedData')
             });
           }
         }
       } else {
-        setMessage({ 
-          type: 'error', 
-          text: '이 드래그된 항목에는 이미지 데이터가 없습니다.' 
+        setMessage({
+          type: 'error',
+          text: t('common.error.noMediaData')
         });
         return;
       }
@@ -258,9 +260,9 @@ export default function FluxKontextPage() {
 
     } catch (error) {
       console.error('❌ 드롭 처리 중 오류:', error);
-      setMessage({ 
-        type: 'error', 
-        text: '드롭된 데이터를 처리하는 중 오류가 발생했습니다.' 
+      setMessage({
+        type: 'error',
+        text: t('common.error.processingDroppedData')
       });
     }
   };
@@ -292,7 +294,7 @@ export default function FluxKontextPage() {
             <div className="bg-secondary p-6 rounded-lg border border-border">
               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                 <PhotoIcon className="w-5 h-5" />
-                입력 이미지
+                {t('fluxKontext.inputImage')}
               </h2>
               
               <div className="space-y-4">
@@ -324,8 +326,8 @@ export default function FluxKontextPage() {
                   ) : (
                     <div className="text-center text-foreground/60">
                       <PhotoIcon className="w-12 h-12 mx-auto mb-2" />
-                      <p>{isDragOver ? '🎯 여기에 놓으세요!' : '이미지를 클릭하여 업로드하세요'}</p>
-                      <p className="text-sm">{isDragOver ? '라이브러리의 결과물을 드래그하세요' : 'PNG, JPG, WEBP 지원'}</p>
+                      <p>{isDragOver ? t('fluxKontext.dragAndDrop.dropHere') : t('fluxKontext.dragAndDrop.clickToUpload')}</p>
+                      <p className="text-sm">{isDragOver ? t('fluxKontext.dragAndDrop.dragFromLibrary') : t('fluxKontext.dragAndDrop.supportedFormats')}</p>
                     </div>
                   )}
                 </div>
@@ -334,15 +336,15 @@ export default function FluxKontextPage() {
 
             {/* Prompt Input */}
             <div className="bg-secondary p-6 rounded-lg border border-border">
-              <h2 className="text-xl font-semibold mb-4">프롬프트</h2>
+              <h2 className="text-xl font-semibold mb-4">{t('fluxKontext.prompt')}</h2>
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="생성하고 싶은 이미지에 대한 상세한 설명을 입력하세요..."
+                placeholder={t('common.placeholder.prompt')}
                 className="w-full h-32 p-3 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary resize-none"
               />
               <p className="text-sm text-foreground/60 mt-2">
-                💡 구체적이고 자세한 설명일수록 더 좋은 결과를 얻을 수 있습니다.
+                {t('fluxKontext.promptTip')}
               </p>
             </div>
           </div>
@@ -353,7 +355,7 @@ export default function FluxKontextPage() {
             <div className="bg-secondary p-6 rounded-lg border border-border">
               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                 <Cog6ToothIcon className="w-5 h-5" />
-                디테일 설정
+                {t('fluxKontext.detailSettings')}
               </h2>
               
               <div className="space-y-4">
@@ -361,7 +363,7 @@ export default function FluxKontextPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-foreground/80 mb-2">
-                      가로 크기
+                      {t('common.width')}
                     </label>
                     <input
                       type="number"
@@ -375,7 +377,7 @@ export default function FluxKontextPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-foreground/80 mb-2">
-                      세로 크기
+                      {t('common.height')}
                     </label>
                     <input
                       type="number"
@@ -393,13 +395,13 @@ export default function FluxKontextPage() {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="block text-sm font-medium text-foreground/80">
-                      SEED 값
+                      {t('fluxKontext.seedValue')}
                     </label>
                     <button
                       onClick={resetSeed}
                       className="text-xs text-primary hover:text-primary/80"
                     >
-                      랜덤
+                      {t('common.random')}
                     </button>
                   </div>
                   <input
@@ -407,17 +409,17 @@ export default function FluxKontextPage() {
                     value={settings.seed}
                     onChange={(e) => updateSetting('seed', parseInt(e.target.value))}
                     className="w-full px-3 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="-1"
+                    placeholder={t('common.placeholder.seed')}
                   />
                   <p className="text-xs text-foreground/60 mt-1">
-                    💡 -1은 랜덤, 고정값은 동일한 결과 생성
+                    {t('fluxKontext.seedTip')}
                   </p>
                 </div>
 
                 {/* Guidance */}
                 <div>
                   <label className="block text-sm font-medium text-foreground/80 mb-2">
-                    Guidance 값
+                    {t('fluxKontext.guidanceValue')}
                   </label>
                   <input
                     type="number"
@@ -429,7 +431,7 @@ export default function FluxKontextPage() {
                     className="w-full px-3 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                   <p className="text-xs text-foreground/60 mt-1">
-                    💡 높을수록 프롬프트를 더 엄격하게 따름 (2.5 권장)
+                    {t('fluxKontext.guidanceTip')}
                   </p>
                 </div>
               </div>
@@ -445,18 +447,18 @@ export default function FluxKontextPage() {
                 {isGenerating ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    생성 중...
+                    {t('common.creating')}
                   </>
                 ) : (
                   <>
                     <SparklesIcon className="w-5 h-5" />
-                    이미지 생성하기
+                    {t('fluxKontext.generateBtn')}
                   </>
                 )}
               </button>
-              
+
               <p className="text-xs text-foreground/60 mt-3 text-center">
-                이미지 생성에는 몇 분 정도 소요될 수 있습니다.
+                {t('fluxKontext.generationTime')}
               </p>
             </div>
           </div>
@@ -465,22 +467,22 @@ export default function FluxKontextPage() {
         {/* Result Display */}
         {currentJobId && (
           <div className="mt-8 bg-secondary p-6 rounded-lg border border-border">
-            <h2 className="text-xl font-semibold mb-4">작업 정보</h2>
+            <h2 className="text-xl font-semibold mb-4">{t('common.jobInfo')}</h2>
             <div className="space-y-2 text-sm text-muted-foreground">
               <p><span className="font-medium">Job ID:</span> {currentJobId}</p>
-              <p><span className="font-medium">상태:</span> 백그라운드 처리 중</p>
+              <p><span className="font-medium">{t('common.status')}:</span> {t('videoUpscale.statusProcessing')}</p>
               <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
                 <p className="text-blue-300 text-sm">
-                  ✅ FLUX KONTEXT 작업이 백그라운드에서 처리되고 있습니다.
+                  ✅ {t('fluxKontext.jobStarted')}
                 </p>
                 <p className="text-blue-200 text-xs mt-2">
-                  • 다른 작업을 자유롭게 수행할 수 있습니다
+                  {t('messages.jobInProgress')}
                 </p>
                 <p className="text-blue-200 text-xs">
-                  • Library에서 진행 상황을 확인하세요
+                  {t('messages.checkLibrary')}
                 </p>
                 <p className="text-blue-200 text-xs">
-                  • 작업 완료 시 자동으로 상태가 업데이트됩니다
+                  {t('messages.autoUpdate')}
                 </p>
               </div>
             </div>
