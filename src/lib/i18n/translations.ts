@@ -104,7 +104,7 @@ export const translations = {
     // Common
     common: {
       loading: '로딩 중...',
-      error: '오류',
+      errorLabel: '오류',
       success: '성공',
       save: '저장',
       cancel: '취소',
@@ -153,6 +153,13 @@ export const translations = {
       size: {
         mustBeMultipleOf64: '64의 배수여야 합니다',
         recommended: '권장값'
+      },
+      error: {
+        generationFailed: '생성 요청에 실패했습니다.',
+        processingDroppedData: '드롭된 데이터 처리 중 오류가 발생했습니다.',
+        noMediaData: '미디어 데이터가 없습니다.',
+        generationError: '생성 중 오류가 발생했습니다.',
+        processingMedia: '미디어 처리 중 오류가 발생했습니다.'
       }
     },
 
@@ -408,6 +415,7 @@ export const translations = {
       fileExplorer: '파일 탐색',
       upload: '업로드',
       fileList: '파일 목록',
+      itemsCount: '개 항목',
       uploadLocation: '업로드 위치',
       refresh: '새로고침',
       parentFolder: '상위 폴더',
@@ -689,7 +697,7 @@ export const translations = {
     // Common
     common: {
       loading: 'Loading...',
-      error: 'Error',
+      errorLabel: 'Error',
       success: 'Success',
       save: 'Save',
       cancel: 'Cancel',
@@ -738,6 +746,13 @@ export const translations = {
       size: {
         mustBeMultipleOf64: 'must be multiple of 64',
         recommended: 'Recommended value'
+      },
+      error: {
+        generationFailed: 'Failed to process generation request.',
+        processingDroppedData: 'An error occurred while processing dropped data.',
+        noMediaData: 'No media data found.',
+        generationError: 'An error occurred during generation.',
+        processingMedia: 'An error occurred while processing media.'
       }
     },
 
@@ -993,6 +1008,7 @@ export const translations = {
       fileExplorer: 'File Explorer',
       upload: 'Upload',
       fileList: 'File List',
+      itemsCount: 'items',
       uploadLocation: 'Upload Location',
       refresh: 'Refresh',
       parentFolder: 'Parent Folder',
