@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       endpointUrl: settings.s3.endpointUrl,
       accessKeyId: settings.s3.accessKeyId,
       secretAccessKey: settings.s3.secretAccessKey,
-      bucketName: volume,
+      bucketName: settings.s3.bucketName || volume,
       region: settings.s3.region || 'us-east-1',
     });
 
