@@ -6,10 +6,10 @@ const prisma = new PrismaClient();
 // 워크스페이스 조회 (작업 목록 포함)
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const workspaceId = params.id;
+    const { id: workspaceId } = await params;
     const searchParams = request.nextUrl.searchParams;
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
@@ -55,10 +55,10 @@ export async function GET(
 // 워크스페이스 수정
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const workspaceId = params.id;
+    const { id: workspaceId } = await params;
     const { name, description, color, isDefault } = await request.json();
 
     const workspace = await prisma.workspace.findUnique({
@@ -122,10 +122,10 @@ export async function PUT(
 // 워크스페이스 삭제
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const workspaceId = params.id;
+    const { id: workspaceId } = await params;
 
     const workspace = await prisma.workspace.findUnique({
       where: { id: workspaceId }
@@ -166,8 +166,7 @@ export async function DELETE(
 
     // 워크스페이스 삭제
     await prisma.workspace.delete({
-      where: { id }
-
+      where: { id: workspaceId }
     });
 
     console.log(`✅ Workspace deleted: ${workspaceId}`);
