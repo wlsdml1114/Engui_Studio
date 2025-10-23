@@ -294,7 +294,7 @@ class RunPodService {
     const requestBody = JSON.stringify(payload);
     
     try {
-      const response = await fetch(`${this.baseUrl}/run`, {
+      const response = await this.fetchWithRetry(`${this.baseUrl}/run`, {
         method: 'POST',
         headers: this.getHeaders(),
         body: requestBody,
@@ -320,9 +320,51 @@ class RunPodService {
     }
   }
 
+  // 네트워크 에러가 재시도 가능한지 확인하는 함수
+  private isRetryableError(error: any): boolean {
+    if (!error) return false;
+
+    const errorMessage = error.message || '';
+
+    // 네트워크 관련 에러들 (재시도 가능)
+    if (errorMessage.includes('SocketError') ||
+        errorMessage.includes('other side closed') ||
+        errorMessage.includes('ECONNRESET') ||
+        errorMessage.includes('ENOTFOUND') ||
+        errorMessage.includes('timeout') ||
+        errorMessage.includes('fetch failed')) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // 재시도 로직이 포함된 fetch wrapper
+  private async fetchWithRetry(url: string, options: RequestInit, maxRetries: number = 3): Promise<Response> {
+    let lastError: any;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await fetch(url, options);
+        return response;
+      } catch (error) {
+        lastError = error;
+
+        if (!this.isRetryableError(error) || attempt === maxRetries) {
+          throw error;
+        }
+
+        console.log(`🔄 Retry attempt ${attempt}/${maxRetries} for network error:`, error.message);
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // 지수 백오프: 1초, 2초, 3초
+      }
+    }
+
+    throw lastError;
+  }
+
   async getJobStatus(jobId: string): Promise<RunPodJobResponse> {
-    
-    const response = await fetch(`${this.baseUrl}/status/${jobId}`, {
+
+    const response = await this.fetchWithRetry(`${this.baseUrl}/status/${jobId}`, {
       method: 'GET',
       headers: this.getHeaders(),
     });
@@ -333,18 +375,18 @@ class RunPodService {
     }
 
     const data = await response.json();
-    
+
     // 상태가 변경되었을 때만 로그 출력
     if (data.status === 'COMPLETED' || data.status === 'FAILED') {
       console.log(`📊 Job ${jobId} status:`, data.status);
-      
+
       // 완료된 경우에만 간단한 출력 정보만 로그
       if (data.status === 'COMPLETED' && data.output) {
         const outputKeys = Object.keys(data.output);
         console.log(`📊 Output keys:`, outputKeys);
       }
     }
-    
+
     return data;
   }
 

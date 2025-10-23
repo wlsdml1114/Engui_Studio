@@ -1,6 +1,6 @@
 // src/lib/s3Service.ts
 
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -29,12 +29,17 @@ function isRetryableError(error: any): boolean {
   if (errorMessage.includes('502') || errorMessage.includes('503') || errorMessage.includes('504')) {
     return true;
   }
-  
+
+  // 520 Service Unavailable (Cloudflare/RunPod S3 일시적 오류)
+  if (errorMessage.includes('520') || errorMessage.includes('HeadObject operation')) {
+    return true;
+  }
+
   // 네트워크 관련 에러
   if (errorMessage.includes('timeout') || errorMessage.includes('ECONNRESET') || errorMessage.includes('ENOTFOUND')) {
     return true;
   }
-  
+
   // AWS CLI 관련 에러
   if (errorMessage.includes('reached max retries') || errorMessage.includes('Bad Gateway')) {
     return true;
@@ -233,23 +238,218 @@ class S3Service {
   // 파일 다운로드 (RunPod S3 API용)
   async downloadFile(key: string): Promise<Buffer> {
     return executeWithRetry(async () => {
-      const tempFile = path.join(os.tmpdir(), `s3-download-${Date.now()}-${path.basename(key)}`);
-      const command = `aws s3 cp "s3://${this.config.bucketName}/${key}" "${tempFile}" --region ${this.config.region} --endpoint-url ${this.config.endpointUrl}`;
-      
+      // downloads 폴더가 없으면 생성
+      const downloadsDir = path.join(os.homedir(), 'Downloads', 's3-downloads');
+      if (!fs.existsSync(downloadsDir)) {
+        fs.mkdirSync(downloadsDir, { recursive: true });
+      }
+
+      const downloadFile = path.join(downloadsDir, `${Date.now()}-${path.basename(key)}`);
+      const command = `aws s3 cp "s3://${this.config.bucketName}/${key}" "${downloadFile}" --region ${this.config.region} --endpoint-url ${this.config.endpointUrl}`;
+
       console.log('📥 Downloading file with command:', command);
-      await execAsync(command, {
-        env: {
-          ...process.env,
-          AWS_ACCESS_KEY_ID: this.config.accessKeyId,
-          AWS_SECRET_ACCESS_KEY: this.config.secretAccessKey,
-          AWS_DEFAULT_REGION: this.config.region,
-          AWS_REGION: this.config.region,
-        },
-        timeout: (this.config.timeout || 3600) * 1000,
+      console.log('🔐 Using credentials:', {
+        accessKeyId: this.config.accessKeyId ? this.config.accessKeyId.substring(0, 8) + '...' : 'missing',
+        region: this.config.region,
+        endpoint: this.config.endpointUrl
       });
-      
-      const fileBuffer = fs.readFileSync(tempFile);
-      fs.unlinkSync(tempFile); // 임시 파일 삭제
+      console.log('⏳ Starting AWS CLI command...');
+
+      try {
+        // 실시간 진행상황을 보기 위해 spawn 사용
+        let downloadProgress = 0;
+        let lastProgressTime = Date.now();
+        let lastDataReceivedTime = Date.now();
+        let hasStartedDownloading = false;
+
+        return new Promise<Buffer>((resolve, reject) => {
+          const awsProcess = spawn('aws', [
+            's3', 'cp',
+            `s3://${this.config.bucketName}/${key}`,
+            downloadFile,
+            '--region', this.config.region,
+            '--endpoint-url', this.config.endpointUrl
+          ], {
+            env: {
+              ...process.env,
+              AWS_ACCESS_KEY_ID: this.config.accessKeyId,
+              AWS_SECRET_ACCESS_KEY: this.config.secretAccessKey,
+              AWS_DEFAULT_REGION: this.config.region,
+              AWS_REGION: this.config.region,
+            },
+            stdio: ['pipe', 'pipe', 'pipe'],
+            // Line-buffered 모드로 설정
+            shell: true
+          });
+
+          let stdout = '';
+          let stderr = '';
+
+          // 실시간 stdout 처리 (Progress 정보가 여기로 나옴!)
+          let stdoutBuffer = '';
+          awsProcess.stdout?.on('data', (data: Buffer) => {
+            // 데이터 수신 시간 갱신
+            lastDataReceivedTime = Date.now();
+            hasStartedDownloading = true;
+
+            stdoutBuffer += data.toString();
+
+            // 라인 단위로 처리하기 위해 개행문자로 분리
+            const lines = stdoutBuffer.split('\n');
+            stdoutBuffer = lines.pop() || ''; // 마지막 불완전한 라인은 버퍼에 유지
+
+            for (const line of lines) {
+              const output = line.trim();
+
+              if (output) {
+                // Progress 정보 추출 (stdout에서 처리)
+                if (output.includes('Completed') && output.includes('MiB')) {
+                  // 디버깅: 실제 출력 형식 확인
+                  console.log('\n🔍 Debug - Raw output:', output);
+
+                  // 여러 형식의 Progress 정보 추출 시도
+                  let progressMatch = output.match(/Completed ([\d.]+) MiB\/([\d.]+) MiB \(([\d.]+) KiB\/s\)/);
+
+                  // 첫 번째 정규식이 실패하면 다른 형식 시도
+                  if (!progressMatch) {
+                    progressMatch = output.match(/Completed ([\d.]+) MiB\/([\d.]+) MiB \(([\d.]+) KiB\/s\) with \d+ file\(s\) remaining/);
+                  }
+
+                  if (!progressMatch) {
+                    progressMatch = output.match(/([\d.]+) MiB\/([\d.]+) MiB \(([\d.]+) KiB\/s\)/);
+                  }
+
+                  if (!progressMatch) {
+                    // 정규식 매칭 실패 시 문자열 분리로 시도
+                    const parts = output.split(' ');
+                    console.log('\n🔍 Debug - Split parts:', parts);
+                  }
+
+                  if (progressMatch) {
+                    const [, completed, total, speed] = progressMatch;
+                    const percent = ((parseFloat(completed) / parseFloat(total)) * 100).toFixed(1);
+                    const progressBar = '█'.repeat(Math.floor(parseFloat(percent) / 2)) + '░'.repeat(50 - Math.floor(parseFloat(percent) / 2));
+
+                    // 같은 줄에서 갱신 (process.stdout.write + \r)
+                    process.stdout.write(`\r📊 다운로드 중: [${progressBar}] ${percent}% (${completed}MiB/${total}MiB) @ ${speed} KiB/s`);
+                  } else {
+                    // 일반 Progress 정보도 출력 (줄바꿈으로)
+                    console.log('\n📤', output);
+                  }
+                } else if (output.includes('download:')) {
+                  console.log('\n📥', output);
+                } else if (output.includes('completed') || output.includes('100%')) {
+                  console.log('\n✅', output);
+                } else if (output.includes('bytes') || output.includes('GB')) {
+                  console.log('\n📊', output);
+                }
+              }
+            }
+
+            // 10초마다 진행상황 표시
+            const now = Date.now();
+            if (now - lastProgressTime > 10000) {
+              downloadProgress += 10;
+
+              // 다운로드가 진행되고 있는지 확인
+              const timeSinceLastData = now - lastDataReceivedTime;
+
+              // Progress bar가 활성화되었는지 확인 (stdout에 completed 포함된 데이터가 있었는지)
+              const progressActive = stdoutBuffer.includes('Completed') && stdoutBuffer.includes('MiB');
+
+              if (hasStartedDownloading && timeSinceLastData > 15000) {
+                // 15초 이상 데이터가 없으면 정체 상태로 간주
+                if (!progressActive) {
+                  process.stdout.write(`\r⏸️ 다운로드 정체 감지! ${Math.floor(downloadProgress)}초 경과 (마지막 데이터: ${Math.floor(timeSinceLastData / 1000)}초 전)`);
+                }
+              } else if (!hasStartedDownloading && downloadProgress < 60) {
+                // 1분 동안 시작도 안되면 대기 상태로 표시
+                if (!progressActive) {
+                  process.stdout.write(`\r⏳ 다운로드 시작 대기중... ${Math.floor(downloadProgress)}초 경과`);
+                }
+              } else {
+                // 정상 진행 상태 - Progress bar가 있으면 표시 안함
+                if (!progressActive) {
+                  process.stdout.write(`\r⏱️ 다운로드 진행중... ${Math.floor(downloadProgress)}초 경과`);
+                }
+              }
+
+              lastProgressTime = now;
+            }
+          });
+
+          // 실시간 stderr 처리 (에러 정보만 처리)
+          awsProcess.stderr?.on('data', (data: Buffer) => {
+            stderr += data.toString();
+            const output = data.toString().trim();
+
+            if (output) {
+              console.log('⚠️', output);
+            }
+          });
+
+          // 프로세스 종료 처리
+          awsProcess.on('close', (code: number) => {
+            // 줄바꿈으로 깔끔하게 정리
+            process.stdout.write('\n');
+
+            if (code === 0) {
+              console.log('✅ AWS CLI completed successfully');
+
+              // 다운로드된 파일 읽기
+              fs.readFile(downloadFile, (err, data) => {
+                if (err) {
+                  reject(err);
+                } else {
+                  resolve(data);
+                }
+              });
+            } else {
+              console.error(`❌ AWS CLI exited with code ${code}`);
+              console.error('❌ stderr:', stderr);
+
+              // 520/HeadObject 오류는 재시도 가능한 오류로 취급
+              const error520 = new Error(`AWS CLI failed with exit code ${code}: ${stderr}`);
+              if (code === 1 && stderr.includes('520') && stderr.includes('HeadObject operation')) {
+                error520.message = 'RunPod S3 520 Service Unavailable - 일시적 서버 오류';
+              }
+
+              reject(error520);
+            }
+          });
+
+          // 에러 처리
+          awsProcess.on('error', (error: Error) => {
+            console.error('❌ AWS CLI process error:', error);
+            reject(error);
+          });
+
+          // 타임아웃 처리
+          const timeoutMs = (this.config.timeout || 3600) * 1000;
+          const timeoutHandle = setTimeout(() => {
+            console.log('⏰ AWS CLI timeout, killing process...');
+            awsProcess.kill('SIGTERM');
+            reject(new Error('AWS CLI timeout'));
+          }, timeoutMs);
+
+          awsProcess.on('close', () => {
+            clearTimeout(timeoutHandle);
+          });
+        });
+
+      } catch (execError: any) {
+        console.error('❌ AWS CLI execution failed:', execError);
+
+        // 타임아웃 오러에 대한 특별 처리
+        if (execError.signal === 'SIGTERM' || execError.message?.includes('timeout')) {
+          throw new Error(`Download timeout - file might be too large or server too slow: ${execError.message}`);
+        }
+
+        throw execError;
+      }
+
+      const fileBuffer = fs.readFileSync(downloadFile);
+      fs.unlinkSync(downloadFile); // 다운로드 파일 삭제
       
       console.log('✅ File downloaded successfully:', key);
       return fileBuffer;
