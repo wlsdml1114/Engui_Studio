@@ -40,6 +40,9 @@ export async function POST(request: NextRequest) {
         // Load user settings
         console.log('📖 Loading user settings...');
         const { settings } = await settingsService.getSettings(userId);
+
+        // Get current workspace ID
+        const currentWorkspaceId = await settingsService.getCurrentWorkspaceId(userId);
         
         // Validate RunPod configuration
         if (!settings.runpod || typeof settings.runpod === 'string' || typeof settings.runpod === 'number' || 
@@ -103,6 +106,7 @@ export async function POST(request: NextRequest) {
             data: {
                 id: Math.random().toString(36).substring(2, 15),
                 userId,
+                workspaceId: currentWorkspaceId,
                 status: 'processing',
                 type: 'multitalk',
                 prompt,
