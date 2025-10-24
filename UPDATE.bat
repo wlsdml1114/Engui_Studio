@@ -32,19 +32,14 @@ if not exist ".git" (
 
 :: Check for uncommitted changes
 echo [INFO] Checking for uncommitted changes...
-git status --porcelain 2>nul | findstr /C:"M temp_status.txt" >nul
+
+:: Simple check - if git status says "working tree clean", we're good
+git status 2>nul | findstr /C:"working tree clean" >nul
 if %ERRORLEVEL% EQU 0 (
-    echo [INFO] Ignoring temp_status.txt (temporary file)
-    git restore temp_status.txt >nul 2>&1
-)
-
-git status --porcelain 2>nul | findstr /v /C:"?? temp_status.txt" >temp_check.txt
-for /f %%i in (temp_check.txt) do set has_changes=1
-del temp_check.txt >nul 2>&1
-
-if defined has_changes (
+    echo [OK] No uncommitted changes found.
+) else (
     echo [WARNING] You have uncommitted changes:
-    git status --porcelain | findstr /v /C:"?? temp_status.txt"
+    git status --porcelain
     echo.
     echo Options:
     echo 1. Commit your changes first
