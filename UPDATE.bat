@@ -32,29 +32,33 @@ if not exist ".git" (
 
 :: Check for uncommitted changes
 echo [INFO] Checking for uncommitted changes...
-git status --porcelain >temp_status.txt 2>nul
+git status --porcelain 2>nul | findstr /C:"M temp_status.txt" >nul
 if %ERRORLEVEL% EQU 0 (
-    for /f %%i in (temp_status.txt) do set has_changes=1
-    if defined has_changes (
-        echo [WARNING] You have uncommitted changes:
-        type temp_status.txt
-        echo.
-        echo Options:
-        echo 1. Commit your changes first
-        echo 2. Stash your changes temporarily
-        echo 3. Continue update ^(may overwrite your changes^)
-        echo.
+    echo [INFO] Ignoring temp_status.txt (temporary file)
+    git restore temp_status.txt >nul 2>&1
+)
 
-        set /p continue_update="Do you want to continue with update? (y/n): "
-        if /i not "!continue_update!"=="y" (
-            echo [INFO] Update cancelled.
-            del temp_status.txt >nul 2>&1
-            pause
-            exit /b 0
-        )
+git status --porcelain 2>nul | findstr /v /C:"?? temp_status.txt" >temp_check.txt
+for /f %%i in (temp_check.txt) do set has_changes=1
+del temp_check.txt >nul 2>&1
+
+if defined has_changes (
+    echo [WARNING] You have uncommitted changes:
+    git status --porcelain | findstr /v /C:"?? temp_status.txt"
+    echo.
+    echo Options:
+    echo 1. Commit your changes first
+    echo 2. Stash your changes temporarily
+    echo 3. Continue update ^(may overwrite your changes^)
+    echo.
+
+    set /p continue_update="Do you want to continue with update? (y/n): "
+    if /i not "!continue_update!"=="y" (
+        echo [INFO] Update cancelled.
+        pause
+        exit /b 0
     )
 )
-del temp_status.txt >nul 2>&1
 
 echo [OK] Git repository check passed.
 echo.

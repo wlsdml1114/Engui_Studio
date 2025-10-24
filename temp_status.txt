@@ -1,2 +1,0 @@
- M .gitignore
- M temp_status.txt
