@@ -41,6 +41,19 @@ export async function POST(request: NextRequest) {
         data: { isDefault: true }
       });
 
+      // 기존 워크스페이스에 분류되지 않은 모든 작업을 기본 워크스페이스로 이동
+      await prisma.job.updateMany({
+        where: {
+          userId,
+          workspaceId: null
+        },
+        data: {
+          workspaceId: updatedWorkspace.id
+        }
+      });
+
+      console.log(`✅ Existing workspace set as default and jobs migrated: ${updatedWorkspace.id}`);
+
       return NextResponse.json({
         workspace: updatedWorkspace,
         isNew: false
