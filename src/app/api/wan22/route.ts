@@ -145,8 +145,50 @@ export async function POST(request: NextRequest) {
         }
 
         // 현재 워크스페이스 ID 가져오기
-        const currentWorkspaceId = await settingsService.getCurrentWorkspaceId(userId);
+        let currentWorkspaceId = await settingsService.getCurrentWorkspaceId(userId);
         console.log('🏗️ Current workspace ID for job:', currentWorkspaceId);
+
+        // currentWorkspaceId가 없다면 기본 워크스페이스 찾기
+        if (!currentWorkspaceId) {
+            console.log('🔍 No current workspace set, finding default workspace...');
+            const defaultWorkspace = await prisma.workspace.findFirst({
+                where: {
+                    userId,
+                    isDefault: true
+                }
+            });
+
+            if (defaultWorkspace) {
+                currentWorkspaceId = defaultWorkspace.id;
+                console.log('✅ Found default workspace:', currentWorkspaceId);
+
+                // 이 워크스페이스를 현재 워크스페이스로 설정
+                await settingsService.setCurrentWorkspaceId(userId, currentWorkspaceId);
+            } else {
+                console.log('⚠️ No default workspace found, creating one...');
+
+                // workspace 초기화 API 호출
+                try {
+                    const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/workspaces/initialize`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ userId })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        currentWorkspaceId = data.workspace.id;
+                        console.log('✅ Created and initialized default workspace:', currentWorkspaceId);
+                    } else {
+                        console.error('❌ Failed to initialize workspace');
+                    }
+                } catch (initError) {
+                    console.error('❌ Error initializing workspace:', initError);
+                }
+            }
+        }
 
         // Create job record in database
         const job = await prisma.job.create({

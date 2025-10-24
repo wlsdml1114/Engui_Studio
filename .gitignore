@@ -70,6 +70,10 @@ Desktop.ini
 # Temporary files
 *.tmp
 *.temp
+temp_status.txt
 
 # FFmpeg
 /ffmpeg
+
+# Claude Code
+.claude/

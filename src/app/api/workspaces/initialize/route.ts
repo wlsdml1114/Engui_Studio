@@ -13,16 +13,50 @@ export async function POST(request: NextRequest) {
 
     // 사용자의 기본 워크스페이스가 이미 있는지 확인
     const existingDefaultWorkspace = await prisma.workspace.findFirst({
-      where: { 
+      where: {
         userId,
-        isDefault: true 
+        isDefault: true
       }
     });
 
     if (existingDefaultWorkspace) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         workspace: existingDefaultWorkspace,
-        isNew: false 
+        isNew: false
+      });
+    }
+
+    // 이름이 'Default workspace'인 워크스페이스가 있는지 확인
+    const existingWorkspace = await prisma.workspace.findFirst({
+      where: {
+        userId,
+        name: 'Default workspace'
+      }
+    });
+
+    if (existingWorkspace) {
+      // 기존 워크스페이스를 기본 워크스페이스로 설정
+      const updatedWorkspace = await prisma.workspace.update({
+        where: { id: existingWorkspace.id },
+        data: { isDefault: true }
+      });
+
+      // 기존 워크스페이스에 분류되지 않은 모든 작업을 기본 워크스페이스로 이동
+      await prisma.job.updateMany({
+        where: {
+          userId,
+          workspaceId: null
+        },
+        data: {
+          workspaceId: updatedWorkspace.id
+        }
+      });
+
+      console.log(`✅ Existing workspace set as default and jobs migrated: ${updatedWorkspace.id}`);
+
+      return NextResponse.json({
+        workspace: updatedWorkspace,
+        isNew: false
       });
     }
 
@@ -30,8 +64,8 @@ export async function POST(request: NextRequest) {
     const defaultWorkspace = await prisma.workspace.create({
       data: {
         userId,
-        name: '기본 워크스페이스',
-        description: '모든 작업이 저장되는 기본 워크스페이스입니다.',
+        name: 'Default workspace',
+        description: 'Default workspace where all your work is saved.',
         color: '#3B82F6', // 파란색
         isDefault: true
       }

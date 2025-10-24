@@ -443,12 +443,73 @@ if (Test-Path "prisma\db\database.db") {
 }
 Write-Host ""
 
-# Start development server
-Write-Host "[INFO] Starting development server..." -ForegroundColor Green
+# Ask user to choose server mode
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "   Choose Server Mode" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "1. Normal mode  - Standard logging with full debug info" -ForegroundColor Green
+Write-Host "2. Minimal mode - Reduced logging (only errors and essential info) [DEFAULT]" -ForegroundColor Yellow
+Write-Host ""
+# Timer countdown and input handling
+$choice = ""
+$timeout = 10
+
+Write-Host "Auto-starting in Minimal mode in $timeout seconds..." -ForegroundColor Cyan
+Write-Host "Press 1 for Normal mode or 2 for Minimal mode to start immediately" -ForegroundColor Cyan
+
+# Simple countdown with user input
+for ($i = $timeout; $i -gt 0; $i--) {
+    Write-Host -NoNewLine "`rTime remaining: $i seconds..."
+
+    # Check if key is available
+    if ($Host.UI.RawUI.KeyAvailable) {
+        $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        if ($key.Character -eq "1") {
+            $choice = "1"
+            Write-Host "`rSelected: Normal mode                    "
+            break
+        } elseif ($key.Character -eq "2") {
+            $choice = "2"
+            Write-Host "`rSelected: Minimal mode                   "
+            break
+        }
+    }
+
+    # Sleep for 1 second
+    Start-Sleep -Seconds 1
+}
+
+# If no choice made, default to Minimal mode
+if (-not $choice) {
+    Write-Host "`rAuto-selected: Minimal mode (timeout)           "
+    $choice = "2"
+}
+
+Write-Host ""
+
+# Determine which npm script to run
+switch ($choice) {
+    "1" {
+        $scriptName = "dev"
+        $modeName = "Normal"
+        $modeDesc = "with standard logging"
+    }
+    default {
+        $scriptName = "dev:minimal"
+        $modeName = "Minimal"
+        $modeDesc = "with reduced logging"
+    }
+}
+
+Write-Host ""
+Write-Host "[INFO] Starting development server in $modeName mode $modeDesc..." -ForegroundColor Green
 Write-Host "[INFO] Browser will open automatically..." -ForegroundColor Green
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "   Development server started successfully!" -ForegroundColor Cyan
+Write-Host "   Mode: $modeName" -ForegroundColor Cyan
 Write-Host "   Check http://localhost:3000 in your browser" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
@@ -458,5 +519,5 @@ Write-Host ""
 # Open browser
 Start-Process "http://localhost:3000"
 
-# Start development server
-npm run dev
+# Start development server with chosen mode
+npm run $scriptName

@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "dev:minimal": "set NEXT_LOG_LEVEL=error&& set NEXT_TELEMETRY_DISABLED=1&& npx next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
