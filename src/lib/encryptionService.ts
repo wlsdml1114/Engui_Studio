@@ -1,8 +1,10 @@
 // src/lib/encryptionService.ts
 
+import { logger } from './logger';
+
 class EncryptionService {
   constructor() {
-    console.log('🔓 Encryption disabled - using plain text for personal use');
+    logger.emoji.encryption('Encryption disabled - using plain text for personal use');
   }
 
   encrypt(text: string): string {

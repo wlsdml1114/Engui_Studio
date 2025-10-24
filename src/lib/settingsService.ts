@@ -2,6 +2,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import EncryptionService from './encryptionService';
+import { logger } from './logger';
 
 // Global Prisma client instance
 declare global {
@@ -80,24 +81,24 @@ class SettingsService {
 
   async getSettings(userId: string): Promise<{ settings: Partial<ServiceConfig>; status: ServiceStatus }> {
     try {
-      console.log(`📖 Loading settings for user: ${userId}`);
+      logger.emoji.loading(`Loading settings for user: ${userId}`);
       
       // Test database connection first
-      console.log('🔧 Testing database connection...');
-      
+      logger.emoji.testing('Testing database connection...');
+
       // Check if prisma is properly initialized
       if (!prisma) {
         throw new Error('Prisma client is not initialized');
       }
-      
-      console.log('🔧 Prisma client is available, attempting to query...');
-      
+
+      logger.emoji.testing('Prisma client is available, attempting to query...');
+
       const userSettings = await prisma.userSetting.findMany({
         where: { userId },
       });
-      
-      console.log(`📊 Found ${userSettings.length} settings for user ${userId}`);
-      console.log('🔍 Raw database settings:', userSettings.map(s => ({
+
+      logger.emoji.stats(`Found ${userSettings.length} settings for user ${userId}`);
+      logger.emoji.search('Raw database settings:', userSettings.map(s => ({
         serviceName: s.serviceName,
         configKey: s.configKey,
         configValue: s.configValue?.substring(0, 30) + '...',
@@ -137,7 +138,7 @@ class SettingsService {
         }
       };
 
-      console.log('🔧 Initial settings structure:', JSON.stringify(settings, null, 2));
+      logger.emoji.testing('Initial settings structure:', JSON.stringify(settings, null, 2));
 
       let decryptionErrors = 0;
       let successfulDecryptions = 0;
@@ -149,7 +150,7 @@ class SettingsService {
             ? this.encryption.decrypt(setting.configValue)
             : setting.configValue;
           
-          console.log(`🔧 Processing setting: ${setting.serviceName}.${setting.configKey} = ${value.substring(0, 20)}...`);
+          logger.emoji.testing(`Processing setting: ${setting.serviceName}.${setting.configKey} = ${value.substring(0, 20)}...`);
           
           // 올바른 중첩 구조로 데이터 배치
           if (setting.serviceName === 'runpod') {
@@ -204,19 +205,19 @@ class SettingsService {
         }
       }
 
-      console.log(`📊 Decryption summary: ${successfulDecryptions} successful, ${decryptionErrors} failed`);
+      logger.emoji.stats(`Decryption summary: ${successfulDecryptions} successful, ${decryptionErrors} failed`);
 
       // If we have decryption errors, suggest clearing the database
       if (decryptionErrors > 0) {
         console.warn(`⚠️  ${decryptionErrors} settings failed to decrypt. Consider clearing the database to start fresh.`);
       }
 
-      console.log('🔧 Final restored settings:', JSON.stringify(settings, null, 2));
+      logger.emoji.testing('Final restored settings:', JSON.stringify(settings, null, 2));
 
       // Calculate status
       const status = this.calculateStatus(settings);
 
-      console.log(`✅ Loaded settings for user ${userId}:`, {
+      logger.info(`Loaded settings for user ${userId}:`, {
         runpodConfigured: !!settings.runpod.apiKey,
         s3Configured: !!settings.s3.accessKeyId,
         status
@@ -224,14 +225,14 @@ class SettingsService {
 
       return { settings, status };
     } catch (error) {
-      console.error('❌ Error loading settings:', error);
+      logger.error('Error loading settings:', error);
       throw new Error(`Failed to load settings: ${error}`);
     }
   }
 
   async saveSettings(userId: string, settings: Partial<ServiceConfig>): Promise<void> {
     try {
-      console.log(`💾 Saving settings for user: ${userId}`);
+      logger.info(`Saving settings for user: ${userId}`);
       
       // Flatten the nested settings structure for database storage
       const flatSettings: Array<{
@@ -320,7 +321,7 @@ class SettingsService {
         });
       }
 
-      console.log(`📝 Flattened ${flatSettings.length} settings to save`);
+      logger.emoji.testing(`Flattened ${flatSettings.length} settings to save`);
 
       // Save each setting using upsert
       for (const setting of flatSettings) {
@@ -351,10 +352,10 @@ class SettingsService {
         });
       }
 
-      console.log(`✅ Successfully saved ${flatSettings.length} settings`);
+      logger.info(`Successfully saved ${flatSettings.length} settings`);
       
     } catch (error) {
-      console.error('❌ Failed to save settings:', error);
+      logger.error('Failed to save settings:', error);
       throw new Error(`Failed to save settings: ${error}`);
     }
   }

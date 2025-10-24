@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import S3Service from '@/lib/s3Service';
 import SettingsService from '@/lib/settingsService';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
     try {
-        console.log('🔍 Fetching LoRA files from S3...');
+        logger.emoji.search('Fetching LoRA files from S3...');
         
         // URL 파라미터에서 볼륨 정보 가져오기
         const { searchParams } = new URL(request.url);
         const volume = searchParams.get('volume');
         
         if (!volume) {
-            console.log('⚠️ No volume specified. Returning empty LoRA list.');
+            logger.warn('No volume specified. Returning empty LoRA list.');
             return NextResponse.json({
                 success: true,
                 files: [],
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
         
         // S3 설정 확인
         if (!settings.s3?.endpointUrl || !settings.s3?.accessKeyId || !settings.s3?.secretAccessKey) {
-            console.log('⚠️ S3 configuration is incomplete. Returning empty LoRA list.');
+            logger.warn('S3 configuration is incomplete. Returning empty LoRA list.');
             return NextResponse.json({
                 success: true,
                 files: [],
@@ -63,9 +64,9 @@ export async function GET(request: NextRequest) {
             file.key.toLowerCase().includes('low')
         );
         
-        console.log(`📁 Found ${loraFiles.length} LoRA files:`, loraFiles.map(f => f.key));
-        console.log(`🔺 High files: ${highFiles.length}`, highFiles.map(f => f.key));
-        console.log(`🔻 Low files: ${lowFiles.length}`, lowFiles.map(f => f.key));
+        logger.emoji.stats(`Found ${loraFiles.length} LoRA files:`, loraFiles.map(f => f.key));
+        logger.emoji.stats(`High files: ${highFiles.length}`, highFiles.map(f => f.key));
+        logger.emoji.stats(`Low files: ${lowFiles.length}`, lowFiles.map(f => f.key));
         
         return NextResponse.json({
             success: true,
@@ -90,7 +91,7 @@ export async function GET(request: NextRequest) {
         });
         
     } catch (error) {
-        console.error('❌ Error fetching LoRA files:', error);
+        logger.error('Error fetching LoRA files:', error);
         
         // 502 Bad Gateway 에러인 경우 특별한 메시지 제공
         if (error instanceof Error && error.message.includes('502')) {

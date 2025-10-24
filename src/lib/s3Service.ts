@@ -5,6 +5,7 @@ import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { logger } from './logger';
 
 const execAsync = promisify(exec);
 
@@ -59,11 +60,11 @@ async function executeWithRetry<T>(
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`🔄 ${operationName} 시도 ${attempt}/${maxRetries}`);
+      logger.emoji.testing(`${operationName} 시도 ${attempt}/${maxRetries}`);
       const result = await operation();
       
       if (attempt > 1) {
-        console.log(`✅ ${operationName} 성공 (${attempt}번째 시도)`);
+        logger.info(`${operationName} 성공 (${attempt}번째 시도)`);
       }
       
       return result;
@@ -71,18 +72,18 @@ async function executeWithRetry<T>(
       lastError = error;
       
       if (!isRetryableError(error)) {
-        console.log(`❌ ${operationName} 재시도 불가능한 에러:`, error);
+        logger.error(`${operationName} 재시도 불가능한 에러:`, error);
         throw error;
       }
       
       if (attempt === maxRetries) {
-        console.log(`❌ ${operationName} 최대 재시도 횟수 초과 (${maxRetries}회)`);
+        logger.error(`${operationName} 최대 재시도 횟수 초과 (${maxRetries}회)`);
         break;
       }
       
       // 지수 백오프 계산 (최대 30초)
       const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 30000);
-      console.log(`⏳ ${operationName} 재시도 대기 중... (${delay}ms 후 ${attempt + 1}번째 시도)`);
+      logger.emoji.testing(`${operationName} 재시도 대기 중... (${delay}ms 후 ${attempt + 1}번째 시도)`);
       
       await new Promise(resolve => setTimeout(resolve, delay));
     }
@@ -114,7 +115,7 @@ class S3Service {
       }
     });
 
-    console.log('🔧 S3Service initialized with config:', {
+    logger.emoji.testing('S3Service initialized with config:', {
       endpointUrl: this.config.endpointUrl,
       bucketName: this.config.bucketName,
       region: this.config.region,
@@ -140,7 +141,7 @@ class S3Service {
       const actualPrefix = prefix === '' ? '' : prefix;
       const command = `aws s3api list-objects-v2 --bucket ${this.config.bucketName} --prefix "${actualPrefix}" --delimiter "/" --region ${this.config.region} --endpoint-url ${this.config.endpointUrl}`;
       
-      console.log('🔍 Listing files with command:', command);
+      logger.emoji.search('Listing files with command:', command);
       const { stdout } = await execAsync(command, {
         env: {
           ...process.env,
@@ -155,8 +156,8 @@ class S3Service {
       const result = JSON.parse(stdout);
       
       // 디버깅: S3 API 응답 확인 (간단하게)
-      console.log('🔍 Contents:', result.Contents?.map((c: any) => ({ Key: c.Key, Size: c.Size })));
-      console.log('🔍 CommonPrefixes:', result.CommonPrefixes?.map((p: any) => ({ Prefix: p.Prefix })));
+      logger.emoji.search('Contents:', result.Contents?.map((c: any) => ({ Key: c.Key, Size: c.Size })));
+      logger.emoji.search('CommonPrefixes:', result.CommonPrefixes?.map((p: any) => ({ Prefix: p.Prefix })));
       
       // 파일들 처리
       const files = (result.Contents || []).map((obj: any) => {
@@ -214,17 +215,17 @@ class S3Service {
       });
 
       // 디버깅: 각 항목의 key 값 확인 (간단하게)
-      console.log('🔍 Found items:', filteredItems.length);
+      logger.emoji.search('Found items:', filteredItems.length);
 
       // 디렉토리와 파일을 구분하여 정렬
       const directories = filteredItems.filter((f: any) => f.type === 'directory');
       const fileList = filteredItems.filter((f: any) => f.type === 'file');
       
-      console.log(`✅ Found ${allItems.length} items (${directories.length} directories, ${fileList.length} files)`);
+      logger.info(`Found ${allItems.length} items (${directories.length} directories, ${fileList.length} files)`);
       
       return [...directories, ...fileList];
     }, this.config.maxRetries || 5, this.config.retryDelay || 1000, '파일 목록 조회').catch(async (error) => {
-      console.error('❌ Failed to list files after retries:', error);
+      logger.error('Failed to list files after retries:', error);
       
       // 502 Bad Gateway 에러인 경우 특별한 메시지 제공
       if (error instanceof Error && error.message.includes('502')) {
@@ -305,7 +306,7 @@ class S3Service {
                 // Progress 정보 추출 (stdout에서 처리)
                 if (output.includes('Completed') && output.includes('MiB')) {
                   // 디버깅: 실제 출력 형식 확인
-                  console.log('\n🔍 Debug - Raw output:', output);
+                  logger.emoji.search('Debug - Raw output:', output);
 
                   // 여러 형식의 Progress 정보 추출 시도
                   let progressMatch = output.match(/Completed ([\d.]+) MiB\/([\d.]+) MiB \(([\d.]+) KiB\/s\)/);
@@ -322,7 +323,7 @@ class S3Service {
                   if (!progressMatch) {
                     // 정규식 매칭 실패 시 문자열 분리로 시도
                     const parts = output.split(' ');
-                    console.log('\n🔍 Debug - Split parts:', parts);
+                    logger.emoji.search('Debug - Split parts:', parts);
                   }
 
                   if (progressMatch) {
