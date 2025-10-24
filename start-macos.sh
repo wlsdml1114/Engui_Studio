@@ -218,12 +218,74 @@ else
 fi
 echo ""
 
-# Start development server
-echo "[INFO] Starting development server..."
+# Ask user to choose server mode
+echo ""
+echo "========================================"
+echo "   Choose Server Mode"
+echo "========================================"
+echo ""
+echo "1. Normal mode  - Standard logging with full debug info"
+echo "2. Minimal mode - Reduced logging (only errors and essential info) [DEFAULT]"
+echo ""
+echo "Auto-starting in Minimal mode in 10 seconds..."
+echo "Press 1 for Normal mode or 2 for Minimal mode to start immediately"
+
+# Timer countdown and input handling with timeout
+choice=""
+timeout=10
+
+# Simple countdown with input handling
+for i in $(seq $timeout -1 1); do
+    echo -ne "\rTime remaining: $i seconds..."
+
+    # Read with 1 second timeout, non-blocking
+    read -t 1 -n 1 input 2>/dev/null
+
+    if [ $? -eq 0 ] && [ -n "$input" ]; then
+        case $input in
+            1)
+                echo -ne "\rSelected: Normal mode                    "
+                choice="1"
+                break
+                ;;
+            2)
+                echo -ne "\rSelected: Minimal mode                   "
+                choice="2"
+                break
+                ;;
+        esac
+    fi
+done
+
+# If no choice made, default to Minimal mode
+if [ -z "$choice" ]; then
+    echo -ne "\rAuto-selected: Minimal mode (timeout)           "
+    choice="2"
+fi
+
+echo ""
+
+# Determine which npm script to run
+case $choice in
+    1)
+        script_name="dev"
+        mode_name="Normal"
+        mode_desc="with standard logging"
+        ;;
+    *)
+        script_name="dev:minimal"
+        mode_name="Minimal"
+        mode_desc="with reduced logging"
+        ;;
+esac
+
+echo ""
+echo "[INFO] Starting development server in $mode_name mode $mode_desc..."
 echo "[INFO] Browser will open automatically..."
 echo ""
 echo "========================================"
 echo "   Development server started successfully!"
+echo "   Mode: $mode_name"
 echo "   Check http://localhost:3000 in your browser"
 echo "========================================"
 echo ""
@@ -238,5 +300,5 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     xdg-open http://localhost:3000
 fi
 
-# Start development server
-npm run dev
+# Start development server with chosen mode
+npm run $script_name
