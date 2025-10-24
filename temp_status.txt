@@ -1,3 +1,2 @@
-?? UPDATE.bat
-?? temp_status.txt
-?? update-macos.sh
+ M .gitignore
+ M temp_status.txt
