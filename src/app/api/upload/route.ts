@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import S3Service from '@/lib/s3Service';
+import { getApiMessage } from '@/lib/apiMessages';
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
     
     if (files.length === 0) {
       return NextResponse.json(
-        { error: 'No files provided' },
+        { error: getApiMessage('FILE', 'NO_FILES_PROVIDED') },
         { status: 400 }
       );
     }

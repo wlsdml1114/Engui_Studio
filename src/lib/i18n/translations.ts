@@ -168,6 +168,11 @@ export const translations = {
       title: 'WAN 2.2',
       prompt: '프롬프트 *',
       imageFile: '이미지 파일 *',
+      endFrame: '엔드 프레임 파일',
+      endFrameOptional: '(선택사항)',
+      endFrameDesc: '엔드 프레임 파일을 선택하거나 드래그하세요',
+      selectEndFrame: '파일 선택',
+      removeEndFrame: '엔드 프레임 제거',
       length: 'Length (16fps)',
       contextOverlap: 'Context Overlap',
       contextOverlapDesc: '긴영상을 생성할때 overlap되는 구간 길이',
@@ -580,7 +585,8 @@ export const translations = {
       inputVideo: '입력 비디오',
       inputFileNotFound: '입력 파일 정보를 찾을 수 없습니다.',
       wanAnimateOptionsParseError: 'WAN Animate 옵션을 파싱할 수 없습니다.',
-      infiniteTalkOptionsParseError: 'Infinite Talk 옵션을 파싱할 수 없습니다.'
+      infiniteTalkOptionsParseError: 'Infinite Talk 옵션을 파싱할 수 없습니다.',
+      infiniteTalkInputImageNotFound: 'Infinite Talk 입력 이미지 정보를 찾을 수 없습니다.'
     },
 
     // General Messages
@@ -591,6 +597,76 @@ export const translations = {
       autoUpdate: '• 작업 완료 시 자동으로 상태가 업데이트됩니다',
       generationRequestAccepted: '이미지 생성 요청이 성공적으로 접수되었습니다! Job ID: {jobId}. 라이브러리에서 진행 상황을 확인하세요.',
       error: '오류: {error}'
+    },
+
+    // API Messages
+    api: {
+      // Job Processing Messages
+      jobStarted: {
+        wan22: 'WAN 2.2 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.',
+        wanAnimate: 'WAN Animate 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.',
+        videoUpscale: '비디오 업스케일 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.',
+        infiniteTalk: 'Infinite Talk 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.',
+        fluxKrea: 'Flux Krea 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.'
+      },
+
+      // S3 Storage Messages
+      s3: {
+        fileUploaded: '파일이 성공적으로 업로드되었습니다.',
+        folderCreated: '폴더가 성공적으로 생성되었습니다.',
+        fileDeleted: '파일이 성공적으로 삭제되었습니다.',
+        uploadFailed: '파일 업로드에 실패했습니다.',
+        downloadFailed: '파일 다운로드에 실패했습니다.',
+        deleteFailed: '파일 삭제에 실패했습니다.',
+        createFolderFailed: '폴더 생성에 실패했습니다.',
+        fileListFailed: '파일 목록을 가져올 수 없습니다.',
+        volumeListFailed: '네트워크 볼륨 목록을 가져올 수 없습니다.',
+        serverUnstable: 'RunPod S3 서버가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.',
+        folderConflict: '폴더 생성 실패: \'{key}\'는 이미 파일로 존재합니다. 기존 파일을 삭제하거나 다른 폴더명을 사용해주세요.',
+        volumeNotSpecified: '볼륨이 지정되지 않았습니다.',
+        settingsNotConfigured: 'S3 설정이 완료되지 않았습니다.',
+        volumeAndKeyRequired: '볼륨과 파일 키가 필요합니다.',
+        volumeAndFolderKeyRequired: '볼륨과 폴더 키가 필요합니다.',
+        loraVolumeNotSpecified: '볼륨이 지정되지 않았습니다. S3 Storage 페이지에서 볼륨을 선택해주세요.',
+        fileAndVolumeRequired: '파일과 볼륨이 필요합니다.'
+      },
+
+      // Workspace Messages
+      workspace: {
+        nameExists: '워크스페이스 이름이 이미 존재합니다.',
+        defaultCannotDelete: '기본 워크스페이스는 삭제할 수 없습니다.'
+      },
+
+      // RunPod Integration Messages
+      runpod: {
+        authFailed: 'RunPod 인증 실패(401). Settings의 API Key/Endpoint ID를 다시 저장해주세요.',
+        s3UploadFailed: 'S3 업로드에 실패했습니다. S3 설정을 확인하세요.',
+        s3ImageUploadFailed: 'S3 이미지 업로드 실패',
+        s3VideoUploadFailed: 'S3 비디오 업로드 실패',
+        submissionFailed: 'RunPod 제출 실패',
+        wanAnimateFailed: 'WAN Animate 생성 실패',
+        settingsNotConfigured: 'RunPod 설정이 완료되지 않았습니다.'
+      },
+
+      // Input Validation Messages
+      validation: {
+        inputTypeRequired: 'input_type은 "image" 또는 "video"여야 합니다.',
+        personCountRequired: 'person_count는 "single" 또는 "multi"여야 합니다.',
+        imageFileRequired: '이미지 파일이 필요합니다.',
+        videoFileRequired: '비디오 파일이 필요합니다.',
+        audioAndPromptRequired: '오디오 파일과 프롬프트가 필요합니다.',
+        secondAudioRequired: '다중 인물 모드에서는 두 번째 오디오 파일이 필요합니다.',
+        unknownError: '알 수 없는 오류가 발생했습니다.'
+      },
+
+      // Settings Test Messages
+      settingsTest: {
+        endpointSuccess: '{endpointType} endpoint 연결 성공!',
+        endpointFailed: '{endpointType} endpoint 연결 실패',
+        endpointError: '{endpointType} endpoint 연결 오류',
+        s3Success: 'S3 연결 성공!',
+        s3Failed: 'S3 연결 실패'
+      }
     }
   },
 
@@ -761,6 +837,11 @@ export const translations = {
       title: 'WAN 2.2',
       prompt: 'Prompt *',
       imageFile: 'Image File *',
+      endFrame: 'End Frame File',
+      endFrameOptional: '(Optional)',
+      endFrameDesc: 'Select or drag end frame files',
+      selectEndFrame: 'Select File',
+      removeEndFrame: 'Remove End Frame',
       length: 'Length (16fps)',
       contextOverlap: 'Context Overlap',
       contextOverlapDesc: 'Overlap length when generating long videos',
@@ -1163,17 +1244,18 @@ export const translations = {
       webAccessIssue: '💡 File exists but there may be a web access path issue',
       s3Path: 'S3 Path',
       fallbackPath: 'Fallback Path',
-      localWebPath: '로컬 웹 경로',
-      base64ImageData: 'Base64 이미지 데이터',
-      format: '형식',
-      size: '크기',
-      available: '사용 가능',
-      inputFiles: '입력 파일',
-      inputImage: '입력 이미지',
-      inputVideo: '입력 비디오',
-      inputFileNotFound: '입력 파일 정보를 찾을 수 없습니다.',
-      wanAnimateOptionsParseError: 'WAN Animate 옵션을 파싱할 수 없습니다.',
-      infiniteTalkOptionsParseError: 'Infinite Talk 옵션을 파싱할 수 없습니다.'
+      localWebPath: 'Local Web Path',
+      base64ImageData: 'Base64 Image Data',
+      format: 'Format',
+      size: 'Size',
+      available: 'Available',
+      inputFiles: 'Input Files',
+      inputImage: 'Input Image',
+      inputVideo: 'Input Video',
+      inputFileNotFound: 'Input file information not found.',
+      wanAnimateOptionsParseError: 'Could not parse WAN Animate options.',
+      infiniteTalkOptionsParseError: 'Could not parse Infinite Talk options.',
+      infiniteTalkInputImageNotFound: 'Infinite Talk input image information not found.'
     },
 
     // General Messages
@@ -1184,6 +1266,76 @@ export const translations = {
       autoUpdate: '• Status automatically updates when job completes',
       generationRequestAccepted: 'Image generation request successfully submitted! Job ID: {jobId}. Check progress in Library.',
       error: 'Error: {error}'
+    },
+
+    // API Messages
+    api: {
+      // Job Processing Messages
+      jobStarted: {
+        wan22: 'WAN 2.2 job is being processed in the background. Check progress in Library.',
+        wanAnimate: 'WAN Animate job is being processed in the background. Check progress in Library.',
+        videoUpscale: 'Video upscale job is being processed in the background. Check progress in Library.',
+        infiniteTalk: 'Infinite Talk job is being processed in the background. Check progress in Library.',
+        fluxKrea: 'Flux Krea job is being processed in the background. Check progress in Library.'
+      },
+
+      // S3 Storage Messages
+      s3: {
+        fileUploaded: 'File uploaded successfully.',
+        folderCreated: 'Folder created successfully.',
+        fileDeleted: 'File deleted successfully.',
+        uploadFailed: 'File upload failed.',
+        downloadFailed: 'File download failed.',
+        deleteFailed: 'File deletion failed.',
+        createFolderFailed: 'Folder creation failed.',
+        fileListFailed: 'Failed to get file list.',
+        volumeListFailed: 'Failed to get network volume list.',
+        serverUnstable: 'RunPod S3 server is temporarily unstable. Please try again later.',
+        folderConflict: 'Folder creation failed: \'{key}\' already exists as a file. Please delete the existing file or use a different folder name.',
+        volumeNotSpecified: 'Volume not specified.',
+        settingsNotConfigured: 'S3 settings not configured.',
+        volumeAndKeyRequired: 'Volume and file key are required.',
+        volumeAndFolderKeyRequired: 'Volume and folder key are required.',
+        loraVolumeNotSpecified: 'Volume not specified. Please select a volume in S3 Storage page.',
+        fileAndVolumeRequired: 'File and volume are required.'
+      },
+
+      // Workspace Messages
+      workspace: {
+        nameExists: 'Workspace name already exists.',
+        defaultCannotDelete: 'Default workspace cannot be deleted.'
+      },
+
+      // RunPod Integration Messages
+      runpod: {
+        authFailed: 'RunPod authentication failed (401). Please resave your API Key/Endpoint ID in Settings.',
+        s3UploadFailed: 'S3 upload failed. Please check your S3 settings.',
+        s3ImageUploadFailed: 'S3 image upload failed',
+        s3VideoUploadFailed: 'S3 video upload failed',
+        submissionFailed: 'RunPod submission failed',
+        wanAnimateFailed: 'WAN Animate generation failed',
+        settingsNotConfigured: 'RunPod settings not configured.'
+      },
+
+      // Input Validation Messages
+      validation: {
+        inputTypeRequired: 'input_type must be "image" or "video".',
+        personCountRequired: 'person_count must be "single" or "multi".',
+        imageFileRequired: 'Image file is required.',
+        videoFileRequired: 'Video file is required.',
+        audioAndPromptRequired: 'Audio file and prompt are required.',
+        secondAudioRequired: 'Second audio file is required in multi-person mode.',
+        unknownError: 'An unknown error occurred.'
+      },
+
+      // Settings Test Messages
+      settingsTest: {
+        endpointSuccess: '{endpointType} endpoint connection successful!',
+        endpointFailed: '{endpointType} endpoint connection failed',
+        endpointError: '{endpointType} endpoint connection error',
+        s3Success: 'S3 connection successful!',
+        s3Failed: 'S3 connection failed'
+      }
     }
   }
 } as const;

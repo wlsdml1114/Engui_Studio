@@ -17,7 +17,21 @@ interface I18nProviderProps {
 }
 
 export function I18nProvider({ children, defaultLanguage = 'ko' }: I18nProviderProps) {
-  const [language, setLanguageState] = useState<Language>(defaultLanguage);
+  // Detect browser language on initial load
+  const getBrowserLanguage = (): Language => {
+    if (typeof window !== 'undefined') {
+      const browserLang = navigator.language.toLowerCase();
+      if (browserLang.startsWith('en')) {
+        return 'en';
+      }
+      if (browserLang.startsWith('ko')) {
+        return 'ko';
+      }
+    }
+    return defaultLanguage;
+  };
+
+  const [language, setLanguageState] = useState<Language>(getBrowserLanguage);
 
   // Load language preference from localStorage on mount
   useEffect(() => {

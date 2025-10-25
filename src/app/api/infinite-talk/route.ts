@@ -5,17 +5,18 @@ import { join, basename } from 'path';
 import S3Service from '@/lib/s3Service';
 import runpodService from '@/lib/runpodService';
 import SettingsService from '@/lib/settingsService';
+import { getApiMessage } from '@/lib/apiMessages';
 
 const prisma = new PrismaClient();
 const settingsService = new SettingsService();
 const LOCAL_STORAGE_DIR = join(process.cwd(), 'public', 'results');
 
 // S3에 파일 업로드 (기존 S3Service 사용)
-async function uploadToS3(file: File, fileName: string): Promise<string> {
+async function uploadToS3(file: File, fileName: string, language: 'ko' | 'en' = 'ko'): Promise<string> {
   const { settings } = await settingsService.getSettings('user-with-settings');
-  
+
   if (!settings.s3?.endpointUrl || !settings.s3?.accessKeyId || !settings.s3?.secretAccessKey) {
-    throw new Error('S3 설정이 완료되지 않았습니다.');
+    throw new Error(getApiMessage('S3', 'SETTINGS_NOT_CONFIGURED', language));
   }
 
   const s3Service = new S3Service({
@@ -34,7 +35,7 @@ async function uploadToS3(file: File, fileName: string): Promise<string> {
 }
 
 // 백그라운드에서 Infinite Talk 작업 처리
-async function processInfiniteTalkJob(jobId: string, runpodJobId: string) {
+async function processInfiniteTalkJob(jobId: string, runpodJobId: string, language: 'ko' | 'en' = 'ko') {
   console.log(`🔄 Processing Infinite Talk job: ${jobId} (RunPod: ${runpodJobId})`);
   const startTime = Date.now();
 
@@ -43,7 +44,7 @@ async function processInfiniteTalkJob(jobId: string, runpodJobId: string) {
     const { settings } = await settingsService.getSettings('user-with-settings');
     
     if (!settings.runpod?.apiKey || !settings.runpod?.endpoints?.['infinite-talk']) {
-      throw new Error('RunPod 설정이 완료되지 않았습니다.');
+      throw new Error(getApiMessage('RUNPOD', 'SETTINGS_NOT_CONFIGURED', language));
     }
     
     const runpod = new runpodService(
@@ -92,7 +93,7 @@ async function processInfiniteTalkJob(jobId: string, runpodJobId: string) {
 
           const { settings } = await settingsService.getSettings('user-with-settings');
           if (!settings.s3?.endpointUrl || !settings.s3?.accessKeyId || !settings.s3?.secretAccessKey) {
-            throw new Error('S3 설정이 완료되지 않았습니다.');
+            throw new Error(getApiMessage('S3', 'SETTINGS_NOT_CONFIGURED', language));
           }
 
           const s3Service = new S3Service({
@@ -205,18 +206,19 @@ export async function POST(request: NextRequest) {
     const prompt = formData.get('prompt') as string;
     const width = parseInt(formData.get('width') as string) || 640;
     const height = parseInt(formData.get('height') as string) || 640;
+    const language = formData.get('language') as 'ko' | 'en' || 'ko';
 
     // 입력 타입과 인물 수 검증
     if (!['image', 'video'].includes(inputType)) {
       return NextResponse.json(
-        { success: false, error: 'input_type은 "image" 또는 "video"여야 합니다.' },
+        { success: false, error: getApiMessage('VALIDATION', 'INPUT_TYPE_REQUIRED', language) },
         { status: 400 }
       );
     }
 
     if (!['single', 'multi'].includes(personCount)) {
       return NextResponse.json(
-        { success: false, error: 'person_count는 "single" 또는 "multi"여야 합니다.' },
+        { success: false, error: getApiMessage('VALIDATION', 'PERSON_COUNT_REQUIRED', language) },
         { status: 400 }
       );
     }
@@ -224,21 +226,21 @@ export async function POST(request: NextRequest) {
     // 필수 파일 검증
     if (inputType === 'image' && !imageFile) {
       return NextResponse.json(
-        { success: false, error: '이미지 파일이 필요합니다.' },
+        { success: false, error: getApiMessage('VALIDATION', 'IMAGE_FILE_REQUIRED', language) },
         { status: 400 }
       );
     }
 
     if (inputType === 'video' && !videoFile) {
       return NextResponse.json(
-        { success: false, error: '비디오 파일이 필요합니다.' },
+        { success: false, error: getApiMessage('VALIDATION', 'VIDEO_FILE_REQUIRED', language) },
         { status: 400 }
       );
     }
 
     if (!audioFile || !prompt) {
       return NextResponse.json(
-        { success: false, error: '오디오 파일과 프롬프트가 필요합니다.' },
+        { success: false, error: getApiMessage('VALIDATION', 'AUDIO_AND_PROMPT_REQUIRED', language) },
         { status: 400 }
       );
     }
@@ -246,7 +248,7 @@ export async function POST(request: NextRequest) {
     // 다중 인물인 경우 두 번째 오디오 파일 검증
     if (personCount === 'multi' && !audioFile2) {
       return NextResponse.json(
-        { success: false, error: '다중 인물 모드에서는 두 번째 오디오 파일이 필요합니다.' },
+        { success: false, error: getApiMessage('VALIDATION', 'SECOND_AUDIO_REQUIRED', language) },
         { status: 400 }
       );
     }
@@ -352,11 +354,11 @@ export async function POST(request: NextRequest) {
     // 미디어 파일 업로드 (이미지 또는 비디오)
     if (inputType === 'image' && imageFile) {
       const imageFileName = `input/infinitetalk/input_${job.id}_${imageFile.name}`;
-      mediaS3Path = await uploadToS3(imageFile, imageFileName);
+      mediaS3Path = await uploadToS3(imageFile, imageFileName, language);
       console.log('✅ Image uploaded to S3:', mediaS3Path);
     } else if (inputType === 'video' && videoFile) {
       const videoFileName = `input/infinitetalk/input_${job.id}_${videoFile.name}`;
-      mediaS3Path = await uploadToS3(videoFile, videoFileName);
+      mediaS3Path = await uploadToS3(videoFile, videoFileName, language);
       console.log('✅ Video uploaded to S3:', mediaS3Path);
     }
     
@@ -410,7 +412,7 @@ export async function POST(request: NextRequest) {
       // 폴백: 원본 업로드 시도
       if (!audioS3Path) {
         const audioFileName = `input/infinitetalk/audio_${job.id}_${audioFile.name}`;
-        audioS3Path = await uploadToS3(audioFile, audioFileName);
+        audioS3Path = await uploadToS3(audioFile, audioFileName, language);
         console.log('✅ Audio uploaded to S3 (fallback original):', audioS3Path);
       }
     }
@@ -458,14 +460,14 @@ export async function POST(request: NextRequest) {
           }
         } else {
           const audioFileName2 = `input/infinitetalk/audio2_${job.id}_${audioFile2.name}`;
-          audioS3Path2 = await uploadToS3(audioFile2, audioFileName2);
+          audioS3Path2 = await uploadToS3(audioFile2, audioFileName2, language);
           console.log('✅ Audio 2 uploaded to S3:', audioS3Path2);
         }
       } catch (e) {
         console.error('❌ Audio2 upload/trim failed:', e);
         if (!audioS3Path2) {
           const audioFileName2 = `input/infinitetalk/audio2_${job.id}_${audioFile2.name}`;
-          audioS3Path2 = await uploadToS3(audioFile2, audioFileName2);
+          audioS3Path2 = await uploadToS3(audioFile2, audioFileName2, language);
           console.log('✅ Audio 2 uploaded to S3 (fallback original):', audioS3Path2);
         }
       }
@@ -648,20 +650,20 @@ export async function POST(request: NextRequest) {
     console.log(`📸 Thumbnail generation ${thumbnailSetSuccess ? 'completed' : 'skipped'}: ${job.id}`);
 
     // 백그라운드에서 작업 처리 시작
-    processInfiniteTalkJob(job.id, runpodJobId).catch(error => {
+    processInfiniteTalkJob(job.id, runpodJobId, language).catch(error => {
       console.error('❌ Background processing failed:', error);
     });
 
     return NextResponse.json({
       success: true,
       jobId: job.id,
-      message: 'Infinite Talk 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.',
+      message: getApiMessage('JOB_STARTED', 'infiniteTalk', language),
     });
 
   } catch (error) {
     console.error('❌ Infinite Talk API error:', error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.' },
+      { success: false, error: error instanceof Error ? error.message : getApiMessage('VALIDATION', 'UNKNOWN_ERROR', language) },
       { status: 500 }
     );
   }

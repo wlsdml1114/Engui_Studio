@@ -3,8 +3,10 @@ import { PrismaClient } from '@prisma/client';
 import RunPodService from '@/lib/runpodService';
 import SettingsService from '@/lib/settingsService';
 import S3Service from '@/lib/s3Service';
+import { processFileUpload } from '@/lib/serverFileUtils';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { getApiMessage } from '@/lib/apiMessages';
 
 const prisma = new PrismaClient();
 const settingsService = new SettingsService();
@@ -20,11 +22,11 @@ try {
 }
 
 // S3에 파일 업로드 (Infinite Talk 방식과 동일)
-async function uploadToS3(file: File, fileName: string): Promise<string> {
+async function uploadToS3(file: File, fileName: string, language: 'ko' | 'en' = 'ko'): Promise<string> {
     const { settings } = await settingsService.getSettings('user-with-settings');
     
     if (!settings.s3?.endpointUrl || !settings.s3?.accessKeyId || !settings.s3?.secretAccessKey) {
-        throw new Error('S3 설정이 완료되지 않았습니다.');
+        throw new Error(getApiMessage('S3', 'SETTINGS_NOT_CONFIGURED', language));
     }
 
     const s3Service = new S3Service({
@@ -50,6 +52,7 @@ export async function POST(request: NextRequest) {
 
         // Extract form data
         const userId = formData.get('userId') as string;
+        const language = formData.get('language') as 'ko' | 'en' || 'ko';
         const prompt = formData.get('prompt') as string;
         const width = parseInt(formData.get('width') as string);
         const height = parseInt(formData.get('height') as string);
@@ -62,17 +65,17 @@ export async function POST(request: NextRequest) {
         // LoRA pair 파라미터 추가 (최대 4개)
         const loraCount = Math.min(parseInt(formData.get('loraCount') as string) || 0, 4);
         console.log(`🔍 Received loraCount: ${loraCount} (max 4)`);
-        
+
         const loraPairs: Array<{high: string, low: string, high_weight: number, low_weight: number}> = [];
-        
+
         for (let i = 0; i < loraCount; i++) {
             const loraHigh = formData.get(`loraHigh_${i}`) as string;
             const loraLow = formData.get(`loraLow_${i}`) as string;
             const loraHighWeight = parseFloat(formData.get(`loraHighWeight_${i}`) as string) || 1.0;
             const loraLowWeight = parseFloat(formData.get(`loraLowWeight_${i}`) as string) || 1.0;
-            
+
             console.log(`🔍 LoRA ${i}: high="${loraHigh}", low="${loraLow}", high_weight=${loraHighWeight}, low_weight=${loraLowWeight}`);
-            
+
             if (loraHigh && loraLow) {
                 loraPairs.push({
                     high: loraHigh, // 파일명만 사용
@@ -85,10 +88,21 @@ export async function POST(request: NextRequest) {
                 console.log(`❌ LoRA pair ${i} skipped: missing high or low file`);
             }
         }
-        
+
         console.log(`📊 Final loraPairs array:`, loraPairs);
         
         const imageFile = formData.get('image') as File;
+        const endImageFile = formData.get('endImage') as File | null;
+
+        // Debug: End frame file reception
+        console.log('🔍 End frame file debug:');
+        console.log('  - endImageFile exists:', !!endImageFile);
+        console.log('  - endImageFile type:', typeof endImageFile);
+        if (endImageFile) {
+            console.log('  - endImageFile name:', endImageFile.name);
+            console.log('  - endImageFile size:', endImageFile.size);
+            console.log('  - endImageFile type:', endImageFile.type);
+        }
 
         // Validate required data
         if (!imageFile || !prompt) {
@@ -136,7 +150,7 @@ export async function POST(request: NextRequest) {
             console.log('🩺 RunPod health preflight:', healthResp.status);
             if (healthResp.status === 401) {
                 return NextResponse.json({
-                    error: 'RunPod 인증 실패(401). Settings의 API Key/Endpoint ID를 다시 저장해주세요.',
+                    error: getApiMessage('RUNPOD', 'AUTH_FAILED', language),
                     details: 'Preflight /health returned 401 with current credentials.'
                 }, { status: 400 });
             }
@@ -221,15 +235,15 @@ export async function POST(request: NextRequest) {
         // 이미지를 S3에 업로드
         const imageFileName = `input_${job.id}_${imageFile.name}`;
         let s3ImagePath: string;
-        
+
         try {
             console.log('📤 Uploading image to S3...');
-            s3ImagePath = await uploadToS3(imageFile, imageFileName);
+            s3ImagePath = await uploadToS3(imageFile, imageFileName, language);
             console.log('✅ Image uploaded to S3:', s3ImagePath);
         } catch (s3Error) {
             console.error('❌ Failed to upload image to S3:', s3Error);
             return NextResponse.json({
-                error: 'S3 업로드에 실패했습니다. S3 설정을 확인하세요.',
+                error: getApiMessage('RUNPOD', 'S3_UPLOAD_FAILED', language),
                 requiresSetup: true,
             }, { status: 400 });
         }
@@ -237,7 +251,7 @@ export async function POST(request: NextRequest) {
         // 로컬에도 백업 저장 (웹 접근용)
         const imageBuffer = Buffer.from(await imageFile.arrayBuffer());
         const localImagePath = join(LOCAL_STORAGE_DIR, imageFileName);
-        
+
         try {
             writeFileSync(localImagePath, imageBuffer);
             console.log('✅ Image saved locally (backup):', localImagePath);
@@ -246,8 +260,43 @@ export async function POST(request: NextRequest) {
             // 로컬 저장 실패해도 계속 진행
         }
 
+        // End frame 처리 (있는 경우) - 헬퍼 함수 사용
+        let endImagePath: string | undefined;
+        let endImageWebPath: string | undefined;
+
+        if (endImageFile) {
+            console.log('🎯 End frame provided, processing...');
+            const endImageFileName = `end_${job.id}_${endImageFile.name}`;
+
+            try {
+                const uploadResult = await processFileUpload(
+                    endImageFile,
+                    endImageFileName,
+                    uploadToS3,
+                    LOCAL_STORAGE_DIR
+                );
+
+                endImagePath = uploadResult.s3Path;
+                endImageWebPath = uploadResult.webPath;
+                console.log('✅ End frame upload completed:', { s3Path: endImagePath, webPath: endImageWebPath });
+            } catch (s3Error) {
+                console.error('❌ Failed to upload end frame to S3:', s3Error);
+                console.error('❌ S3 Error details:', {
+                    message: s3Error instanceof Error ? s3Error.message : String(s3Error),
+                    stack: s3Error instanceof Error ? s3Error.stack : undefined,
+                    fileName: endImageFileName
+                });
+                // End frame 업로드 실패해도 계속 진행 (optional이므로)
+                console.log('⚠️ Continuing without end frame due to upload failure');
+                endImagePath = undefined;
+                endImageWebPath = undefined;
+            }
+        } else {
+            console.log('ℹ️ No end frame provided');
+        }
+
         // Prepare RunPod input with S3 image path
-        const runpodInput = {
+        const runpodInput: any = {
             prompt: prompt,
             image_path: s3ImagePath, // S3 경로 사용
             width: width,
@@ -261,6 +310,18 @@ export async function POST(request: NextRequest) {
             lora_pairs: loraPairs
         };
 
+        // End frame이 있는 경우 runpodInput에 추가
+        console.log('🔍 Checking endImagePath before adding to payload:', endImagePath);
+        if (endImagePath) {
+            runpodInput.end_image_path = endImagePath;
+            console.log('🎯 End frame added to RunPod input:', endImagePath);
+        } else {
+            console.log('❌ No endImagePath to add to payload. Possible reasons:');
+            console.log('  - No end frame file provided');
+            console.log('  - End frame S3 upload failed');
+            console.log('  - endImagePath variable was undefined/null');
+        }
+
         console.log('🔧 Final RunPod input structure:');
         console.log('  - prompt:', runpodInput.prompt);
         console.log('  - image_path:', runpodInput.image_path);
@@ -272,6 +333,9 @@ export async function POST(request: NextRequest) {
         console.log('  - steps:', runpodInput.steps);
         console.log('  - context_overlap:', runpodInput.context_overlap);
         console.log('  - lora_pairs:', runpodInput.lora_pairs);
+        if (runpodInput.end_image_path) {
+            console.log('  - end_image_path:', runpodInput.end_image_path);
+        }
         console.log('📁 S3 이미지 경로 전달 완료: serverless에서 S3 경로 사용');
 
         // RunPod 입력 로그 출력
@@ -332,6 +396,11 @@ export async function POST(request: NextRequest) {
                     localImagePath,
                     // 로컬 이미지 웹 경로 (이미지 표시용)
                     imageWebPath: `/results/${imageFileName}`,
+                    // End frame 정보 (있는 경우)
+                    ...(endImagePath && {
+                        endImagePath,
+                        endImageWebPath
+                    }),
                 }),
             },
         });
@@ -349,7 +418,7 @@ export async function POST(request: NextRequest) {
             jobId: job.id,
             runpodJobId,
             status: 'processing',
-            message: 'WAN 2.2 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.'
+            message: getApiMessage('JOB_STARTED', 'wan22', language)
         });
 
     } catch (error) {

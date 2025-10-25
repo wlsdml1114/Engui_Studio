@@ -3,6 +3,7 @@ import { ffmpegService } from '@/lib/ffmpegService';
 import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { getApiMessage } from '@/lib/apiMessages';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest) {
 
     if (!file) {
       return NextResponse.json(
-        { error: 'No video file provided' },
+        { error: getApiMessage('FILE', 'NO_FILES_PROVIDED') },
         { status: 400 }
       );
     }
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
     const isFFmpegAvailable = await ffmpegService.isFFmpegAvailable();
     if (!isFFmpegAvailable) {
       return NextResponse.json(
-        { error: 'FFmpeg is not available. Please install FFmpeg first.' },
+        { error: getApiMessage('FILE', 'FAILED_TO_GENERATE_THUMBNAIL') },
         { status: 500 }
       );
     }
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
       const isValidVideo = await ffmpegService.validateVideo(tempVideoPath);
       if (!isValidVideo) {
         return NextResponse.json(
-          { error: 'Invalid video file' },
+          { error: getApiMessage('FILE', 'INVALID_VIDEO_FILE') },
           { status: 400 }
         );
       }
@@ -97,7 +98,7 @@ export async function POST(request: NextRequest) {
 
       console.error('Thumbnail generation error:', error);
       return NextResponse.json(
-        { error: 'Failed to generate thumbnail' },
+        { error: getApiMessage('FILE', 'FAILED_TO_GENERATE_THUMBNAIL') },
         { status: 500 }
       );
     }
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Thumbnail API error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: getApiMessage('FILE', 'INTERNAL_SERVER_ERROR') },
       { status: 500 }
     );
   }
@@ -130,7 +131,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Thumbnail status error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: getApiMessage('FILE', 'INTERNAL_SERVER_ERROR') },
       { status: 500 }
     );
   }

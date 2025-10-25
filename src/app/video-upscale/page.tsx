@@ -5,14 +5,17 @@ import { VideoCameraIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
 import { useI18n } from '@/lib/i18n/context';
 
 export default function VideoUpscalePage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
   const [taskType, setTaskType] = useState<'upscale' | 'upscale_and_interpolation'>('upscale');
   const [isProcessing, setIsProcessing] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [currentJobId, setCurrentJobId] = useState<string>('');
-  
+
+  // 메시지 타입을 저장하여 언어 변경 시 재번역 가능하게 함
+  const [messageType, setMessageType] = useState<'inputsLoaded' | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -53,8 +56,9 @@ export default function VideoUpscalePage() {
           }
           
           // 성공 메시지 표시
-          setMessage({ type: 'success', text: t('common.inputsLoaded') });
-          
+          setMessage({ type: 'success', text: t('messages.inputsLoaded') });
+          setMessageType('inputsLoaded');
+
           // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
           localStorage.removeItem('reuseInputs');
         }
@@ -62,7 +66,14 @@ export default function VideoUpscalePage() {
         console.error('입력값 로드 중 오류:', error);
       }
     }
-  }, []);
+  }, [language]);
+
+  // 언어 변경 시 메시지 재번역
+  useEffect(() => {
+    if (messageType === 'inputsLoaded') {
+      setMessage({ type: 'success', text: t('messages.inputsLoaded') });
+    }
+  }, [language, messageType]);
 
   const handleVideoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -142,6 +153,7 @@ export default function VideoUpscalePage() {
             type: 'success',
             text: t('videoUpscale.dragAndDrop.reusedAsVideo', { jobType: dragData.jobType })
           });
+          setMessageType(null);
         } catch (error) {
           console.error('❌ 드롭된 비디오 File 객체 생성 실패:', error);
           console.error('❌ 실패한 URL:', videoUrl);
@@ -149,12 +161,14 @@ export default function VideoUpscalePage() {
             type: 'error',
             text: t('videoUpscale.dropVideoError', { url: videoUrl })
           });
+          setMessageType(null);
         }
       } else {
         setMessage({
           type: 'error',
           text: t('videoUpscale.noVideoData')
         });
+        setMessageType(null);
         return;
       }
 
@@ -164,23 +178,27 @@ export default function VideoUpscalePage() {
         type: 'error',
         text: t('videoUpscale.dropError')
       });
+      setMessageType(null);
     }
   };
 
   const handleUpscale = async () => {
     if (!videoFile) {
       setMessage({ type: 'error', text: t('videoUpscale.videoRequired') });
+      setMessageType(null);
       return;
     }
 
     setIsProcessing(true);
     setMessage(null);
+    setMessageType(null);
 
     try {
       const formData = new FormData();
       formData.append('userId', 'user-with-settings');
       formData.append('video', videoFile);
       formData.append('task_type', taskType);
+      formData.append('language', language);
 
       const response = await fetch('/api/video-upscale', {
         method: 'POST',
@@ -192,7 +210,8 @@ export default function VideoUpscalePage() {
       if (response.ok && data.success && data.jobId) {
         setCurrentJobId(data.jobId);
         setMessage({ type: 'success', text: data.message || t('videoUpscale.jobStarted') });
-        
+        setMessageType(null);
+
         // 백그라운드 처리이므로 즉시 완료 상태로 변경
         setIsProcessing(false);
       } else {
@@ -201,6 +220,7 @@ export default function VideoUpscalePage() {
     } catch (error: any) {
       console.error('Video upscale error:', error);
       setMessage({ type: 'error', text: error.message || t('videoUpscale.upscaleError') });
+      setMessageType(null);
       setIsProcessing(false);
     }
   };
@@ -210,9 +230,10 @@ export default function VideoUpscalePage() {
     setPreviewUrl('');
     setTaskType('upscale');
     setMessage(null);
+    setMessageType(null);
     setCurrentJobId('');
     setIsProcessing(false);
-    
+
     // 파일 입력 초기화
     if (fileInputRef.current) {
       fileInputRef.current.value = '';

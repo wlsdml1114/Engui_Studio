@@ -5,7 +5,7 @@ import { PhotoIcon, PlayIcon, Cog6ToothIcon, FilmIcon, SparklesIcon } from '@her
 import { useI18n } from '@/lib/i18n/context';
 
 export default function WanAnimatePage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [prompt, setPrompt] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -14,6 +14,9 @@ export default function WanAnimatePage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [currentJobId, setCurrentJobId] = useState<string>('');
+
+  // 메시지 타입을 저장하여 언어 변경 시 재번역 가능하게 함
+  const [messageType, setMessageType] = useState<'inputsLoaded' | null>(null);
   
   // 추가 설정값들
   const [seed, setSeed] = useState(-1);
@@ -106,7 +109,8 @@ export default function WanAnimatePage() {
           }
           
           // 성공 메시지 표시
-          setMessage({ type: 'success', text: t('settings.inputsLoaded') });
+          setMessage({ type: 'success', text: t('messages.inputsLoaded') });
+          setMessageType('inputsLoaded');
           
           // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
           localStorage.removeItem('reuseInputs');
@@ -115,7 +119,14 @@ export default function WanAnimatePage() {
         console.error('입력값 로드 중 오류:', error);
       }
     }
-  }, []);
+  }, [language]);
+
+  // 언어 변경 시 메시지 재번역
+  useEffect(() => {
+    if (messageType === 'inputsLoaded') {
+      setMessage({ type: 'success', text: t('messages.inputsLoaded') });
+    }
+  }, [language, messageType]);
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -346,18 +357,21 @@ export default function WanAnimatePage() {
               isVideo: isVideo ? t('common.video') : t('common.image')
             })
           });
+          setMessageType(null);
         } catch (error) {
           console.error('❌ 드롭된 미디어 File 객체 생성 실패:', error);
           setMessage({
             type: 'error',
             text: t('common.error.processingMedia')
           });
+          setMessageType(null);
         }
       } else {
         setMessage({
           type: 'error',
           text: t('common.error.noMediaData')
         });
+        setMessageType(null);
         return;
       }
 
@@ -373,25 +387,30 @@ export default function WanAnimatePage() {
         type: 'error',
         text: t('common.error.processingDroppedData')
       });
+      setMessageType(null);
     }
   };
 
   const generateVideo = async () => {
     if (!imageFile && !videoFile) {
       setMessage({ type: 'error', text: t('wanAnimate.inputRequired') });
+      setMessageType(null);
       return;
     }
 
     if (!prompt.trim()) {
       setMessage({ type: 'error', text: t('wanAnimate.promptRequired') });
+      setMessageType(null);
       return;
     }
 
     try {
       setIsGenerating(true);
       setMessage(null);
+      setMessageType(null);
 
       const formData = new FormData();
+      formData.append('language', language);
       formData.append('prompt', prompt);
       formData.append('seed', seed.toString());
       formData.append('cfg', cfg.toString());
@@ -449,12 +468,15 @@ export default function WanAnimatePage() {
       if (data.success) {
         setCurrentJobId(data.jobId);
         setMessage({ type: 'success', text: t('wanAnimate.generationStarted', { jobId: data.jobId }) });
+        setMessageType(null);
       } else {
         setMessage({ type: 'error', text: data.error || t('common.error.generationFailed') });
+        setMessageType(null);
       }
     } catch (error) {
       console.error('Error generating video:', error);
       setMessage({ type: 'error', text: t('common.error.generationError') });
+      setMessageType(null);
     } finally {
       setIsGenerating(false);
     }

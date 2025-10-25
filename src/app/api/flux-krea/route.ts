@@ -4,6 +4,7 @@ import RunPodService from '@/lib/runpodService';
 import SettingsService from '@/lib/settingsService';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { getApiMessage } from '@/lib/apiMessages';
 
 const prisma = new PrismaClient();
 const settingsService = new SettingsService();
@@ -26,6 +27,7 @@ export async function POST(request: NextRequest) {
 
         // Extract form data
         const userId = formData.get('userId') as string;
+        const language = formData.get('language') as 'ko' | 'en' || 'ko';
         const prompt = formData.get('prompt') as string;
         const width = parseInt(formData.get('width') as string);
         const height = parseInt(formData.get('height') as string);
@@ -67,7 +69,7 @@ export async function POST(request: NextRequest) {
         if (!settings.runpod || typeof settings.runpod === 'string' || typeof settings.runpod === 'number' || 
             !(settings.runpod as any).apiKey || !(settings.runpod as any).endpoints?.['flux-krea']) {
             return NextResponse.json({
-                error: 'RunPod configuration incomplete. Please configure your API key and Flux Krea endpoint in Settings.',
+                error: getApiMessage('RUNPOD_CONFIG', 'INCOMPLETE', language, 'Flux Krea'),
                 requiresSetup: true,
             }, { status: 400 });
         }
@@ -218,7 +220,7 @@ export async function POST(request: NextRequest) {
             jobId: job.id,
             runpodJobId,
             status: 'processing',
-            message: 'Flux Krea 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.'
+            message: getApiMessage('JOB_STARTED', 'fluxKrea', language)
         });
 
     } catch (error) {

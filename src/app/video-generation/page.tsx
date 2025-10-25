@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { PhotoIcon, SparklesIcon, Cog6ToothIcon, PlayIcon, CpuChipIcon, FilmIcon } from '@heroicons/react/24/outline';
 import { thumbnailService, ThumbnailOptions } from '@/lib/thumbnailService';
 import { useI18n } from '@/lib/i18n/context';
+import { createFileFromUrl, createFileFromReuseData } from '@/lib/fileUtils';
 
 interface LoRAFile {
   key: string;
@@ -20,10 +21,12 @@ interface LoRAPair {
 }
 
 export default function Wan22Page() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [prompt, setPrompt] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [endImageFile, setEndImageFile] = useState<File | null>(null);
+  const [endPreviewUrl, setEndPreviewUrl] = useState<string>('');
   const [width, setWidth] = useState(720);
   const [height, setHeight] = useState(480);
   const [seed, setSeed] = useState(-1);
@@ -34,13 +37,17 @@ export default function Wan22Page() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [currentJobId, setCurrentJobId] = useState<string>('');
-  
+
+  // 메시지 타입을 저장하여 언어 변경 시 재번역 가능하게 함
+  const [messageType, setMessageType] = useState<'inputsLoaded' | null>(null);
+
   // 썸네일 관련 상태
   const [thumbnailStatus, setThumbnailStatus] = useState<{ ffmpegAvailable: boolean; supportedFormats: string[] } | null>(null);
   const [isGeneratingThumbnail, setIsGeneratingThumbnail] = useState(false);
   const [thumbnailUrl, setThumbnailUrl] = useState<string>('');
   const [isDragOver, setIsDragOver] = useState(false);
-  
+  const [isEndFrameDragOver, setIsEndFrameDragOver] = useState(false);
+
   // LoRA 관련 상태
   const [loraFiles, setLoraFiles] = useState<LoRAFile[]>([]);
   const [highFiles, setHighFiles] = useState<LoRAFile[]>([]);
@@ -50,13 +57,7 @@ export default function Wan22Page() {
   const [loraLoading, setLoraLoading] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // URL에서 File 객체를 생성하는 헬퍼 함수
-  const createFileFromUrl = async (url: string, filename: string, mimeType: string): Promise<File> => {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    return new File([blob], filename, { type: mimeType });
-  };
+  const endFileInputRef = useRef<HTMLInputElement>(null);
 
   // LoRA 자동 선택 함수
   const applyLoraSettings = (loraPairs: LoRAPair[]) => {
@@ -70,83 +71,93 @@ export default function Wan22Page() {
 
   // 입력값 자동 로드 기능
   useEffect(() => {
-    console.log('🔄 Video Generation 페이지 로드됨');
-    const reuseData = localStorage.getItem('reuseInputs');
-    console.log('📋 재사용 데이터:', reuseData);
-    
-    if (reuseData) {
-      try {
-        const data = JSON.parse(reuseData);
-        console.log('📊 파싱된 데이터:', data);
-        console.log('🎯 데이터 타입:', data.type);
-        
-        if (data.type === 'wan22') {
-          console.log('✅ WAN 2.2 타입 매칭됨');
-          
-          // 프롬프트 로드
-          if (data.prompt) {
-            setPrompt(data.prompt);
-            console.log('📝 프롬프트 로드됨:', data.prompt);
-          }
-          
-          // 이미지 로드 및 File 객체 생성
-          if (data.imagePath) {
-            setPreviewUrl(data.imagePath);
-            console.log('🔄 WAN 2.2 이미지 재사용:', data.imagePath);
-            
-            // URL에서 File 객체 생성
-            createFileFromUrl(data.imagePath, 'reused_image.jpg', 'image/jpeg')
-              .then(file => {
-                setImageFile(file);
-                console.log('✅ WAN 2.2 이미지 File 객체 생성 완료:', file.name);
-              })
-              .catch(error => {
-                console.error('❌ WAN 2.2 이미지 File 객체 생성 실패:', error);
-              });
+    const loadReuseData = async () => {
+      console.log('🔄 Video Generation 페이지 로드됨');
+      const reuseData = localStorage.getItem('reuseInputs');
+      console.log('📋 재사용 데이터:', reuseData);
+
+      if (reuseData) {
+        try {
+          const data = JSON.parse(reuseData);
+          console.log('📊 파싱된 데이터:', data);
+          console.log('🎯 데이터 타입:', data.type);
+
+          if (data.type === 'wan22') {
+            console.log('✅ WAN 2.2 타입 매칭됨');
+
+            // 프롬프트 로드
+            if (data.prompt) {
+              setPrompt(data.prompt);
+              console.log('📝 프롬프트 로드됨:', data.prompt);
+            }
+
+            // 이미지 로드 및 File 객체 생성 (헬퍼 함수 사용)
+            const imageData = await createFileFromReuseData(data, 'imagePath', 'reused_image.jpg');
+            if (imageData) {
+              setPreviewUrl(imageData.previewUrl);
+              setImageFile(imageData.file);
+              console.log('✅ WAN 2.2 이미지 재사용 완료:', imageData.file.name);
+            }
+
+            // End frame 로드 및 File 객체 생성 (헬퍼 함수 사용)
+            const endImageData = await createFileFromReuseData(data, 'endImagePath', 'reused_end_image.jpg');
+            if (endImageData) {
+              setEndPreviewUrl(endImageData.previewUrl);
+              setEndImageFile(endImageData.file);
+              console.log('✅ WAN 2.2 End frame 재사용 완료:', endImageData.file.name);
+            }
+
+            // 설정값 로드
+            if (data.options) {
+              const options = data.options;
+              console.log('⚙️ 설정값 로드:', options);
+              if (options.width) setWidth(options.width);
+              if (options.height) setHeight(options.height);
+              if (options.seed !== undefined) setSeed(options.seed);
+              if (options.cfg !== undefined) setCfg(options.cfg);
+              if (options.length) setLength(options.length);
+              if (options.step) setStep(options.step);
+              if (options.contextOverlap !== undefined) setContextOverlap(options.contextOverlap);
+            }
+
+            // LoRA 설정을 나중에 적용하기 위해 저장
+            if (data.options && data.options.loraPairs) {
+              console.log('🎨 LoRA 설정 저장됨 (나중에 적용):', data.options.loraPairs);
+              pendingReuseData.current = data.options.loraPairs;
+            }
+
+            // 성공 메시지 표시
+            setMessage({ type: 'success', text: t('messages.inputsLoaded') });
+            setMessageType('inputsLoaded');
+
+            // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
+            localStorage.removeItem('reuseInputs');
+            console.log('🗑️ 재사용 데이터 제거됨');
           } else {
-            console.log('⚠️ 이미지 경로가 없음');
+            console.log('❌ 타입이 일치하지 않음. 예상: wan22, 실제:', data.type);
           }
-          
-          // 설정값 로드
-          if (data.options) {
-            const options = data.options;
-            console.log('⚙️ 설정값 로드:', options);
-            if (options.width) setWidth(options.width);
-            if (options.height) setHeight(options.height);
-            if (options.seed !== undefined) setSeed(options.seed);
-            if (options.cfg !== undefined) setCfg(options.cfg);
-            if (options.length) setLength(options.length);
-            if (options.step) setStep(options.step);
-            if (options.contextOverlap !== undefined) setContextOverlap(options.contextOverlap);
-          }
-          
-          // LoRA 설정을 나중에 적용하기 위해 저장
-          if (data.options && data.options.loraPairs) {
-            console.log('🎨 LoRA 설정 저장됨 (나중에 적용):', data.options.loraPairs);
-            pendingReuseData.current = data.options.loraPairs;
-          }
-          
-          // 성공 메시지 표시
-          setMessage({ type: 'success', text: t('messages.inputsLoaded') });
-          
-          // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
-          localStorage.removeItem('reuseInputs');
-          console.log('🗑️ 재사용 데이터 제거됨');
-        } else {
-          console.log('❌ 타입이 일치하지 않음. 예상: wan22, 실제:', data.type);
+        } catch (error) {
+          console.error('❌ 입력값 로드 중 오류:', error);
+          console.error('❌ 오류 상세:', {
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+            reuseData: reuseData
+          });
         }
-      } catch (error) {
-        console.error('❌ 입력값 로드 중 오류:', error);
-        console.error('❌ 오류 상세:', {
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-          reuseData: reuseData
-        });
+      } else {
+        console.log('ℹ️ 재사용할 데이터가 없음');
       }
-    } else {
-      console.log('ℹ️ 재사용할 데이터가 없음');
+    };
+
+    loadReuseData();
+  }, [language]);
+
+  // 언어 변경 시 메시지 재번역
+  useEffect(() => {
+    if (messageType === 'inputsLoaded') {
+      setMessage({ type: 'success', text: t('messages.inputsLoaded') });
     }
-  }, []);
+  }, [language, messageType]);
 
   // LoRA 파일 목록 가져오기
   const fetchLoraFiles = async () => {
@@ -185,15 +196,18 @@ export default function Wan22Page() {
         
         // 성공적으로 목록을 가져왔으면 메시지 초기화
         setMessage(null);
+        setMessageType(null);
       } else {
         console.error('Failed to load LoRA files:', data.error);
         if (data.message) {
           setMessage({ type: 'error', text: data.message });
+          setMessageType(null);
         }
       }
     } catch (err) {
       console.error('❌ Error fetching LoRA files:', err);
       setMessage({ type: 'error', text: t('s3Storage.errors.fileListFailed') });
+      setMessageType(null);
     } finally {
       setLoraLoading(false);
     }
@@ -214,7 +228,7 @@ export default function Wan22Page() {
   useEffect(() => {
     fetchLoraFiles();
     checkThumbnailStatus();
-  }, []);
+  }, [language]);
 
   // 썸네일 서비스 상태 확인
   const checkThumbnailStatus = async () => {
@@ -242,7 +256,7 @@ export default function Wan22Page() {
       setImageFile(file);
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
-      
+
       // 비디오 파일인 경우 썸네일 생성
       if (thumbnailService.isSupportedVideoFormat(file)) {
         generateThumbnail(file);
@@ -252,10 +266,20 @@ export default function Wan22Page() {
     }
   };
 
+  const handleEndImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setEndImageFile(file);
+      const url = URL.createObjectURL(file);
+      setEndPreviewUrl(url);
+    }
+  };
+
   // 썸네일 생성 함수
   const generateThumbnail = async (file: File) => {
     if (!thumbnailStatus?.ffmpegAvailable) {
       setMessage({ type: 'error', text: t('videoGeneration.ffmpegNotInstalled') });
+      setMessageType(null);
       return;
     }
 
@@ -274,12 +298,15 @@ export default function Wan22Page() {
       if (result.success && result.thumbnail) {
         setThumbnailUrl(result.thumbnail);
         setMessage({ type: 'success', text: t('videoGeneration.thumbnailGenerated') });
+        setMessageType(null);
       } else {
         setMessage({ type: 'error', text: result.error || t('videoGeneration.thumbnailGenerateFailed') });
+        setMessageType(null);
       }
     } catch (error) {
       console.error('Thumbnail generation error:', error);
       setMessage({ type: 'error', text: t('videoGeneration.thumbnailError') });
+      setMessageType(null);
     } finally {
       setIsGeneratingThumbnail(false);
     }
@@ -288,24 +315,28 @@ export default function Wan22Page() {
   const handleGenerate = async () => {
     if (!imageFile || !prompt.trim()) {
       setMessage({ type: 'error', text: t('videoGeneration.inputRequired') });
+      setMessageType(null);
       return;
     }
 
     // LoRA pair 설정 검증
-    const validPairs = loraPairs.filter(pair => 
+    const validPairs = loraPairs.filter(pair =>
       pair.high && pair.low && pair.high_weight > 0 && pair.low_weight > 0
     );
     if (loraCount > 0 && validPairs.length !== loraCount) {
       setMessage({ type: 'error', text: t('videoGeneration.loraPairsRequired') });
+      setMessageType(null);
       return;
     }
 
     setIsGenerating(true);
     setMessage(null);
+    setMessageType(null);
 
     try {
       const formData = new FormData();
       formData.append('userId', 'user-with-settings');
+      formData.append('language', language);
       formData.append('image', imageFile);
       formData.append('prompt', prompt);
       formData.append('width', width.toString());
@@ -315,6 +346,18 @@ export default function Wan22Page() {
       formData.append('length', length.toString());
       formData.append('step', step.toString());
       formData.append('contextOverlap', contextOverlap.toString());
+
+      // End frame이 있는 경우 추가
+      if (endImageFile) {
+        console.log('🔍 Frontend: Adding end frame to FormData:', {
+          name: endImageFile.name,
+          size: endImageFile.size,
+          type: endImageFile.type
+        });
+        formData.append('endImage', endImageFile);
+      } else {
+        console.log('ℹ️ Frontend: No end frame file to add');
+      }
       
       // LoRA pair 파라미터 추가
       console.log('🔍 Sending LoRA data:', { loraCount, validPairs });
@@ -337,10 +380,11 @@ export default function Wan22Page() {
       if (response.ok && data.success && data.jobId) {
         setCurrentJobId(data.jobId);
         setMessage({ type: 'success', text: data.message || t('videoGeneration.jobStarted') });
-        
+        setMessageType(null);
+
         // 백그라운드 처리이므로 즉시 완료 상태로 변경
         setIsGenerating(false);
-        
+
         // 작업 정보는 유지하되 생성 중 상태는 해제
         // 사용자는 다른 작업을 할 수 있음
       } else {
@@ -349,6 +393,7 @@ export default function Wan22Page() {
     } catch (error: any) {
       console.error('Video generation error:', error);
       setMessage({ type: 'error', text: error.message || t('messages.error', { error: 'Video generation error occurred' }) });
+      setMessageType(null);
       setIsGenerating(false);
     }
   };
@@ -357,19 +402,25 @@ export default function Wan22Page() {
     setPrompt('');
     setImageFile(null);
     setPreviewUrl('');
+    setEndImageFile(null);
+    setEndPreviewUrl('');
     setThumbnailUrl('');
     setMessage(null);
+    setMessageType(null);
     setCurrentJobId('');
     setIsGenerating(false);
     setIsGeneratingThumbnail(false);
-    
+
     // LoRA 상태 초기화
     setLoraCount(0);
     setLoraPairs([]);
-    
+
     // 파일 입력 초기화
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+    if (endFileInputRef.current) {
+      endFileInputRef.current.value = '';
     }
   };
 
@@ -427,7 +478,7 @@ export default function Wan22Page() {
           // 이미지 미리보기 설정
           setPreviewUrl(imageUrl);
           
-          // URL에서 File 객체 생성
+          // URL에서 File 객체 생성 (헬퍼 함수 사용)
           try {
             const file = await createFileFromUrl(imageUrl, 'dropped_image.jpg', 'image/jpeg');
             setImageFile(file);
@@ -437,12 +488,14 @@ export default function Wan22Page() {
               type: 'success',
               text: t('videoGeneration.dragAndDrop.reusedAsInput', { jobType: dragData.jobType })
             });
+            setMessageType(null);
           } catch (error) {
             console.error('❌ 드롭된 이미지 File 객체 생성 실패:', error);
             setMessage({
               type: 'error',
               text: t('infiniteTalk.dragAndDrop.processError')
             });
+            setMessageType(null);
           }
         }
       } else {
@@ -450,6 +503,7 @@ export default function Wan22Page() {
           type: 'error',
           text: t('videoGeneration.dragAndDrop.imageOnly', { jobType: dragData.jobType })
         });
+        setMessageType(null);
         return;
       }
 
@@ -465,6 +519,100 @@ export default function Wan22Page() {
         type: 'error',
         text: t('infiniteTalk.dragAndDrop.processError')
       });
+      setMessageType(null);
+    }
+  };
+
+  // End Frame 전용 드래그 앤 드롭 핸들러들
+  const handleEndFrameDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsEndFrameDragOver(true);
+  };
+
+  const handleEndFrameDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsEndFrameDragOver(false);
+  };
+
+  const handleEndFrameDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsEndFrameDragOver(false);
+
+    try {
+      // 드래그된 데이터를 찾기
+      let dragData = null;
+
+      try {
+        const jsonData = e.dataTransfer.getData('application/json');
+        dragData = jsonData ? JSON.parse(jsonData) : null;
+      } catch {
+        try {
+          const textData = e.dataTransfer.getData('text/plain');
+          dragData = textData ? JSON.parse(textData) : null;
+        } catch {
+          console.log('❌ 드래그 데이터를 파싱할 수 없음');
+          return;
+        }
+      }
+
+      if (!dragData || dragData.type !== 'library-result') {
+        console.log('❌ 라이브러리 결과 데이터가 아님');
+        return;
+      }
+
+      console.log('🎯 End Frame에 드롭된 데이터:', dragData);
+
+      // WAN 2.2는 이미지만 지원하므로 이미지 결과물만 처리
+      const isImageResult = dragData.jobType === 'flux-kontext' || dragData.jobType === 'flux-krea';
+
+      if (isImageResult && (dragData.inputImagePath || dragData.imageUrl || dragData.thumbnailUrl)) {
+        const imageUrl = dragData.inputImagePath || dragData.imageUrl || dragData.thumbnailUrl;
+
+        if (imageUrl) {
+          console.log('🖼️ End Frame 이미지 드롭 처리:', imageUrl);
+
+          // End Frame 미리보기 설정
+          setEndPreviewUrl(imageUrl);
+
+          // URL에서 File 객체 생성 (헬퍼 함수 사용)
+          try {
+            const file = await createFileFromUrl(imageUrl, 'dropped_end_image.jpg', 'image/jpeg');
+            setEndImageFile(file);
+            console.log('✅ 드롭된 End Frame File 객체 생성 완료');
+
+            setMessage({
+              type: 'success',
+              text: t('videoGeneration.dragAndDrop.reusedAsEndFrame', { jobType: dragData.jobType })
+            });
+            setMessageType(null);
+          } catch (error) {
+            console.error('❌ 드롭된 End Frame File 객체 생성 실패:', error);
+            setMessage({
+              type: 'error',
+              text: t('infiniteTalk.dragAndDrop.processError')
+            });
+            setMessageType(null);
+          }
+        }
+      } else {
+        setMessage({
+          type: 'error',
+          text: t('videoGeneration.dragAndDrop.imageOnly', { jobType: dragData.jobType })
+        });
+        setMessageType(null);
+        return;
+      }
+
+    } catch (error) {
+      console.error('❌ End Frame 드롭 처리 중 오류:', error);
+      setMessage({
+        type: 'error',
+        text: t('infiniteTalk.dragAndDrop.processError')
+      });
+      setMessageType(null);
     }
   };
 
@@ -602,6 +750,77 @@ export default function Wan22Page() {
                     </button>
                     
                     {/* FFmpeg 상태 표시 블록 제거 */}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* End Frame Upload */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                {t('videoGeneration.endFrame')} {t('videoGeneration.endFrameOptional')}
+              </label>
+              <div
+                className={`border-2 border-dashed rounded-lg p-4 text-center relative transition-all duration-200 ${
+                  isEndFrameDragOver
+                    ? 'border-primary bg-primary/10 border-solid'
+                    : 'border-border hover:border-primary'
+                }`}
+                onDragOver={handleEndFrameDragOver}
+                onDragLeave={handleEndFrameDragLeave}
+                onDrop={handleEndFrameDrop}
+              >
+                <input
+                  ref={endFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleEndImageUpload}
+                  className="hidden"
+                  disabled={isGenerating}
+                />
+                {endPreviewUrl ? (
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <img
+                        src={endPreviewUrl}
+                        alt="End Frame Preview"
+                        className="max-w-full max-h-32 mx-auto rounded-lg border border-green-500"
+                      />
+                      <div className="absolute top-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded">
+                        End Frame
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEndImageFile(null);
+                        setEndPreviewUrl('');
+                        if (endFileInputRef.current) endFileInputRef.current.value = '';
+                      }}
+                      className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors"
+                    >
+                      {t('videoGeneration.removeEndFrame')}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <PhotoIcon className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground mb-2">
+                      {isEndFrameDragOver ? t('videoGeneration.dragAndDrop.dropHere') : t('videoGeneration.endFrameDesc')}
+                    </p>
+                    {isEndFrameDragOver && (
+                      <p className="text-xs text-primary mb-2">
+                        {t('videoGeneration.dragAndDrop.dragFromLibrary')}
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => endFileInputRef.current?.click()}
+                      disabled={isGenerating}
+                      className="px-3 py-1 bg-secondary hover:bg-secondary/80 text-foreground rounded text-sm transition-colors disabled:opacity-50"
+                    >
+                      {t('videoGeneration.selectEndFrame')}
+                    </button>
                   </>
                 )}
               </div>

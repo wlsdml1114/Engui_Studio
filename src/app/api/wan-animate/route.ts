@@ -5,6 +5,7 @@ import SettingsService from '@/lib/settingsService';
 import S3Service from '@/lib/s3Service';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { getApiMessage } from '@/lib/apiMessages';
 
 const prisma = new PrismaClient();
 const settingsService = new SettingsService();
@@ -20,11 +21,11 @@ try {
 }
 
 // S3에 파일 업로드
-async function uploadToS3(file: File, fileName: string): Promise<string> {
+async function uploadToS3(file: File, fileName: string, language: 'ko' | 'en' = 'ko'): Promise<string> {
     const { settings } = await settingsService.getSettings('user-with-settings');
     
     if (!settings.s3?.endpointUrl || !settings.s3?.accessKeyId || !settings.s3?.secretAccessKey) {
-        throw new Error('S3 설정이 완료되지 않았습니다.');
+        throw new Error(getApiMessage('S3', 'SETTINGS_NOT_CONFIGURED', language));
     }
 
     const s3Service = new S3Service({
@@ -51,6 +52,7 @@ export async function POST(request: NextRequest) {
 
         // Extract form data
         const userId = formData.get('userId') as string || 'user-with-settings';
+        const language = formData.get('language') as 'ko' | 'en' || 'ko';
         const prompt = formData.get('prompt') as string;
         const imageFile = formData.get('image') as File;
         const videoFile = formData.get('video') as File;
@@ -111,7 +113,7 @@ export async function POST(request: NextRequest) {
         if (!settings.runpod || typeof settings.runpod === 'string' || typeof settings.runpod === 'number' || 
             !(settings.runpod as any).apiKey || !(settings.runpod as any).endpoints?.['wan-animate']) {
             return NextResponse.json({
-                error: 'RunPod configuration incomplete. Please configure your API key and WAN Animate endpoint in Settings.',
+                error: getApiMessage('RUNPOD_CONFIG', 'INCOMPLETE', language, 'WAN Animate'),
                 requiresSetup: true,
             }, { status: 400 });
         }
@@ -169,7 +171,7 @@ export async function POST(request: NextRequest) {
             try {
                 console.log('📤 Uploading image to S3...');
                 const imageFileName = `input_image_${job.id}_${imageFile.name}`;
-                s3ImagePath = await uploadToS3(imageFile, imageFileName);
+                s3ImagePath = await uploadToS3(imageFile, imageFileName, language);
                 console.log('✅ Image uploaded to S3:', s3ImagePath);
                 
                 // 로컬에도 백업 저장
@@ -188,7 +190,7 @@ export async function POST(request: NextRequest) {
                         completedAt: new Date(),
                         options: JSON.stringify({
                             ...JSON.parse(job.options || '{}'),
-                            error: `S3 이미지 업로드 실패: ${s3Error instanceof Error ? s3Error.message : String(s3Error)}`,
+                            error: `${getApiMessage('RUNPOD', 'S3_IMAGE_UPLOAD_FAILED', language)}: ${s3Error instanceof Error ? s3Error.message : String(s3Error)}`,
                             failedAt: new Date().toISOString(),
                             failureReason: 'S3_UPLOAD_ERROR'
                         })
@@ -208,7 +210,7 @@ export async function POST(request: NextRequest) {
             try {
                 console.log('📤 Uploading video to S3...');
                 const videoFileName = `input_video_${job.id}_${videoFile.name}`;
-                s3VideoPath = await uploadToS3(videoFile, videoFileName);
+                s3VideoPath = await uploadToS3(videoFile, videoFileName, language);
                 console.log('✅ Video uploaded to S3:', s3VideoPath);
                 
                 // 로컬에도 백업 저장
@@ -227,7 +229,7 @@ export async function POST(request: NextRequest) {
                         completedAt: new Date(),
                         options: JSON.stringify({
                             ...JSON.parse(job.options || '{}'),
-                            error: `S3 비디오 업로드 실패: ${s3Error instanceof Error ? s3Error.message : String(s3Error)}`,
+                            error: `${getApiMessage('RUNPOD', 'S3_VIDEO_UPLOAD_FAILED', language)}: ${s3Error instanceof Error ? s3Error.message : String(s3Error)}`,
                             failedAt: new Date().toISOString(),
                             failureReason: 'S3_UPLOAD_ERROR'
                         })
@@ -318,7 +320,7 @@ export async function POST(request: NextRequest) {
                     completedAt: new Date(),
                     options: JSON.stringify({
                         ...JSON.parse(job.options || '{}'),
-                        error: `RunPod 제출 실패: ${runpodError instanceof Error ? runpodError.message : String(runpodError)}`,
+                        error: `${getApiMessage('RUNPOD', 'SUBMISSION_FAILED', language)}: ${runpodError instanceof Error ? runpodError.message : String(runpodError)}`,
                         failedAt: new Date().toISOString(),
                         failureReason: 'RUNPOD_SUBMISSION_ERROR'
                     })
@@ -371,7 +373,7 @@ export async function POST(request: NextRequest) {
             jobId: job.id,
             runpodJobId,
             status: 'processing',
-            message: 'WAN Animate 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.'
+            message: getApiMessage('JOB_STARTED', 'wanAnimate', language)
         });
 
     } catch (error) {
@@ -387,7 +389,7 @@ export async function POST(request: NextRequest) {
                         completedAt: new Date(),
                         options: JSON.stringify({
                             ...JSON.parse(job.options || '{}'),
-                            error: `WAN Animate 생성 실패: ${error instanceof Error ? error.message : String(error)}`,
+                            error: `${getApiMessage('RUNPOD', 'WAN_ANIMATE_FAILED', language)}: ${error instanceof Error ? error.message : String(error)}`,
                             failedAt: new Date().toISOString(),
                             failureReason: 'GENERAL_ERROR'
                         })

@@ -39,12 +39,14 @@ interface FluxKreaInput {
 interface Wan22Input {
   prompt: string;
   image_path: string; // base64 인코딩된 이미지 데이터 (키는 image_path)
+  end_image_path?: string; // optional end frame image
   width: number;
   height: number;
   seed: number;
   cfg: number;
   length: number;
   steps: number; // step을 steps로 변경
+  context_overlap?: number; // context overlap 추가
   lora_pairs?: Array<{
     high: string;
     low: string;
@@ -120,7 +122,7 @@ class RunPodService {
   async submitJob(input: RunPodInput): Promise<string> {
     console.log('🚀 Submitting job to RunPod...');
     console.log('📋 Endpoint ID:', this.endpointId);
-    
+
     // Match the Python code structure exactly
     let payload: any;
     if ('audio_paths' in input) {
@@ -133,7 +135,7 @@ class RunPodService {
           ...(input.audio_type && { audio_type: input.audio_type }) // audio_type이 있으면 포함
         }
       };
-      
+
       console.log('🎭 MultiTalk payload created:');
       console.log('  - prompt:', payload.input.prompt);
       console.log('  - image_path:', payload.input.image_path);
@@ -151,7 +153,7 @@ class RunPodService {
           guidance: input.guidance
         }
       };
-      
+
       console.log('🎭 FluxKontext payload created:');
       console.log('  - prompt:', payload.input.prompt);
       console.log('  - image_path:', payload.input.image_path);
@@ -172,7 +174,7 @@ class RunPodService {
           ...(input.lora && { lora: input.lora })
         }
       };
-      
+
       console.log('🎭 FluxKrea payload created:');
       console.log('  - prompt:', payload.input.prompt);
       console.log('  - width:', payload.input.width);
@@ -205,7 +207,7 @@ class RunPodService {
           ...(input.video_path && { video_path: input.video_path })
         }
       };
-      
+
       console.log('🎭 WanAnimate payload created:');
       console.log('  - prompt:', payload.input.prompt);
       console.log('  - positive_prompt:', payload.input.positive_prompt);
@@ -232,19 +234,23 @@ class RunPodService {
           cfg: input.cfg,
           length: input.length,
           steps: input.steps, // steps로 변경
+          context_overlap: input.context_overlap, // context overlap 추가
+          ...(input.end_image_path && { end_image_path: input.end_image_path }), // end_image_path 추가
           ...(input.lora_pairs && { lora_pairs: input.lora_pairs }) // LoRA pairs 추가
         }
       };
-      
+
       console.log('🎭 Wan22 payload created:');
       console.log('  - prompt:', payload.input.prompt);
       console.log('  - image_path:', `[base64 data] (${payload.input.image_path.length} characters)`);
+      console.log('  - end_image_path:', payload.input.end_image_path || 'not set');
       console.log('  - width:', payload.input.width);
       console.log('  - height:', payload.input.height);
       console.log('  - seed:', payload.input.seed);
       console.log('  - cfg:', payload.input.cfg);
       console.log('  - length:', payload.input.length);
       console.log('  - steps:', payload.input.steps);
+      console.log('  - context_overlap:', payload.input.context_overlap || 'not set');
       if (payload.input.lora_pairs) {
         console.log('  - lora_pairs:', payload.input.lora_pairs);
       }
@@ -264,7 +270,7 @@ class RunPodService {
           ...(input.network_volume && { network_volume: true })
         }
       };
-      
+
       console.log('🎭 InfiniteTalk payload created:');
       console.log('  - prompt:', payload.input.prompt);
       console.log('  - input_type:', payload.input.input_type);
@@ -284,7 +290,7 @@ class RunPodService {
           network_volume: true
         }
       };
-      
+
       console.log('🎬 Video Upscale payload created:');
       console.log('  - video_path:', payload.input.video_path);
       console.log('  - task_type:', payload.input.task_type);
@@ -308,11 +314,11 @@ class RunPodService {
 
       const data = JSON.parse(responseText);
       console.log('✅ Job submitted successfully, ID:', data.id);
-      
+
       if (!data.id) {
         throw new Error('RunPod API did not return a job ID');
       }
-      
+
       return data.id;
     } catch (error) {
       console.error('❌ RunPod API call failed:', error);
@@ -399,17 +405,17 @@ class RunPodService {
 
     while (Date.now() - startTime < timeout) {
       const status = await this.getJobStatus(jobId);
-      
+
       if (status.status === 'COMPLETED') {
         console.log('✅ Job completed successfully!');
         return status;
       }
-      
+
       if (status.status === 'FAILED') {
         console.log('❌ Job failed:', status.error);
         throw new Error(`Job failed: ${status.error}`);
       }
-      
+
       if (status.status === 'IN_QUEUE' || status.status === 'IN_PROGRESS') {
         // 진행 상황은 30초마다만 로그 출력
         const elapsed = Math.floor((Date.now() - startTime) / 1000);
@@ -419,10 +425,10 @@ class RunPodService {
         await new Promise(resolve => setTimeout(resolve, pollInterval));
         continue;
       }
-      
+
       throw new Error(`Unknown job status: ${status.status}`);
     }
-    
+
     throw new Error(`Job timeout: Maximum wait time (${timeout / 1000}초) exceeded`);
   }
 }
