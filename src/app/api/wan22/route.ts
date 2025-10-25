@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import RunPodService from '@/lib/runpodService';
 import SettingsService from '@/lib/settingsService';
 import S3Service from '@/lib/s3Service';
+import { processFileUpload } from '@/lib/serverFileUtils';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
@@ -257,7 +258,7 @@ export async function POST(request: NextRequest) {
             // 로컬 저장 실패해도 계속 진행
         }
 
-        // End frame 처리 (있는 경우)
+        // End frame 처리 (있는 경우) - 헬퍼 함수 사용
         let endImagePath: string | undefined;
         let endImageWebPath: string | undefined;
 
@@ -266,22 +267,16 @@ export async function POST(request: NextRequest) {
             const endImageFileName = `end_${job.id}_${endImageFile.name}`;
 
             try {
-                // End frame을 S3에 업로드
-                console.log('📤 Uploading end frame to S3...');
-                endImagePath = await uploadToS3(endImageFile, endImageFileName);
-                console.log('✅ End frame uploaded to S3:', endImagePath);
+                const uploadResult = await processFileUpload(
+                    endImageFile,
+                    endImageFileName,
+                    uploadToS3,
+                    LOCAL_STORAGE_DIR
+                );
 
-                // 로컬에도 백업 저장
-                const endImageBuffer = Buffer.from(await endImageFile.arrayBuffer());
-                const endImageLocalPath = join(LOCAL_STORAGE_DIR, endImageFileName);
-
-                try {
-                    writeFileSync(endImageLocalPath, endImageBuffer);
-                    console.log('✅ End frame saved locally (backup):', endImageLocalPath);
-                    endImageWebPath = `/results/${endImageFileName}`;
-                } catch (saveError) {
-                    console.error('❌ Failed to save end frame locally (backup):', saveError);
-                }
+                endImagePath = uploadResult.s3Path;
+                endImageWebPath = uploadResult.webPath;
+                console.log('✅ End frame upload completed:', { s3Path: endImagePath, webPath: endImageWebPath });
             } catch (s3Error) {
                 console.error('❌ Failed to upload end frame to S3:', s3Error);
                 console.error('❌ S3 Error details:', {

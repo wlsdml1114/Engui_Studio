@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { PhotoIcon, SparklesIcon, Cog6ToothIcon, PlayIcon, CpuChipIcon, FilmIcon } from '@heroicons/react/24/outline';
 import { thumbnailService, ThumbnailOptions } from '@/lib/thumbnailService';
 import { useI18n } from '@/lib/i18n/context';
+import { createFileFromUrl, createFileFromReuseData } from '@/lib/fileUtils';
 
 interface LoRAFile {
   key: string;
@@ -54,13 +55,6 @@ export default function Wan22Page() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const endFileInputRef = useRef<HTMLInputElement>(null);
 
-  // URL에서 File 객체를 생성하는 헬퍼 함수
-  const createFileFromUrl = async (url: string, filename: string, mimeType: string): Promise<File> => {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    return new File([blob], filename, { type: mimeType });
-  };
-
   // LoRA 자동 선택 함수
   const applyLoraSettings = (loraPairs: LoRAPair[]) => {
     console.log('🎯 LoRA 설정 적용:', loraPairs);
@@ -73,100 +67,84 @@ export default function Wan22Page() {
 
   // 입력값 자동 로드 기능
   useEffect(() => {
-    console.log('🔄 Video Generation 페이지 로드됨');
-    const reuseData = localStorage.getItem('reuseInputs');
-    console.log('📋 재사용 데이터:', reuseData);
-    
-    if (reuseData) {
-      try {
-        const data = JSON.parse(reuseData);
-        console.log('📊 파싱된 데이터:', data);
-        console.log('🎯 데이터 타입:', data.type);
-        
-        if (data.type === 'wan22') {
-          console.log('✅ WAN 2.2 타입 매칭됨');
-          
-          // 프롬프트 로드
-          if (data.prompt) {
-            setPrompt(data.prompt);
-            console.log('📝 프롬프트 로드됨:', data.prompt);
-          }
-          
-          // 이미지 로드 및 File 객체 생성
-          if (data.imagePath) {
-            setPreviewUrl(data.imagePath);
-            console.log('🔄 WAN 2.2 이미지 재사용:', data.imagePath);
-            
-            // URL에서 File 객체 생성
-            createFileFromUrl(data.imagePath, 'reused_image.jpg', 'image/jpeg')
-              .then(file => {
-                setImageFile(file);
-                console.log('✅ WAN 2.2 이미지 File 객체 생성 완료:', file.name);
-              })
-              .catch(error => {
-                console.error('❌ WAN 2.2 이미지 File 객체 생성 실패:', error);
-              });
+    const loadReuseData = async () => {
+      console.log('🔄 Video Generation 페이지 로드됨');
+      const reuseData = localStorage.getItem('reuseInputs');
+      console.log('📋 재사용 데이터:', reuseData);
+
+      if (reuseData) {
+        try {
+          const data = JSON.parse(reuseData);
+          console.log('📊 파싱된 데이터:', data);
+          console.log('🎯 데이터 타입:', data.type);
+
+          if (data.type === 'wan22') {
+            console.log('✅ WAN 2.2 타입 매칭됨');
+
+            // 프롬프트 로드
+            if (data.prompt) {
+              setPrompt(data.prompt);
+              console.log('📝 프롬프트 로드됨:', data.prompt);
+            }
+
+            // 이미지 로드 및 File 객체 생성 (헬퍼 함수 사용)
+            const imageData = await createFileFromReuseData(data, 'imagePath', 'reused_image.jpg');
+            if (imageData) {
+              setPreviewUrl(imageData.previewUrl);
+              setImageFile(imageData.file);
+              console.log('✅ WAN 2.2 이미지 재사용 완료:', imageData.file.name);
+            }
+
+            // End frame 로드 및 File 객체 생성 (헬퍼 함수 사용)
+            const endImageData = await createFileFromReuseData(data, 'endImagePath', 'reused_end_image.jpg');
+            if (endImageData) {
+              setEndPreviewUrl(endImageData.previewUrl);
+              setEndImageFile(endImageData.file);
+              console.log('✅ WAN 2.2 End frame 재사용 완료:', endImageData.file.name);
+            }
+
+            // 설정값 로드
+            if (data.options) {
+              const options = data.options;
+              console.log('⚙️ 설정값 로드:', options);
+              if (options.width) setWidth(options.width);
+              if (options.height) setHeight(options.height);
+              if (options.seed !== undefined) setSeed(options.seed);
+              if (options.cfg !== undefined) setCfg(options.cfg);
+              if (options.length) setLength(options.length);
+              if (options.step) setStep(options.step);
+              if (options.contextOverlap !== undefined) setContextOverlap(options.contextOverlap);
+            }
+
+            // LoRA 설정을 나중에 적용하기 위해 저장
+            if (data.options && data.options.loraPairs) {
+              console.log('🎨 LoRA 설정 저장됨 (나중에 적용):', data.options.loraPairs);
+              pendingReuseData.current = data.options.loraPairs;
+            }
+
+            // 성공 메시지 표시
+            setMessage({ type: 'success', text: t('messages.inputsLoaded') });
+
+            // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
+            localStorage.removeItem('reuseInputs');
+            console.log('🗑️ 재사용 데이터 제거됨');
           } else {
-            console.log('⚠️ 이미지 경로가 없음');
+            console.log('❌ 타입이 일치하지 않음. 예상: wan22, 실제:', data.type);
           }
-
-          // End frame 로드 및 File 객체 생성
-          if (data.endImagePath) {
-            setEndPreviewUrl(data.endImagePath);
-            console.log('🔄 WAN 2.2 End frame 재사용:', data.endImagePath);
-
-            // URL에서 File 객체 생성
-            createFileFromUrl(data.endImagePath, 'reused_end_image.jpg', 'image/jpeg')
-              .then(file => {
-                setEndImageFile(file);
-                console.log('✅ WAN 2.2 End frame File 객체 생성 완료:', file.name);
-              })
-              .catch(error => {
-                console.error('❌ WAN 2.2 End frame File 객체 생성 실패:', error);
-              });
-          } else {
-            console.log('ℹ️ End frame 경로가 없음');
-          }
-
-          // 설정값 로드
-          if (data.options) {
-            const options = data.options;
-            console.log('⚙️ 설정값 로드:', options);
-            if (options.width) setWidth(options.width);
-            if (options.height) setHeight(options.height);
-            if (options.seed !== undefined) setSeed(options.seed);
-            if (options.cfg !== undefined) setCfg(options.cfg);
-            if (options.length) setLength(options.length);
-            if (options.step) setStep(options.step);
-            if (options.contextOverlap !== undefined) setContextOverlap(options.contextOverlap);
-          }
-          
-          // LoRA 설정을 나중에 적용하기 위해 저장
-          if (data.options && data.options.loraPairs) {
-            console.log('🎨 LoRA 설정 저장됨 (나중에 적용):', data.options.loraPairs);
-            pendingReuseData.current = data.options.loraPairs;
-          }
-          
-          // 성공 메시지 표시
-          setMessage({ type: 'success', text: t('messages.inputsLoaded') });
-          
-          // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
-          localStorage.removeItem('reuseInputs');
-          console.log('🗑️ 재사용 데이터 제거됨');
-        } else {
-          console.log('❌ 타입이 일치하지 않음. 예상: wan22, 실제:', data.type);
+        } catch (error) {
+          console.error('❌ 입력값 로드 중 오류:', error);
+          console.error('❌ 오류 상세:', {
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+            reuseData: reuseData
+          });
         }
-      } catch (error) {
-        console.error('❌ 입력값 로드 중 오류:', error);
-        console.error('❌ 오류 상세:', {
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-          reuseData: reuseData
-        });
+      } else {
+        console.log('ℹ️ 재사용할 데이터가 없음');
       }
-    } else {
-      console.log('ℹ️ 재사용할 데이터가 없음');
-    }
+    };
+
+    loadReuseData();
   }, []);
 
   // LoRA 파일 목록 가져오기
@@ -474,7 +452,7 @@ export default function Wan22Page() {
           // 이미지 미리보기 설정
           setPreviewUrl(imageUrl);
           
-          // URL에서 File 객체 생성
+          // URL에서 File 객체 생성 (헬퍼 함수 사용)
           try {
             const file = await createFileFromUrl(imageUrl, 'dropped_image.jpg', 'image/jpeg');
             setImageFile(file);

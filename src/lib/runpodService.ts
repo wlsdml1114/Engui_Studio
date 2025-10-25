@@ -46,6 +46,7 @@ interface Wan22Input {
   cfg: number;
   length: number;
   steps: number; // step을 steps로 변경
+  context_overlap?: number; // context overlap 추가
   lora_pairs?: Array<{
     high: string;
     low: string;
@@ -233,6 +234,7 @@ class RunPodService {
           cfg: input.cfg,
           length: input.length,
           steps: input.steps, // steps로 변경
+          context_overlap: input.context_overlap, // context overlap 추가
           ...(input.end_image_path && { end_image_path: input.end_image_path }), // end_image_path 추가
           ...(input.lora_pairs && { lora_pairs: input.lora_pairs }) // LoRA pairs 추가
         }
@@ -248,6 +250,7 @@ class RunPodService {
       console.log('  - cfg:', payload.input.cfg);
       console.log('  - length:', payload.input.length);
       console.log('  - steps:', payload.input.steps);
+      console.log('  - context_overlap:', payload.input.context_overlap || 'not set');
       if (payload.input.lora_pairs) {
         console.log('  - lora_pairs:', payload.input.lora_pairs);
       }
