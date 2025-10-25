@@ -1593,7 +1593,10 @@ export default function Library() {
         }),
         ...(item.type === 'wan22' && {
           imagePath: options.imageWebPath || options.inputImagePath,
-          imageName: options.inputImageName
+          imageName: options.inputImageName,
+          // End frame 정보 추가
+          endImagePath: options.endImageWebPath || options.endImagePath,
+          endImageName: options.endImageName
         }),
         ...(item.type === 'wan-animate' && {
           imagePath: options.imageWebPath || options.s3ImagePath,

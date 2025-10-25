@@ -62,17 +62,17 @@ export async function POST(request: NextRequest) {
         // LoRA pair 파라미터 추가 (최대 4개)
         const loraCount = Math.min(parseInt(formData.get('loraCount') as string) || 0, 4);
         console.log(`🔍 Received loraCount: ${loraCount} (max 4)`);
-        
+
         const loraPairs: Array<{high: string, low: string, high_weight: number, low_weight: number}> = [];
-        
+
         for (let i = 0; i < loraCount; i++) {
             const loraHigh = formData.get(`loraHigh_${i}`) as string;
             const loraLow = formData.get(`loraLow_${i}`) as string;
             const loraHighWeight = parseFloat(formData.get(`loraHighWeight_${i}`) as string) || 1.0;
             const loraLowWeight = parseFloat(formData.get(`loraLowWeight_${i}`) as string) || 1.0;
-            
+
             console.log(`🔍 LoRA ${i}: high="${loraHigh}", low="${loraLow}", high_weight=${loraHighWeight}, low_weight=${loraLowWeight}`);
-            
+
             if (loraHigh && loraLow) {
                 loraPairs.push({
                     high: loraHigh, // 파일명만 사용
@@ -85,10 +85,21 @@ export async function POST(request: NextRequest) {
                 console.log(`❌ LoRA pair ${i} skipped: missing high or low file`);
             }
         }
-        
+
         console.log(`📊 Final loraPairs array:`, loraPairs);
         
         const imageFile = formData.get('image') as File;
+        const endImageFile = formData.get('endImage') as File | null;
+
+        // Debug: End frame file reception
+        console.log('🔍 End frame file debug:');
+        console.log('  - endImageFile exists:', !!endImageFile);
+        console.log('  - endImageFile type:', typeof endImageFile);
+        if (endImageFile) {
+            console.log('  - endImageFile name:', endImageFile.name);
+            console.log('  - endImageFile size:', endImageFile.size);
+            console.log('  - endImageFile type:', endImageFile.type);
+        }
 
         // Validate required data
         if (!imageFile || !prompt) {
@@ -221,7 +232,7 @@ export async function POST(request: NextRequest) {
         // 이미지를 S3에 업로드
         const imageFileName = `input_${job.id}_${imageFile.name}`;
         let s3ImagePath: string;
-        
+
         try {
             console.log('📤 Uploading image to S3...');
             s3ImagePath = await uploadToS3(imageFile, imageFileName);
@@ -237,7 +248,7 @@ export async function POST(request: NextRequest) {
         // 로컬에도 백업 저장 (웹 접근용)
         const imageBuffer = Buffer.from(await imageFile.arrayBuffer());
         const localImagePath = join(LOCAL_STORAGE_DIR, imageFileName);
-        
+
         try {
             writeFileSync(localImagePath, imageBuffer);
             console.log('✅ Image saved locally (backup):', localImagePath);
@@ -246,8 +257,49 @@ export async function POST(request: NextRequest) {
             // 로컬 저장 실패해도 계속 진행
         }
 
+        // End frame 처리 (있는 경우)
+        let endImagePath: string | undefined;
+        let endImageWebPath: string | undefined;
+
+        if (endImageFile) {
+            console.log('🎯 End frame provided, processing...');
+            const endImageFileName = `end_${job.id}_${endImageFile.name}`;
+
+            try {
+                // End frame을 S3에 업로드
+                console.log('📤 Uploading end frame to S3...');
+                endImagePath = await uploadToS3(endImageFile, endImageFileName);
+                console.log('✅ End frame uploaded to S3:', endImagePath);
+
+                // 로컬에도 백업 저장
+                const endImageBuffer = Buffer.from(await endImageFile.arrayBuffer());
+                const endImageLocalPath = join(LOCAL_STORAGE_DIR, endImageFileName);
+
+                try {
+                    writeFileSync(endImageLocalPath, endImageBuffer);
+                    console.log('✅ End frame saved locally (backup):', endImageLocalPath);
+                    endImageWebPath = `/results/${endImageFileName}`;
+                } catch (saveError) {
+                    console.error('❌ Failed to save end frame locally (backup):', saveError);
+                }
+            } catch (s3Error) {
+                console.error('❌ Failed to upload end frame to S3:', s3Error);
+                console.error('❌ S3 Error details:', {
+                    message: s3Error instanceof Error ? s3Error.message : String(s3Error),
+                    stack: s3Error instanceof Error ? s3Error.stack : undefined,
+                    fileName: endImageFileName
+                });
+                // End frame 업로드 실패해도 계속 진행 (optional이므로)
+                console.log('⚠️ Continuing without end frame due to upload failure');
+                endImagePath = undefined;
+                endImageWebPath = undefined;
+            }
+        } else {
+            console.log('ℹ️ No end frame provided');
+        }
+
         // Prepare RunPod input with S3 image path
-        const runpodInput = {
+        const runpodInput: any = {
             prompt: prompt,
             image_path: s3ImagePath, // S3 경로 사용
             width: width,
@@ -261,6 +313,18 @@ export async function POST(request: NextRequest) {
             lora_pairs: loraPairs
         };
 
+        // End frame이 있는 경우 runpodInput에 추가
+        console.log('🔍 Checking endImagePath before adding to payload:', endImagePath);
+        if (endImagePath) {
+            runpodInput.end_image_path = endImagePath;
+            console.log('🎯 End frame added to RunPod input:', endImagePath);
+        } else {
+            console.log('❌ No endImagePath to add to payload. Possible reasons:');
+            console.log('  - No end frame file provided');
+            console.log('  - End frame S3 upload failed');
+            console.log('  - endImagePath variable was undefined/null');
+        }
+
         console.log('🔧 Final RunPod input structure:');
         console.log('  - prompt:', runpodInput.prompt);
         console.log('  - image_path:', runpodInput.image_path);
@@ -272,6 +336,9 @@ export async function POST(request: NextRequest) {
         console.log('  - steps:', runpodInput.steps);
         console.log('  - context_overlap:', runpodInput.context_overlap);
         console.log('  - lora_pairs:', runpodInput.lora_pairs);
+        if (runpodInput.end_image_path) {
+            console.log('  - end_image_path:', runpodInput.end_image_path);
+        }
         console.log('📁 S3 이미지 경로 전달 완료: serverless에서 S3 경로 사용');
 
         // RunPod 입력 로그 출력
@@ -332,6 +399,11 @@ export async function POST(request: NextRequest) {
                     localImagePath,
                     // 로컬 이미지 웹 경로 (이미지 표시용)
                     imageWebPath: `/results/${imageFileName}`,
+                    // End frame 정보 (있는 경우)
+                    ...(endImagePath && {
+                        endImagePath,
+                        endImageWebPath
+                    }),
                 }),
             },
         });

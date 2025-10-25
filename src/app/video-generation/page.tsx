@@ -24,6 +24,8 @@ export default function Wan22Page() {
   const [prompt, setPrompt] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [endImageFile, setEndImageFile] = useState<File | null>(null);
+  const [endPreviewUrl, setEndPreviewUrl] = useState<string>('');
   const [width, setWidth] = useState(720);
   const [height, setHeight] = useState(480);
   const [seed, setSeed] = useState(-1);
@@ -50,6 +52,7 @@ export default function Wan22Page() {
   const [loraLoading, setLoraLoading] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const endFileInputRef = useRef<HTMLInputElement>(null);
 
   // URL에서 File 객체를 생성하는 헬퍼 함수
   const createFileFromUrl = async (url: string, filename: string, mimeType: string): Promise<File> => {
@@ -106,7 +109,25 @@ export default function Wan22Page() {
           } else {
             console.log('⚠️ 이미지 경로가 없음');
           }
-          
+
+          // End frame 로드 및 File 객체 생성
+          if (data.endImagePath) {
+            setEndPreviewUrl(data.endImagePath);
+            console.log('🔄 WAN 2.2 End frame 재사용:', data.endImagePath);
+
+            // URL에서 File 객체 생성
+            createFileFromUrl(data.endImagePath, 'reused_end_image.jpg', 'image/jpeg')
+              .then(file => {
+                setEndImageFile(file);
+                console.log('✅ WAN 2.2 End frame File 객체 생성 완료:', file.name);
+              })
+              .catch(error => {
+                console.error('❌ WAN 2.2 End frame File 객체 생성 실패:', error);
+              });
+          } else {
+            console.log('ℹ️ End frame 경로가 없음');
+          }
+
           // 설정값 로드
           if (data.options) {
             const options = data.options;
@@ -242,13 +263,22 @@ export default function Wan22Page() {
       setImageFile(file);
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
-      
+
       // 비디오 파일인 경우 썸네일 생성
       if (thumbnailService.isSupportedVideoFormat(file)) {
         generateThumbnail(file);
       } else {
         setThumbnailUrl('');
       }
+    }
+  };
+
+  const handleEndImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setEndImageFile(file);
+      const url = URL.createObjectURL(file);
+      setEndPreviewUrl(url);
     }
   };
 
@@ -315,6 +345,18 @@ export default function Wan22Page() {
       formData.append('length', length.toString());
       formData.append('step', step.toString());
       formData.append('contextOverlap', contextOverlap.toString());
+
+      // End frame이 있는 경우 추가
+      if (endImageFile) {
+        console.log('🔍 Frontend: Adding end frame to FormData:', {
+          name: endImageFile.name,
+          size: endImageFile.size,
+          type: endImageFile.type
+        });
+        formData.append('endImage', endImageFile);
+      } else {
+        console.log('ℹ️ Frontend: No end frame file to add');
+      }
       
       // LoRA pair 파라미터 추가
       console.log('🔍 Sending LoRA data:', { loraCount, validPairs });
@@ -357,19 +399,24 @@ export default function Wan22Page() {
     setPrompt('');
     setImageFile(null);
     setPreviewUrl('');
+    setEndImageFile(null);
+    setEndPreviewUrl('');
     setThumbnailUrl('');
     setMessage(null);
     setCurrentJobId('');
     setIsGenerating(false);
     setIsGeneratingThumbnail(false);
-    
+
     // LoRA 상태 초기화
     setLoraCount(0);
     setLoraPairs([]);
-    
+
     // 파일 입력 초기화
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+    if (endFileInputRef.current) {
+      endFileInputRef.current.value = '';
     }
   };
 
@@ -602,6 +649,69 @@ export default function Wan22Page() {
                     </button>
                     
                     {/* FFmpeg 상태 표시 블록 제거 */}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* End Frame Upload */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                {t('videoGeneration.endFrame')} {t('videoGeneration.endFrameOptional')}
+              </label>
+              <div
+                className={`border-2 border-dashed rounded-lg p-4 text-center relative transition-all duration-200 ${
+                  isDragOver
+                    ? 'border-primary bg-primary/10 border-solid'
+                    : 'border-border hover:border-primary'
+                }`}
+              >
+                <input
+                  ref={endFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleEndImageUpload}
+                  className="hidden"
+                  disabled={isGenerating}
+                />
+                {endPreviewUrl ? (
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <img
+                        src={endPreviewUrl}
+                        alt="End Frame Preview"
+                        className="max-w-full max-h-32 mx-auto rounded-lg border border-green-500"
+                      />
+                      <div className="absolute top-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded">
+                        End Frame
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEndImageFile(null);
+                        setEndPreviewUrl('');
+                        if (endFileInputRef.current) endFileInputRef.current.value = '';
+                      }}
+                      className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors"
+                    >
+                      {t('videoGeneration.removeEndFrame')}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <PhotoIcon className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground mb-2">
+                      {t('videoGeneration.endFrameDesc')}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => endFileInputRef.current?.click()}
+                      disabled={isGenerating}
+                      className="px-3 py-1 bg-secondary hover:bg-secondary/80 text-foreground rounded text-sm transition-colors disabled:opacity-50"
+                    >
+                      {t('videoGeneration.selectEndFrame')}
+                    </button>
                   </>
                 )}
               </div>
