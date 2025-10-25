@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
         if (!settings.runpod || typeof settings.runpod === 'string' || typeof settings.runpod === 'number' ||
             !(settings.runpod as any).apiKey || !(settings.runpod as any).endpoints?.['video-upscale']) {
             return NextResponse.json({
-                error: getApiMessage('RUNPOD_CONFIG', 'INCOMPLETE', 'video-upscale', language),
+                error: getApiMessage('RUNPOD_CONFIG', 'INCOMPLETE', language, 'video-upscale'),
                 requiresSetup: true,
             }, { status: 400 });
         }

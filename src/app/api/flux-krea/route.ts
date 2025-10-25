@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
         if (!settings.runpod || typeof settings.runpod === 'string' || typeof settings.runpod === 'number' || 
             !(settings.runpod as any).apiKey || !(settings.runpod as any).endpoints?.['flux-krea']) {
             return NextResponse.json({
-                error: getApiMessage('RUNPOD_CONFIG', 'INCOMPLETE', 'Flux Krea'),
+                error: getApiMessage('RUNPOD_CONFIG', 'INCOMPLETE', language, 'Flux Krea'),
                 requiresSetup: true,
             }, { status: 400 });
         }

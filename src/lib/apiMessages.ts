@@ -383,10 +383,11 @@ export const ApiMessages = {
 
 // 메시지 getter 함수
 export const getApiMessage = (category: keyof typeof ApiMessages.ko, key: string, language: 'ko' | 'en' = 'ko', ...params: any[]): string => {
-  const messages = ApiMessages[language][category];
+  const langMessages = ApiMessages[language] || ApiMessages.ko;
+  const messages = langMessages[category];
   const messageKey = key as keyof typeof messages;
 
-  if (messageKey in messages) {
+  if (messages && messageKey in messages) {
     const message = (messages as any)[messageKey];
 
     // 함수형 메시지 처리
