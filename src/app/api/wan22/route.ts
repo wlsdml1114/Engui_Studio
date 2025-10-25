@@ -6,6 +6,7 @@ import S3Service from '@/lib/s3Service';
 import { processFileUpload } from '@/lib/serverFileUtils';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { getApiMessage } from '@/lib/apiMessages';
 
 const prisma = new PrismaClient();
 const settingsService = new SettingsService();
@@ -21,11 +22,11 @@ try {
 }
 
 // S3에 파일 업로드 (Infinite Talk 방식과 동일)
-async function uploadToS3(file: File, fileName: string): Promise<string> {
+async function uploadToS3(file: File, fileName: string, language: 'ko' | 'en' = 'ko'): Promise<string> {
     const { settings } = await settingsService.getSettings('user-with-settings');
     
     if (!settings.s3?.endpointUrl || !settings.s3?.accessKeyId || !settings.s3?.secretAccessKey) {
-        throw new Error('S3 설정이 완료되지 않았습니다.');
+        throw new Error(getApiMessage('S3', 'SETTINGS_NOT_CONFIGURED', language));
     }
 
     const s3Service = new S3Service({
@@ -51,6 +52,7 @@ export async function POST(request: NextRequest) {
 
         // Extract form data
         const userId = formData.get('userId') as string;
+        const language = formData.get('language') as 'ko' | 'en' || 'ko';
         const prompt = formData.get('prompt') as string;
         const width = parseInt(formData.get('width') as string);
         const height = parseInt(formData.get('height') as string);
@@ -148,7 +150,7 @@ export async function POST(request: NextRequest) {
             console.log('🩺 RunPod health preflight:', healthResp.status);
             if (healthResp.status === 401) {
                 return NextResponse.json({
-                    error: 'RunPod 인증 실패(401). Settings의 API Key/Endpoint ID를 다시 저장해주세요.',
+                    error: getApiMessage('RUNPOD', 'AUTH_FAILED', language),
                     details: 'Preflight /health returned 401 with current credentials.'
                 }, { status: 400 });
             }
@@ -236,12 +238,12 @@ export async function POST(request: NextRequest) {
 
         try {
             console.log('📤 Uploading image to S3...');
-            s3ImagePath = await uploadToS3(imageFile, imageFileName);
+            s3ImagePath = await uploadToS3(imageFile, imageFileName, language);
             console.log('✅ Image uploaded to S3:', s3ImagePath);
         } catch (s3Error) {
             console.error('❌ Failed to upload image to S3:', s3Error);
             return NextResponse.json({
-                error: 'S3 업로드에 실패했습니다. S3 설정을 확인하세요.',
+                error: getApiMessage('RUNPOD', 'S3_UPLOAD_FAILED', language),
                 requiresSetup: true,
             }, { status: 400 });
         }
@@ -416,7 +418,7 @@ export async function POST(request: NextRequest) {
             jobId: job.id,
             runpodJobId,
             status: 'processing',
-            message: 'WAN 2.2 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.'
+            message: getApiMessage('JOB_STARTED', 'wan22', language)
         });
 
     } catch (error) {

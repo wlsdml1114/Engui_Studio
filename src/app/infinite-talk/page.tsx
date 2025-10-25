@@ -5,7 +5,7 @@ import { MicrophoneIcon, PhotoIcon, MusicalNoteIcon, VideoCameraIcon } from '@he
 import { useI18n } from '@/lib/i18n/context';
 
 export default function InfiniteTalkPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [prompt, setPrompt] = useState('');
   const [inputType, setInputType] = useState<'image' | 'video'>('image');
   const [personCount, setPersonCount] = useState<'single' | 'multi'>('single');
@@ -25,7 +25,10 @@ export default function InfiniteTalkPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [currentJobId, setCurrentJobId] = useState<string>('');
-  
+
+  // 메시지 타입을 저장하여 언어 변경 시 재번역 가능하게 함
+  const [messageType, setMessageType] = useState<'inputsLoaded' | null>(null);
+
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
@@ -143,7 +146,8 @@ export default function InfiniteTalkPage() {
           
           // 성공 메시지 표시
           setMessage({ type: 'success', text: t('messages.inputsLoaded') });
-          
+          setMessageType('inputsLoaded');
+
           // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
           localStorage.removeItem('reuseInputs');
         }
@@ -151,7 +155,14 @@ export default function InfiniteTalkPage() {
         console.error('입력값 로드 중 오류:', error);
       }
     }
-  }, []);
+  }, [language]);
+
+  // 언어 변경 시 메시지 재번역
+  useEffect(() => {
+    if (messageType === 'inputsLoaded') {
+      setMessage({ type: 'success', text: t('messages.inputsLoaded') });
+    }
+  }, [language, messageType]);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -274,18 +285,21 @@ export default function InfiniteTalkPage() {
               isVideo: isVideo ? t('common.video') : t('common.image')
             })
           });
+          setMessageType(null);
         } catch (error) {
           console.error('❌ 드롭된 미디어 File 객체 생성 실패:', error);
           setMessage({
             type: 'error',
             text: t('infiniteTalk.dragAndDrop.processError')
           });
+          setMessageType(null);
         }
       } else {
         setMessage({
           type: 'error',
           text: t('common.error.noMediaData')
         });
+        setMessageType(null);
         return;
       }
 
@@ -301,6 +315,7 @@ export default function InfiniteTalkPage() {
         type: 'error',
         text: t('common.error.processingDroppedData')
       });
+      setMessageType(null);
     }
   };
 
@@ -308,46 +323,52 @@ export default function InfiniteTalkPage() {
     // 입력 검증
     if (inputType === 'image' && !imageFile) {
       setMessage({ type: 'error', text: t('multitalk.imageRequired') });
+      setMessageType(null);
       return;
     }
     if (inputType === 'video' && !videoFile) {
       setMessage({ type: 'error', text: t('videoUpscale.videoRequired') });
+      setMessageType(null);
       return;
     }
     if (!audioFile || !prompt.trim()) {
       setMessage({ type: 'error', text: t('multitalk.audioRequired') });
+      setMessageType(null);
       return;
     }
     if (personCount === 'multi' && !audioFile2) {
       setMessage({ type: 'error', text: t('multitalk.dualAudioRequired') });
+      setMessageType(null);
       return;
     }
 
     setIsGenerating(true);
     setMessage(null);
+    setMessageType(null);
 
     try {
       const formData = new FormData();
       formData.append('userId', 'user-with-settings');
       formData.append('input_type', inputType);
       formData.append('person_count', personCount);
-      
+      formData.append('language', language);
+
       if (inputType === 'image' && imageFile) {
         formData.append('image', imageFile);
       } else if (inputType === 'video' && videoFile) {
         formData.append('video', videoFile);
       }
-      
+
       formData.append('audio', audioFile);
       if (audioStart.trim()) formData.append('audio_start', audioStart.trim());
       if (audioEnd.trim()) formData.append('audio_end', audioEnd.trim());
-      
+
       if (personCount === 'multi' && audioFile2) {
         formData.append('audio2', audioFile2);
         if (audio2Start.trim()) formData.append('audio2_start', audio2Start.trim());
         if (audio2End.trim()) formData.append('audio2_end', audio2End.trim());
       }
-      
+
       formData.append('prompt', prompt);
       formData.append('width', width.toString());
       formData.append('height', height.toString());
@@ -365,7 +386,8 @@ export default function InfiniteTalkPage() {
           type: 'success',
           text: data.message || t('infiniteTalk.jobStarted')
         });
-        
+        setMessageType(null);
+
         // 백그라운드 처리이므로 즉시 완료 상태로 변경
         setIsGenerating(false);
         // 라이브러리 목록 즉시 갱신 요청 (썸네일/상태 반영)
@@ -374,9 +396,9 @@ export default function InfiniteTalkPage() {
             window.dispatchEvent(new CustomEvent('jobs:refresh'));
           }
         } catch {}
-        
+
         // 리다이렉트 제거: 현재 페이지에 유지하며 작업 정보/메시지만 표시
-        
+
         // 입력 초기화
         setPrompt('');
         setImageFile(null);
@@ -401,6 +423,7 @@ export default function InfiniteTalkPage() {
     } catch (error) {
       console.error('Generation error:', error);
       setMessage({ type: 'error', text: error instanceof Error ? error.message : t('messages.error', { error: 'Unknown error occurred' }) });
+      setMessageType(null);
     } finally {
       setIsGenerating(false);
     }
@@ -420,6 +443,7 @@ export default function InfiniteTalkPage() {
     if (audioInputRef.current) audioInputRef.current.value = '';
     if (audioInputRef2.current) audioInputRef2.current.value = '';
     setMessage(null);
+    setMessageType(null);
     setCurrentJobId('');
   };
 

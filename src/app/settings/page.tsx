@@ -172,7 +172,7 @@ export default function SettingsPage() {
       if (data.success) {
         setSettings(data.settings);
         setStatus(data.status);
-        setMessage({ type: 'success', text: 'Settings saved successfully!' });
+        setMessage({ type: 'success', text: t('settings.settingsSaved') });
       } else {
         setMessage({ type: 'error', text: data.error });
       }
@@ -252,7 +252,7 @@ export default function SettingsPage() {
           ...prev,
           [endpointType]: {
             success: true,
-            message: '연결 성공!',
+            message: t('settings.connectionSuccess'),
             responseTime,
             statusCode: response.status
           }
@@ -263,7 +263,7 @@ export default function SettingsPage() {
           ...prev,
           [endpointType]: {
             success: false,
-            message: `연결 실패: ${errorData.error || 'Unknown error'}`,
+            message: `${t('settings.connectionFailed')} ${errorData.error || 'Unknown error'}`,
             responseTime,
             statusCode: response.status
           }
@@ -274,7 +274,7 @@ export default function SettingsPage() {
         ...prev,
         [endpointType]: {
           success: false,
-          message: `연결 오류: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          message: `${t('settings.connectionError')} ${error instanceof Error ? error.message : 'Unknown error'}`,
           responseTime: 0,
           statusCode: 0
         }
@@ -420,7 +420,7 @@ export default function SettingsPage() {
 
             {/* Generate Timeout */}
             <div>
-              <label className="block text-sm font-medium mb-2">Generate Timeout (초)</label>
+              <label className="block text-sm font-medium mb-2">{t('settings.generateTimeout')}</label>
               <input
                 type="number"
                 value={settings.runpod?.generateTimeout || 3600}
@@ -429,7 +429,7 @@ export default function SettingsPage() {
                 className="w-full p-2 border rounded-md bg-background"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                AI 작업 완료 대기 시간 (초 단위)
+                {t('settings.generateTimeoutDesc')}
               </p>
             </div>
 
@@ -754,7 +754,7 @@ export default function SettingsPage() {
 
             <div>
               <label className="block text-sm font-medium text-foreground/80 mb-2">
-                S3 Upload Timeout (초)
+                {t('settings.s3UploadTimeout')}
               </label>
               <input
                 type="number"
@@ -767,7 +767,7 @@ export default function SettingsPage() {
                 placeholder="3600"
               />
               <p className="text-xs text-foreground/60 mt-1">
-                💡 기본값: 3600초 (1시간). 큰 파일 업로드 시 늘릴 수 있습니다.
+                {t('settings.s3UploadTimeoutDesc')}
               </p>
             </div>
 

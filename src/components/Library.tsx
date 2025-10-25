@@ -1137,7 +1137,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                       {!options.hasImage && !options.hasVideo && (
                         <div className="text-center py-8 text-foreground/50">
                           <PhotoIcon className="w-16 h-16 mx-auto mb-2" />
-                          <p>입력 파일 정보를 찾을 수 없습니다.</p>
+                          <p>{safeT('library.inputFileNotFound')}</p>
                         </div>
                       )}
                     </div>
@@ -1147,7 +1147,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                   return (
                     <div className="text-center py-8 text-foreground/50">
                       <PhotoIcon className="w-16 h-16 mx-auto mb-2" />
-                      <p>WAN Animate 옵션을 파싱할 수 없습니다.</p>
+                      <p>{safeT('library.wanAnimateOptionsParseError')}</p>
                     </div>
                   );
                 }
@@ -1311,7 +1311,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                   return (
                     <div className="text-center py-8 text-foreground/50">
                       <PhotoIcon className="w-16 h-16 mx-auto mb-2" />
-                      <p>Infinite Talk 입력 이미지 정보를 찾을 수 없습니다.</p>
+                      <p>{safeT('library.infiniteTalkInputImageNotFound')}</p>
                     </div>
                   );
                 } catch (e) {
@@ -1319,7 +1319,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                   return (
                     <div className="text-center py-8 text-foreground/50">
                       <PhotoIcon className="w-16 h-16 mx-auto mb-2" />
-                      <p>Infinite Talk 옵션을 파싱할 수 없습니다.</p>
+                      <p>{safeT('library.infiniteTalkOptionsParseError')}</p>
                     </div>
                   );
                 }

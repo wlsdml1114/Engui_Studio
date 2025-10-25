@@ -12,7 +12,7 @@ interface LoRAFile {
 }
 
 export default function FluxKreaPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [prompt, setPrompt] = useState('');
   const [width, setWidth] = useState(1024);
   const [height, setHeight] = useState(1024);
@@ -22,7 +22,10 @@ export default function FluxKreaPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [currentJobId, setCurrentJobId] = useState<string>('');
-  
+
+  // 메시지 타입을 저장하여 언어 변경 시 재번역 가능하게 함
+  const [messageType, setMessageType] = useState<'inputsLoaded' | null>(null);
+
   // LoRA 관련 상태
   const [loraFiles, setLoraFiles] = useState<LoRAFile[]>([]);
   const [selectedLora, setSelectedLora] = useState('');
@@ -85,7 +88,8 @@ export default function FluxKreaPage() {
           
           // 성공 메시지 표시
           setMessage({ type: 'success', text: t('messages.inputsLoaded') });
-          
+          setMessageType('inputsLoaded');
+
           // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
           localStorage.removeItem('reuseInputs');
         }
@@ -93,7 +97,14 @@ export default function FluxKreaPage() {
         console.error('입력값 로드 중 오류:', error);
       }
     }
-  }, []);
+  }, [language]);
+
+  // 언어 변경 시 메시지 재번역
+  useEffect(() => {
+    if (messageType === 'inputsLoaded') {
+      setMessage({ type: 'success', text: t('messages.inputsLoaded') });
+    }
+  }, [language, messageType]);
 
   // LoRA 파일 목록 가져오기
   const fetchLoraFiles = async () => {
@@ -133,15 +144,18 @@ export default function FluxKreaPage() {
         
         // 성공적으로 목록을 가져왔으면 메시지 초기화
         setMessage(null);
+        setMessageType(null);
       } else {
         console.error('Failed to load LoRA files:', data.error);
         if (data.message) {
           setMessage({ type: 'error', text: data.message });
+          setMessageType(null);
         }
       }
     } catch (err) {
       console.error('❌ Error fetching LoRA files:', err);
       setMessage({ type: 'error', text: t('s3Storage.errors.fileListFailed') });
+      setMessageType(null);
     } finally {
       setLoraLoading(false);
     }
@@ -150,20 +164,23 @@ export default function FluxKreaPage() {
   // 컴포넌트 마운트 시 LoRA 파일 목록 가져오기
   useEffect(() => {
     fetchLoraFiles();
-  }, []);
+  }, [language]);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
       setMessage({ type: 'error', text: t('fluxKrea.inputRequired') });
+      setMessageType(null);
       return;
     }
 
     setIsGenerating(true);
     setMessage(null);
+    setMessageType(null);
 
     try {
       const formData = new FormData();
       formData.append('userId', 'user-with-settings');
+      formData.append('language', language);
       formData.append('prompt', prompt);
       formData.append('width', width.toString());
       formData.append('height', height.toString());
@@ -190,10 +207,11 @@ export default function FluxKreaPage() {
       if (response.ok && data.success && data.jobId) {
         setCurrentJobId(data.jobId);
         setMessage({ type: 'success', text: data.message || t('fluxKrea.jobStarted') });
-        
+        setMessageType(null);
+
         // 백그라운드 처리이므로 즉시 완료 상태로 변경
         setIsGenerating(false);
-        
+
         // 작업 정보는 유지하되 생성 중 상태는 해제
         // 사용자는 다른 작업을 할 수 있음
       } else {
@@ -202,6 +220,7 @@ export default function FluxKreaPage() {
     } catch (error: any) {
       console.error('Image generation error:', error);
       setMessage({ type: 'error', text: error.message || t('common.error.generationError') });
+      setMessageType(null);
       setIsGenerating(false);
     }
   };
@@ -214,9 +233,10 @@ export default function FluxKreaPage() {
     setGuidance(3.5);
     setModel('');
     setMessage(null);
+    setMessageType(null);
     setCurrentJobId('');
     setIsGenerating(false);
-    
+
     // LoRA 상태 초기화
     setSelectedLora('');
     setLoraWeight(1.0);

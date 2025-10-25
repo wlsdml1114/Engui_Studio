@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import SettingsService from '@/lib/settingsService';
+import { getApiMessage } from '@/lib/apiMessages';
 
 // Initialize settings service
 let settingsService: SettingsService;
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { 
           success: false,
-          error: 'Settings data is required' 
+          error: getApiMessage('SETTINGS', 'DATA_REQUIRED') 
         },
         { status: 400 }
       );
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json({
       success: true,
-      message: 'Settings saved successfully',
+      message: getApiMessage('SETTINGS', 'SAVED_SUCCESSFULLY'),
       settings: maskedSettings,
       status: result.status,
       timestamp: new Date().toISOString()
@@ -108,13 +109,13 @@ export async function POST(request: NextRequest) {
 function validateSettings(settings: any): string | null {
   // Basic validation for settings structure
   if (typeof settings !== 'object') {
-    return 'Settings must be an object';
+    return getApiMessage('SETTINGS', 'MUST_BE_OBJECT');
   }
   
   // Validate RunPod settings if provided
   if (settings.runpod) {
     if (settings.runpod.apiKey && typeof settings.runpod.apiKey !== 'string') {
-      return 'RunPod API key must be a string';
+      return getApiMessage('SETTINGS', 'RUNPOD_KEY_MUST_BE_STRING');
     }
     
     if (settings.runpod.endpoints) {

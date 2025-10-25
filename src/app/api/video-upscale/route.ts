@@ -5,6 +5,7 @@ import SettingsService from '@/lib/settingsService';
 import S3Service from '@/lib/s3Service';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
+import { getApiMessage } from '@/lib/apiMessages';
 
 const prisma = new PrismaClient();
 const settingsService = new SettingsService();
@@ -20,11 +21,11 @@ try {
 }
 
 // S3에 파일 업로드 (infinite talk 방식 참고)
-async function uploadToS3(file: File, fileName: string): Promise<string> {
+async function uploadToS3(file: File, fileName: string, language: 'ko' | 'en' = 'ko'): Promise<string> {
   const { settings } = await settingsService.getSettings('user-with-settings');
-  
+
   if (!settings.s3?.endpointUrl || !settings.s3?.accessKeyId || !settings.s3?.secretAccessKey) {
-    throw new Error('S3 설정이 완료되지 않았습니다.');
+    throw new Error(getApiMessage('S3', 'SETTINGS_NOT_CONFIGURED', language));
   }
 
   const s3Service = new S3Service({
@@ -52,6 +53,7 @@ export async function POST(request: NextRequest) {
         const userId = formData.get('userId') as string;
         const taskType = formData.get('task_type') as string;
         const videoFile = formData.get('video') as File;
+        const language = formData.get('language') as 'ko' | 'en' || 'ko';
 
         // Validate required data
         if (!videoFile || !taskType) {
@@ -66,10 +68,10 @@ export async function POST(request: NextRequest) {
         const { settings } = await settingsService.getSettings(userId);
         
         // Validate RunPod configuration
-        if (!settings.runpod || typeof settings.runpod === 'string' || typeof settings.runpod === 'number' || 
+        if (!settings.runpod || typeof settings.runpod === 'string' || typeof settings.runpod === 'number' ||
             !(settings.runpod as any).apiKey || !(settings.runpod as any).endpoints?.['video-upscale']) {
             return NextResponse.json({
-                error: 'RunPod configuration incomplete. Please configure your API key and video-upscale endpoint in Settings.',
+                error: getApiMessage('RUNPOD_CONFIG', 'INCOMPLETE', 'video-upscale', language),
                 requiresSetup: true,
             }, { status: 400 });
         }
@@ -123,11 +125,11 @@ export async function POST(request: NextRequest) {
         try {
             console.log('📤 Uploading video to S3...');
             const videoFileName = `input/video-upscale/input_${job.id}_${videoFile.name}`;
-            videoS3Path = await uploadToS3(videoFile, videoFileName);
+            videoS3Path = await uploadToS3(videoFile, videoFileName, language);
             console.log('✅ Video uploaded to S3:', videoS3Path);
         } catch (s3Error) {
             console.error('❌ Failed to upload video to S3:', s3Error);
-            
+
             // Job 상태를 failed로 업데이트
             await prisma.job.update({
                 where: { id: job.id },
@@ -135,13 +137,13 @@ export async function POST(request: NextRequest) {
                     status: 'failed',
                     completedAt: new Date(),
                     options: JSON.stringify({
-                        error: `S3 비디오 업로드 실패: ${s3Error instanceof Error ? s3Error.message : String(s3Error)}`,
+                        error: `${getApiMessage('RUNPOD', 'S3_VIDEO_UPLOAD_FAILED', language)}: ${s3Error instanceof Error ? s3Error.message : String(s3Error)}`,
                         failedAt: new Date().toISOString(),
                         failureReason: 'S3_UPLOAD_ERROR'
                     })
                 },
             });
-            
+
             return NextResponse.json({
                 error: s3Error instanceof Error ? s3Error.message : String(s3Error),
                 requiresSetup: true,
@@ -234,7 +236,7 @@ export async function POST(request: NextRequest) {
 
         // 백그라운드에서 작업 상태 확인 및 결과 처리 (비동기)
         // 사용자는 즉시 응답을 받고 다른 작업을 할 수 있음
-        processVideoUpscaleJob(job.id, runpodJobId, runpodSettings, prisma).catch(error => {
+        processVideoUpscaleJob(job.id, runpodJobId, runpodSettings, prisma, language).catch(error => {
             console.error(`❌ Background processing failed for job ${job.id}:`, error);
         });
 
@@ -243,7 +245,7 @@ export async function POST(request: NextRequest) {
             jobId: job.id,
             runpodJobId,
             status: 'processing',
-            message: '비디오 업스케일 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.'
+            message: getApiMessage('JOB_STARTED', 'videoUpscale', language)
         });
 
     } catch (error) {
@@ -256,7 +258,7 @@ export async function POST(request: NextRequest) {
 }
 
 // 백그라운드 작업 처리 함수
-async function processVideoUpscaleJob(jobId: string, runpodJobId: string, runpodSettings: any, prisma: PrismaClient) {
+async function processVideoUpscaleJob(jobId: string, runpodJobId: string, runpodSettings: any, prisma: PrismaClient, language: 'ko' | 'en' = 'ko') {
     try {
         console.log(`🔄 Starting background processing for video upscale job: ${jobId} (RunPod: ${runpodJobId})`);
         console.log(`⏰ Started at: ${new Date().toISOString()}`);
@@ -337,9 +339,9 @@ async function processVideoUpscaleJob(jobId: string, runpodJobId: string, runpod
                     
                     // S3에서 파일 다운로드
                     const { settings } = await settingsService.getSettings('user-with-settings');
-                    
+
                     if (!settings.s3?.endpointUrl || !settings.s3?.accessKeyId || !settings.s3?.secretAccessKey) {
-                        throw new Error('S3 설정이 완료되지 않았습니다.');
+                        throw new Error(getApiMessage('S3', 'SETTINGS_NOT_CONFIGURED', language));
                     }
 
                     const s3Service = new S3Service({

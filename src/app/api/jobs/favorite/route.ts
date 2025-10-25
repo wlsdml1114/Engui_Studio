@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { getApiMessage } from '@/lib/apiMessages';
 
 const prisma = new PrismaClient();
 
@@ -8,7 +9,7 @@ export async function POST(request: NextRequest) {
     const { jobId } = await request.json();
 
     if (!jobId) {
-      return NextResponse.json({ error: 'Job ID is required' }, { status: 400 });
+      return NextResponse.json({ error: getApiMessage('JOB', 'ID_REQUIRED') }, { status: 400 });
     }
 
     // 현재 작업의 즐겨찾기 상태 확인
@@ -18,7 +19,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!currentJob) {
-      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      return NextResponse.json({ error: getApiMessage('JOB', 'NOT_FOUND') }, { status: 404 });
     }
 
     // 즐겨찾기 상태 토글
@@ -38,13 +39,13 @@ export async function POST(request: NextRequest) {
     
     if (error instanceof Error) {
       return NextResponse.json({ 
-        error: 'Failed to toggle favorite', 
+        error: getApiMessage('JOB', 'FAILED_TO_TOGGLE_FAVORITE'), 
         details: error.message 
       }, { status: 500 });
     }
     
     return NextResponse.json({ 
-      error: 'Failed to toggle favorite' 
+      error: getApiMessage('JOB', 'FAILED_TO_TOGGLE_FAVORITE') 
     }, { status: 500 });
   }
 }

@@ -21,7 +21,7 @@ interface LoRAPair {
 }
 
 export default function Wan22Page() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [prompt, setPrompt] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
@@ -37,7 +37,10 @@ export default function Wan22Page() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [currentJobId, setCurrentJobId] = useState<string>('');
-  
+
+  // 메시지 타입을 저장하여 언어 변경 시 재번역 가능하게 함
+  const [messageType, setMessageType] = useState<'inputsLoaded' | null>(null);
+
   // 썸네일 관련 상태
   const [thumbnailStatus, setThumbnailStatus] = useState<{ ffmpegAvailable: boolean; supportedFormats: string[] } | null>(null);
   const [isGeneratingThumbnail, setIsGeneratingThumbnail] = useState(false);
@@ -124,6 +127,7 @@ export default function Wan22Page() {
 
             // 성공 메시지 표시
             setMessage({ type: 'success', text: t('messages.inputsLoaded') });
+            setMessageType('inputsLoaded');
 
             // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
             localStorage.removeItem('reuseInputs');
@@ -145,7 +149,14 @@ export default function Wan22Page() {
     };
 
     loadReuseData();
-  }, []);
+  }, [language]);
+
+  // 언어 변경 시 메시지 재번역
+  useEffect(() => {
+    if (messageType === 'inputsLoaded') {
+      setMessage({ type: 'success', text: t('messages.inputsLoaded') });
+    }
+  }, [language, messageType]);
 
   // LoRA 파일 목록 가져오기
   const fetchLoraFiles = async () => {
@@ -184,15 +195,18 @@ export default function Wan22Page() {
         
         // 성공적으로 목록을 가져왔으면 메시지 초기화
         setMessage(null);
+        setMessageType(null);
       } else {
         console.error('Failed to load LoRA files:', data.error);
         if (data.message) {
           setMessage({ type: 'error', text: data.message });
+          setMessageType(null);
         }
       }
     } catch (err) {
       console.error('❌ Error fetching LoRA files:', err);
       setMessage({ type: 'error', text: t('s3Storage.errors.fileListFailed') });
+      setMessageType(null);
     } finally {
       setLoraLoading(false);
     }
@@ -213,7 +227,7 @@ export default function Wan22Page() {
   useEffect(() => {
     fetchLoraFiles();
     checkThumbnailStatus();
-  }, []);
+  }, [language]);
 
   // 썸네일 서비스 상태 확인
   const checkThumbnailStatus = async () => {
@@ -264,6 +278,7 @@ export default function Wan22Page() {
   const generateThumbnail = async (file: File) => {
     if (!thumbnailStatus?.ffmpegAvailable) {
       setMessage({ type: 'error', text: t('videoGeneration.ffmpegNotInstalled') });
+      setMessageType(null);
       return;
     }
 
@@ -282,12 +297,15 @@ export default function Wan22Page() {
       if (result.success && result.thumbnail) {
         setThumbnailUrl(result.thumbnail);
         setMessage({ type: 'success', text: t('videoGeneration.thumbnailGenerated') });
+        setMessageType(null);
       } else {
         setMessage({ type: 'error', text: result.error || t('videoGeneration.thumbnailGenerateFailed') });
+        setMessageType(null);
       }
     } catch (error) {
       console.error('Thumbnail generation error:', error);
       setMessage({ type: 'error', text: t('videoGeneration.thumbnailError') });
+      setMessageType(null);
     } finally {
       setIsGeneratingThumbnail(false);
     }
@@ -296,24 +314,28 @@ export default function Wan22Page() {
   const handleGenerate = async () => {
     if (!imageFile || !prompt.trim()) {
       setMessage({ type: 'error', text: t('videoGeneration.inputRequired') });
+      setMessageType(null);
       return;
     }
 
     // LoRA pair 설정 검증
-    const validPairs = loraPairs.filter(pair => 
+    const validPairs = loraPairs.filter(pair =>
       pair.high && pair.low && pair.high_weight > 0 && pair.low_weight > 0
     );
     if (loraCount > 0 && validPairs.length !== loraCount) {
       setMessage({ type: 'error', text: t('videoGeneration.loraPairsRequired') });
+      setMessageType(null);
       return;
     }
 
     setIsGenerating(true);
     setMessage(null);
+    setMessageType(null);
 
     try {
       const formData = new FormData();
       formData.append('userId', 'user-with-settings');
+      formData.append('language', language);
       formData.append('image', imageFile);
       formData.append('prompt', prompt);
       formData.append('width', width.toString());
@@ -357,10 +379,11 @@ export default function Wan22Page() {
       if (response.ok && data.success && data.jobId) {
         setCurrentJobId(data.jobId);
         setMessage({ type: 'success', text: data.message || t('videoGeneration.jobStarted') });
-        
+        setMessageType(null);
+
         // 백그라운드 처리이므로 즉시 완료 상태로 변경
         setIsGenerating(false);
-        
+
         // 작업 정보는 유지하되 생성 중 상태는 해제
         // 사용자는 다른 작업을 할 수 있음
       } else {
@@ -369,6 +392,7 @@ export default function Wan22Page() {
     } catch (error: any) {
       console.error('Video generation error:', error);
       setMessage({ type: 'error', text: error.message || t('messages.error', { error: 'Video generation error occurred' }) });
+      setMessageType(null);
       setIsGenerating(false);
     }
   };
@@ -381,6 +405,7 @@ export default function Wan22Page() {
     setEndPreviewUrl('');
     setThumbnailUrl('');
     setMessage(null);
+    setMessageType(null);
     setCurrentJobId('');
     setIsGenerating(false);
     setIsGeneratingThumbnail(false);
@@ -462,12 +487,14 @@ export default function Wan22Page() {
               type: 'success',
               text: t('videoGeneration.dragAndDrop.reusedAsInput', { jobType: dragData.jobType })
             });
+            setMessageType(null);
           } catch (error) {
             console.error('❌ 드롭된 이미지 File 객체 생성 실패:', error);
             setMessage({
               type: 'error',
               text: t('infiniteTalk.dragAndDrop.processError')
             });
+            setMessageType(null);
           }
         }
       } else {
@@ -475,6 +502,7 @@ export default function Wan22Page() {
           type: 'error',
           text: t('videoGeneration.dragAndDrop.imageOnly', { jobType: dragData.jobType })
         });
+        setMessageType(null);
         return;
       }
 
@@ -490,6 +518,7 @@ export default function Wan22Page() {
         type: 'error',
         text: t('infiniteTalk.dragAndDrop.processError')
       });
+      setMessageType(null);
     }
   };
 
