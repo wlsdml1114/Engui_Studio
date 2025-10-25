@@ -46,7 +46,8 @@ export default function Wan22Page() {
   const [isGeneratingThumbnail, setIsGeneratingThumbnail] = useState(false);
   const [thumbnailUrl, setThumbnailUrl] = useState<string>('');
   const [isDragOver, setIsDragOver] = useState(false);
-  
+  const [isEndFrameDragOver, setIsEndFrameDragOver] = useState(false);
+
   // LoRA 관련 상태
   const [loraFiles, setLoraFiles] = useState<LoRAFile[]>([]);
   const [highFiles, setHighFiles] = useState<LoRAFile[]>([]);
@@ -522,6 +523,99 @@ export default function Wan22Page() {
     }
   };
 
+  // End Frame 전용 드래그 앤 드롭 핸들러들
+  const handleEndFrameDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsEndFrameDragOver(true);
+  };
+
+  const handleEndFrameDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsEndFrameDragOver(false);
+  };
+
+  const handleEndFrameDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsEndFrameDragOver(false);
+
+    try {
+      // 드래그된 데이터를 찾기
+      let dragData = null;
+
+      try {
+        const jsonData = e.dataTransfer.getData('application/json');
+        dragData = jsonData ? JSON.parse(jsonData) : null;
+      } catch {
+        try {
+          const textData = e.dataTransfer.getData('text/plain');
+          dragData = textData ? JSON.parse(textData) : null;
+        } catch {
+          console.log('❌ 드래그 데이터를 파싱할 수 없음');
+          return;
+        }
+      }
+
+      if (!dragData || dragData.type !== 'library-result') {
+        console.log('❌ 라이브러리 결과 데이터가 아님');
+        return;
+      }
+
+      console.log('🎯 End Frame에 드롭된 데이터:', dragData);
+
+      // WAN 2.2는 이미지만 지원하므로 이미지 결과물만 처리
+      const isImageResult = dragData.jobType === 'flux-kontext' || dragData.jobType === 'flux-krea';
+
+      if (isImageResult && (dragData.inputImagePath || dragData.imageUrl || dragData.thumbnailUrl)) {
+        const imageUrl = dragData.inputImagePath || dragData.imageUrl || dragData.thumbnailUrl;
+
+        if (imageUrl) {
+          console.log('🖼️ End Frame 이미지 드롭 처리:', imageUrl);
+
+          // End Frame 미리보기 설정
+          setEndPreviewUrl(imageUrl);
+
+          // URL에서 File 객체 생성 (헬퍼 함수 사용)
+          try {
+            const file = await createFileFromUrl(imageUrl, 'dropped_end_image.jpg', 'image/jpeg');
+            setEndImageFile(file);
+            console.log('✅ 드롭된 End Frame File 객체 생성 완료');
+
+            setMessage({
+              type: 'success',
+              text: t('videoGeneration.dragAndDrop.reusedAsEndFrame', { jobType: dragData.jobType })
+            });
+            setMessageType(null);
+          } catch (error) {
+            console.error('❌ 드롭된 End Frame File 객체 생성 실패:', error);
+            setMessage({
+              type: 'error',
+              text: t('infiniteTalk.dragAndDrop.processError')
+            });
+            setMessageType(null);
+          }
+        }
+      } else {
+        setMessage({
+          type: 'error',
+          text: t('videoGeneration.dragAndDrop.imageOnly', { jobType: dragData.jobType })
+        });
+        setMessageType(null);
+        return;
+      }
+
+    } catch (error) {
+      console.error('❌ End Frame 드롭 처리 중 오류:', error);
+      setMessage({
+        type: 'error',
+        text: t('infiniteTalk.dragAndDrop.processError')
+      });
+      setMessageType(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background p-6 overflow-y-auto custom-scrollbar">
       <div className="max-w-6xl mx-auto">
@@ -668,10 +762,13 @@ export default function Wan22Page() {
               </label>
               <div
                 className={`border-2 border-dashed rounded-lg p-4 text-center relative transition-all duration-200 ${
-                  isDragOver
+                  isEndFrameDragOver
                     ? 'border-primary bg-primary/10 border-solid'
                     : 'border-border hover:border-primary'
                 }`}
+                onDragOver={handleEndFrameDragOver}
+                onDragLeave={handleEndFrameDragLeave}
+                onDrop={handleEndFrameDrop}
               >
                 <input
                   ref={endFileInputRef}
@@ -709,8 +806,13 @@ export default function Wan22Page() {
                   <>
                     <PhotoIcon className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                     <p className="text-xs text-muted-foreground mb-2">
-                      {t('videoGeneration.endFrameDesc')}
+                      {isEndFrameDragOver ? t('videoGeneration.dragAndDrop.dropHere') : t('videoGeneration.endFrameDesc')}
                     </p>
+                    {isEndFrameDragOver && (
+                      <p className="text-xs text-primary mb-2">
+                        {t('videoGeneration.dragAndDrop.dragFromLibrary')}
+                      </p>
+                    )}
                     <button
                       type="button"
                       onClick={() => endFileInputRef.current?.click()}
