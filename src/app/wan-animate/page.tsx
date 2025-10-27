@@ -55,54 +55,46 @@ export default function WanAnimatePage() {
   // 입력값 자동 로드 기능
   useEffect(() => {
     const reuseData = localStorage.getItem('reuseInputs');
-    console.log('📦 [WAN Animate] localStorage에서 reuseInputs 로드:', reuseData);
     if (reuseData) {
       try {
         const data = JSON.parse(reuseData);
-        console.log('📦 [WAN Animate] 파싱된 데이터:', data);
-        console.log('📦 [WAN Animate] data.type:', data.type);
-        console.log('📦 [WAN Animate] data.mode:', data.mode);
         if (data.type === 'wan-animate') {
           // 프롬프트 로드
           if (data.prompt) {
             setPrompt(data.prompt);
           }
-          
+
           // 이미지 로드 및 File 객체 생성
           if (data.imagePath) {
             setImagePreviewUrl(data.imagePath);
-            console.log('🔄 WAN Animate 이미지 재사용:', data.imagePath);
-            
+
             // URL에서 File 객체 생성
             createFileFromUrl(data.imagePath, 'reused_image.jpg', 'image/jpeg')
               .then(file => {
                 setImageFile(file);
-                console.log('✅ 이미지 File 객체 생성 완료:', file.name);
               })
               .catch(error => {
-                console.error('❌ 이미지 File 객체 생성 실패:', error);
+                console.error('Failed to load image:', error);
               });
           }
-          
+
           // 비디오 로드 및 File 객체 생성
           if (data.videoPath) {
             setVideoPreviewUrl(data.videoPath);
-            console.log('🔄 WAN Animate 비디오 재사용:', data.videoPath);
-            
+
             // URL에서 File 객체 생성
             createFileFromUrl(data.videoPath, 'reused_video.mp4', 'video/mp4')
               .then(file => {
                 setVideoFile(file);
-                console.log('✅ 비디오 File 객체 생성 완료:', file.name);
-                
+
                 // 첫 번째 프레임 추출
                 extractFirstFrame(data.videoPath);
               })
               .catch(error => {
-                console.error('❌ 비디오 File 객체 생성 실패:', error);
+                console.error('Failed to load video:', error);
               });
           }
-          
+
           // 설정값 로드
           if (data.options) {
             const options = data.options;
@@ -114,34 +106,19 @@ export default function WanAnimatePage() {
           }
 
           // Mode 로드
-          console.log('🎭 [WAN Animate] mode 로드 시작');
-          console.log('🎭 [WAN Animate] 현재 mode state:', mode);
-          console.log('🎭 [WAN Animate] data.mode 타입:', typeof data.mode);
-          console.log('🎭 [WAN Animate] data.mode 값:', data.mode);
-          console.log('🎭 [WAN Animate] data.mode 검사 (!!data.mode):', !!data.mode);
-
           if (data.mode) {
-            console.log('🎭 [WAN Animate] mode 설정 시작:', data.mode);
-            console.log('🎭 [WAN Animate] setMode 실행 전 mode:', mode);
             setMode(data.mode as 'animate' | 'replace');
-            console.log('🎭 [WAN Animate] setMode 호출 완료 (state는 다음 렌더링에 적용됨)');
-          } else {
-            console.log('🎭 [WAN Animate] data.mode이 없어서 기본값 사용');
           }
 
           // 성공 메시지 표시
           setMessage({ type: 'success', text: t('messages.inputsLoaded') });
           setMessageType('inputsLoaded');
 
-          console.log('🎭 [WAN Animate] localStorage 제거 전 mode:', mode);
-
           // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
           localStorage.removeItem('reuseInputs');
-
-          console.log('🎭 [WAN Animate] localStorage 제거 완료');
         }
       } catch (error) {
-        console.error('입력값 로드 중 오류:', error);
+        console.error('Failed to load reuse inputs:', error);
       }
     }
   }, [language]);
@@ -153,10 +130,6 @@ export default function WanAnimatePage() {
     }
   }, [language, messageType]);
 
-  // Mode 상태 변경 감지 (디버깅용)
-  useEffect(() => {
-    console.log('🎭 [WAN Animate] mode state 업데이트됨:', mode);
-  }, [mode]);
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -209,7 +182,6 @@ export default function WanAnimatePage() {
         }
         
         setVideoFps(estimatedFps);
-        console.log(`🎬 비디오 정보: ${video.videoWidth}x${video.videoHeight}, 추정 FPS: ${estimatedFps}, Duration: ${duration}s`);
       }
       
       canvas.width = video.videoWidth;
@@ -266,10 +238,6 @@ export default function WanAnimatePage() {
     const y = ((e.clientY - rect.top) / rect.height) * (originalVideoSize?.height || rect.height);
     
     setSelectedPoints(prev => [...prev, { x, y }]);
-    
-    console.log('📍 클릭된 좌표:', { x, y });
-    console.log('📍 이미지 크기:', { width: rect.width, height: rect.height });
-    console.log('📍 원본 비디오 크기:', originalVideoSize);
   };
 
   const removePoint = (index: number) => {
@@ -291,15 +259,7 @@ export default function WanAnimatePage() {
       x: point.x * scaleX,
       y: point.y * scaleY
     }));
-    
-    console.log('🔧 좌표 조정:', {
-      원본비디오크기: originalVideoSize,
-      출력크기: { width, height },
-      스케일: { scaleX, scaleY },
-      원본좌표: points,
-      조정된좌표: adjustedPoints
-    });
-    
+
     return adjustedPoints;
   };
 
@@ -333,17 +293,13 @@ export default function WanAnimatePage() {
           const textData = e.dataTransfer.getData('text/plain');
           dragData = textData ? JSON.parse(textData) : null;
         } catch {
-          console.log('❌ 드래그 데이터를 파싱할 수 없음');
           return;
         }
       }
 
       if (!dragData || dragData.type !== 'library-result') {
-        console.log('❌ 라이브러리 결과 데이터가 아님');
         return;
       }
-
-      console.log('🎯 WAN Animate에 드롭된 데이터:', dragData);
 
       // 미디어 타입 감지
       const isVideo = dragData.mediaType === 'video' || dragData.jobType === 'multitalk' || 
@@ -361,9 +317,6 @@ export default function WanAnimatePage() {
       }
       
       if (mediaUrl) {
-        console.log('🎬 미디어 드롭 처리:', mediaUrl);
-        console.log('🔍 미디어 타입:', isVideo ? '비디오' : '이미지');
-        
         try {
           if (isVideo) {
             // 비디오 처리
@@ -371,13 +324,11 @@ export default function WanAnimatePage() {
             const file = await createFileFromUrl(mediaUrl, 'dropped_video.mp4', 'video/mp4');
             setVideoFile(file);
             extractFirstFrame(mediaUrl);
-            console.log('✅ 드롭된 비디오 File 객체 생성 완료');
           } else {
             // 이미지 처리
             setImagePreviewUrl(mediaUrl);
             const file = await createFileFromUrl(mediaUrl, 'dropped_image.jpg', 'image/jpeg');
             setImageFile(file);
-            console.log('✅ 드롭된 이미지 File 객체 생성 완료');
           }
           
           setMessage({
@@ -408,11 +359,10 @@ export default function WanAnimatePage() {
       // 프롬프트가 있으면 적용
       if (dragData.prompt && dragData.prompt.trim()) {
         setPrompt(dragData.prompt);
-        console.log('📝 프롬프트 자동 설정:', dragData.prompt);
       }
 
     } catch (error) {
-      console.error('❌ 드롭 처리 중 오류:', error);
+      console.error('Error processing dropped data:', error);
       setMessage({
         type: 'error',
         text: t('common.error.processingDroppedData')
@@ -451,35 +401,23 @@ export default function WanAnimatePage() {
       // 비디오 FPS 추가 (기본값 30으로 설정)
       const fpsToSend = videoFps || 30;
       formData.append('fps', fpsToSend.toString());
-      console.log('🎬 FPS 전송:', fpsToSend, '(원본:', videoFps, ')');
-      console.log('🎭 Mode 전송:', mode);
       // 선택된 포인트들을 올바른 형식으로 변환하여 전송
       if (selectedPoints.length > 0) {
         // 좌표를 출력 크기에 맞게 조정
         const adjustedPoints = adjustCoordinatesToOutputSize(selectedPoints);
-        
+
         // points_store 형식: {"positive": [...], "negative": [...]}
         const pointsStore = {
           positive: adjustedPoints,
           negative: [{ x: 0, y: 0 }] // 기본값
         };
         formData.append('points_store', JSON.stringify(pointsStore));
-        
+
         // coordinates 형식: [{"x": ..., "y": ...}, ...]
         formData.append('coordinates', JSON.stringify(adjustedPoints));
-        
+
         // neg_coordinates는 빈 배열
         formData.append('neg_coordinates', JSON.stringify([]));
-        
-        console.log('📍 전송할 포인트 데이터:');
-        console.log('  - 원본 비디오 크기:', originalVideoSize);
-        console.log('  - 출력 크기:', { width, height });
-        console.log('  - 원본 포인트:', selectedPoints);
-        console.log('  - 조정된 포인트:', adjustedPoints);
-        console.log('  - points_store:', JSON.stringify(pointsStore));
-        console.log('  - coordinates:', JSON.stringify(adjustedPoints));
-      } else {
-        console.log('📍 인물을 선택하지 않았으므로 포인트 데이터를 전송하지 않습니다.');
       }
       
       if (imageFile) {
@@ -506,7 +444,7 @@ export default function WanAnimatePage() {
         setMessageType(null);
       }
     } catch (error) {
-      console.error('Error generating video:', error);
+      console.error('Failed to generate video:', error);
       setMessage({ type: 'error', text: t('common.error.generationError') });
       setMessageType(null);
     } finally {

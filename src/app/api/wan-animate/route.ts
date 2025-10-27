@@ -17,7 +17,7 @@ const LOCAL_STORAGE_DIR = join(process.cwd(), 'public', 'results');
 try {
     mkdirSync(LOCAL_STORAGE_DIR, { recursive: true });
 } catch (error) {
-    console.log('📁 Results directory already exists or cannot be created');
+    // Directory already exists or cannot be created
 }
 
 // S3에 파일 업로드
@@ -44,10 +44,8 @@ async function uploadToS3(file: File, fileName: string, language: 'ko' | 'en' = 
 
 export async function POST(request: NextRequest) {
     let job: any = null; // job 변수를 함수 스코프에서 선언
-    
-    try {
-        console.log('🎬 Processing WAN Animate video generation request...');
 
+    try {
         const formData = await request.formData();
 
         // Extract form data
@@ -65,8 +63,6 @@ export async function POST(request: NextRequest) {
         const height = parseInt(formData.get('height') as string) || 512;
         const fps = parseInt(formData.get('fps') as string) || 30;
         const mode = (formData.get('mode') as string) || 'replace';
-        console.log('🎬 수신된 FPS:', fps);
-        console.log('🎭 수신된 Mode:', mode);
         const pointsStore = formData.get('points_store') as string;
         const coordinates = formData.get('coordinates') as string;
         const negCoordinates = formData.get('neg_coordinates') as string;
@@ -74,7 +70,6 @@ export async function POST(request: NextRequest) {
         // Seed가 -1이면 랜덤 시드로 변환 (0 이상의 값)
         if (seed === -1) {
             seed = Math.floor(Math.random() * 2147483647); // 32비트 정수 범위
-            console.log(`🎲 Random seed generated: ${seed}`);
         }
 
         // Validate required data
@@ -108,7 +103,6 @@ export async function POST(request: NextRequest) {
         }
 
         // Load user settings
-        console.log('📖 Loading user settings...');
         const { settings } = await settingsService.getSettings(userId);
         
         // Validate RunPod configuration
@@ -125,7 +119,6 @@ export async function POST(request: NextRequest) {
 
         // 현재 워크스페이스 ID 가져오기
         const currentWorkspaceId = await settingsService.getCurrentWorkspaceId(userId);
-        console.log('🏗️ Current workspace ID for job:', currentWorkspaceId);
 
         // Create job record in database
         job = await prisma.job.create({
@@ -155,12 +148,6 @@ export async function POST(request: NextRequest) {
             },
         });
 
-        console.log(`📝 Created job record: ${job.id}`);
-        console.log('📝 저장된 options JSON:', job.options);
-        const savedOptions = JSON.parse(job.options || '{}');
-        console.log('📝 저장된 options 파싱됨:', savedOptions);
-        console.log('📝 저장된 mode:', savedOptions.mode);
-
         // Deduct credit
         await prisma.creditActivity.create({
             data: {
@@ -176,16 +163,13 @@ export async function POST(request: NextRequest) {
         
         if (imageFile) {
             try {
-                console.log('📤 Uploading image to S3...');
                 const imageFileName = `input_image_${job.id}_${imageFile.name}`;
                 s3ImagePath = await uploadToS3(imageFile, imageFileName, language);
-                console.log('✅ Image uploaded to S3:', s3ImagePath);
-                
+
                 // 로컬에도 백업 저장
                 const imageBuffer = Buffer.from(await imageFile.arrayBuffer());
                 const localImagePath = join(LOCAL_STORAGE_DIR, imageFileName);
                 writeFileSync(localImagePath, imageBuffer);
-                console.log('✅ Image saved locally (backup):', localImagePath);
             } catch (s3Error) {
                 console.error('❌ Failed to upload image to S3:', s3Error);
                 
@@ -215,16 +199,13 @@ export async function POST(request: NextRequest) {
 
         if (videoFile) {
             try {
-                console.log('📤 Uploading video to S3...');
                 const videoFileName = `input_video_${job.id}_${videoFile.name}`;
                 s3VideoPath = await uploadToS3(videoFile, videoFileName, language);
-                console.log('✅ Video uploaded to S3:', s3VideoPath);
-                
+
                 // 로컬에도 백업 저장
                 const videoBuffer = Buffer.from(await videoFile.arrayBuffer());
                 const localVideoPath = join(LOCAL_STORAGE_DIR, videoFileName);
                 writeFileSync(localVideoPath, videoBuffer);
-                console.log('✅ Video saved locally (backup):', localVideoPath);
             } catch (s3Error) {
                 console.error('❌ Failed to upload video to S3:', s3Error);
                 
@@ -289,8 +270,6 @@ export async function POST(request: NextRequest) {
             );
 
             runpodJobId = await runpodService.submitJob(runpodInput);
-
-            console.log(`✅ RunPod job submitted successfully: ${runpodJobId}`);
         } catch (runpodError) {
             console.error('❌ RunPod submission failed:', runpodError);
 
@@ -345,8 +324,6 @@ export async function POST(request: NextRequest) {
             },
         });
 
-        console.log(`✅ WAN Animate job submitted: ${job.id} (RunPod: ${runpodJobId})`);
-
         // 백그라운드에서 작업 상태 확인 및 결과 처리 (비동기)
         processWanAnimateJob(job.id, runpodJobId, runpodSettings, prisma).catch(error => {
             console.error(`❌ Background processing failed for job ${job.id}:`, error);
@@ -379,7 +356,6 @@ export async function POST(request: NextRequest) {
                         })
                     },
                 });
-                console.log(`✅ Job ${job.id} marked as failed due to general error`);
             } catch (updateError) {
                 console.error('❌ Failed to update job status:', updateError);
             }
@@ -399,42 +375,30 @@ export async function POST(request: NextRequest) {
 // 백그라운드 작업 처리 함수
 async function processWanAnimateJob(jobId: string, runpodJobId: string, runpodSettings: any, prisma: PrismaClient) {
     try {
-        console.log(`🔄 Starting background processing for WAN Animate job: ${jobId} (RunPod: ${runpodJobId})`);
-        console.log(`⏰ Started at: ${new Date().toISOString()}`);
-        
         const runpodService = new RunPodService(
             runpodSettings.apiKey,
             runpodSettings.endpoints['wan-animate'],
             runpodSettings.generateTimeout || 3600
         );
 
-        console.log(`⏳ Waiting for RunPod job completion... (timeout: ${runpodSettings.generateTimeout || 3600}초)`);
-        
         // RunPod 작업 완료 대기
         const result = await runpodService.waitForCompletion(runpodJobId);
-        
-        console.log(`✅ RunPod job ${runpodJobId} completed with status: ${result.status}`);
-        console.log(`⏰ Completed at: ${new Date().toISOString()}`);
-        
+
         if (result.status === 'COMPLETED' && result.output) {
-            console.log(`✅ WAN Animate job ${jobId} completed successfully!`);
             
             let resultUrl: string;
             let runpodResultUrl: string = 'unknown';
-            
+
             // 비디오 결과 찾기
             if (result.output.video) {
                 resultUrl = result.output.video;
                 runpodResultUrl = result.output.video;
-                console.log(`🎬 Found video result`);
             } else if (result.output.mp4) {
                 resultUrl = result.output.mp4;
                 runpodResultUrl = result.output.mp4;
-                console.log(`🎬 Found MP4 result`);
             } else if (result.output.result) {
                 resultUrl = result.output.result;
                 runpodResultUrl = result.output.result;
-                console.log(`🎬 Found result`);
             } else {
                 console.warn('⚠️ No video data found in RunPod output');
                 resultUrl = `/api/results/${jobId}.mp4`;
@@ -444,84 +408,62 @@ async function processWanAnimateJob(jobId: string, runpodJobId: string, runpodSe
             // RunPod에서 base64 인코딩된 비디오 데이터 처리
             let videoData: string | null = null;
             let videoFormat: string = 'mp4';
-            
-            if (result.output.video && typeof result.output.video === 'string' && 
+
+            if (result.output.video && typeof result.output.video === 'string' &&
                 result.output.video.length > 100 && !result.output.video.startsWith('http')) {
                 videoData = result.output.video;
                 videoFormat = 'mp4';
-                console.log(`🎬 Found base64 video data in video field, length: ${videoData?.length} characters`);
-            } else if (result.output.mp4 && typeof result.output.mp4 === 'string' && 
+            } else if (result.output.mp4 && typeof result.output.mp4 === 'string' &&
                        result.output.mp4.length > 100 && !result.output.mp4.startsWith('http')) {
                 videoData = result.output.mp4;
                 videoFormat = 'mp4';
-                console.log(`🎬 Found base64 MP4 data in mp4 field, length: ${videoData?.length} characters`);
-            } else if (result.output.result && typeof result.output.result === 'string' && 
+            } else if (result.output.result && typeof result.output.result === 'string' &&
                        result.output.result.length > 100 && !result.output.result.startsWith('http')) {
                 videoData = result.output.result;
                 videoFormat = 'mp4';
-                console.log(`🎬 Found base64 result data in result field, length: ${videoData?.length} characters`);
             }
 
             // base64 비디오 데이터를 디코딩하여 로컬에 저장
             if (videoData && typeof videoData === 'string' && videoData.length > 0) {
                 try {
-                    console.log(`🔓 Decoding base64 video data...`);
-                    
                     const videoBuffer = Buffer.from(videoData, 'base64');
-                    console.log(`✅ Decoded video buffer size: ${videoBuffer.length} bytes`);
-                    
+
                     const videoFileName = `wan_animate_result_${jobId}.${videoFormat}`;
                     const videoPath = join(LOCAL_STORAGE_DIR, videoFileName);
-                    
+
                     writeFileSync(videoPath, videoBuffer);
-                    console.log(`✅ Video saved locally: ${videoPath}`);
-                    
+
                     resultUrl = `/results/${videoFileName}`;
                     runpodResultUrl = `local:${videoPath}`;
                     
-                    console.log(`🔄 Set resultUrl to local path: ${resultUrl}`);
-                    
                 } catch (decodeError) {
                     console.error(`❌ Error decoding base64 video data:`, decodeError);
-                    console.log(`💡 Using original resultUrl: ${resultUrl}`);
                 }
             } else {
-                console.log(`💡 No base64 video data found, using original result handling`);
-                
                 if (resultUrl && (resultUrl.startsWith('http://') || resultUrl.startsWith('https://'))) {
-                    console.log(`🌐 RunPod returned external URL: ${resultUrl}`);
-                    console.log(`💡 Converting to local path for web access`);
-                    
                     const urlParts = resultUrl.split('/');
                     const fileName = urlParts[urlParts.length - 1] || `${jobId}.mp4`;
                     resultUrl = `/results/${fileName}`;
-                    
-                    console.log(`🔄 Converted to local path: ${resultUrl}`);
                 }
 
                 // RunPod 결과 비디오를 로컬에 다운로드
-                if (runpodResultUrl && runpodResultUrl !== 'unknown' && 
+                if (runpodResultUrl && runpodResultUrl !== 'unknown' &&
                     (runpodResultUrl.startsWith('http://') || runpodResultUrl.startsWith('https://'))) {
                     try {
-                        console.log(`📥 Downloading video from RunPod: ${runpodResultUrl}`);
-                        
                         const videoResponse = await fetch(runpodResultUrl);
                         if (videoResponse.ok) {
                             const videoBuffer = await videoResponse.arrayBuffer();
                             const videoFileName = `wan_animate_result_${jobId}.mp4`;
                             const videoPath = join(LOCAL_STORAGE_DIR, videoFileName);
-                            
+
                             writeFileSync(videoPath, Buffer.from(videoBuffer));
-                            console.log(`✅ Video downloaded and saved locally: ${videoPath}`);
-                            
+
                             resultUrl = `/results/${videoFileName}`;
-                            console.log(`🔄 Updated resultUrl to local path: ${resultUrl}`);
                         } else {
                             console.warn(`⚠️ Failed to download video from RunPod: ${videoResponse.status}`);
                         }
                     } catch (downloadError) {
                         console.error(`❌ Error downloading video from RunPod:`, downloadError);
-                        console.log(`💡 Using original resultUrl: ${resultUrl}`);
                     }
                 }
             }
@@ -554,10 +496,6 @@ async function processWanAnimateJob(jobId: string, runpodJobId: string, runpodSe
                     })
                 },
             });
-
-            console.log(`✅ Job ${jobId} marked as completed with result URL: ${resultUrl}`);
-            console.log(`✅ RunPod result URL: ${runpodResultUrl}`);
-            console.log(`🎉 WAN Animate video generation completed successfully!`);
 
         } else {
             console.error('❌ RunPod job failed or no output');
