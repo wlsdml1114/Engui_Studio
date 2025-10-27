@@ -74,216 +74,182 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
     if (item.type === 'multitalk' && item.options) {
       try {
         const options = JSON.parse(item.options);
-        
+
         // 로컬 웹 경로가 있으면 우선 사용 (가장 안정적)
         if (options.imageWebPath) {
-          console.log('🖼️ Using local web path for MultiTalk thumbnail');
           return options.imageWebPath;
         }
-        
+
         // S3 URL이 있으면 사용 (폴백)
         if (options.imageS3Url) {
-          console.log('🔗 Using S3 URL for MultiTalk thumbnail');
           return options.imageS3Url;
         }
       } catch (e) {
-        console.warn('Failed to parse MultiTalk options:', e);
+        // Silent fail
       }
     }
-    
+
     // FLUX KONTEXT의 경우 결과 이미지나 입력 이미지 사용
     if (item.type === 'flux-kontext' && item.options) {
       try {
         const options = JSON.parse(item.options);
-        
+
         // 결과 이미지가 있으면 우선 사용
         if (item.resultUrl) {
-          console.log('🎨 Using result image for FLUX KONTEXT thumbnail');
           return item.resultUrl;
         }
-        
+
         // 입력 이미지 경로가 있으면 웹 경로로 변환하여 사용
         if (options.inputImagePath) {
-          console.log('🖼️ Using input image path for FLUX KONTEXT thumbnail:', options.inputImagePath);
           // 로컬 파일 경로를 웹 경로로 변환
           const fileName = options.inputImageName || options.inputImagePath.split('/').pop();
           if (fileName) {
             const webPath = `/results/${fileName}`;
-            console.log('🔄 Converted to web path:', webPath);
             return webPath;
           }
           return options.inputImagePath;
         }
-        
+
         // inputImageName이 직접 있는 경우 웹 경로로 사용
         if (options.inputImageName) {
           const webPath = `/results/${options.inputImageName}`;
-          console.log('🖼️ Using input image name for FLUX KONTEXT thumbnail:', webPath);
           return webPath;
         }
       } catch (e) {
-        console.warn('Failed to parse FLUX KONTEXT options:', e);
+        // Silent fail
       }
     }
-    
+
     // FLUX KREA의 경우 결과 이미지 사용
     if (item.type === 'flux-krea' && item.resultUrl) {
-      console.log('🎨 Using result image for FLUX KREA thumbnail');
       return item.resultUrl;
     }
-    
+
     // WAN 2.2의 경우 입력 이미지를 썸네일로 사용
     if (item.type === 'wan22' && item.options) {
       try {
         const options = JSON.parse(item.options);
-        console.log('🔍 WAN 2.2 options for thumbnail:', options);
-        
+
         // 로컬 웹 경로가 있으면 직접 사용 (개발 환경)
         if (options.imageWebPath) {
-          console.log('🖼️ Using local web path for WAN 2.2 thumbnail:', options.imageWebPath);
           // 개발 환경에서는 직접 경로 사용
           return options.imageWebPath;
         }
-        
+
         // 입력 이미지 경로가 있으면 다양한 패턴으로 시도
         if (options.inputImagePath) {
-          console.log('🖼️ Using input image path for WAN 2.2 thumbnail');
-          
           // 기존 파일명이 있으면 사용
           if (options.inputImageName) {
             const webPath = `/results/${options.inputImageName}`;
-            console.log('🔄 Using existing file name:', webPath);
             return webPath;
           }
-          
+
           // 폴백: 기본 패턴
           return `/results/input_${item.id}.jpg`;
         }
-        
-        console.log('⚠️ No suitable thumbnail found for WAN 2.2');
       } catch (e) {
-        console.warn('Failed to parse WAN 2.2 options:', e);
+        // Silent fail
       }
     }
-    
+
     // Infinite Talk의 경우 입력 이미지/비디오나 생성된 썸네일 사용
     if (item.type === 'infinitetalk' && item.options) {
       try {
         const options = JSON.parse(item.options);
-        console.log('🔍 Infinite Talk options for thumbnail:', options);
-        console.log('🔍 Item thumbnailUrl:', item.thumbnailUrl);
-        console.log('🔍 Item ID:', item.id);
-        
+
         // 생성된 썸네일이 있으면 우선 사용 (최고 우선순위)
         if (item.thumbnailUrl) {
-          console.log('🖼️ Using generated thumbnail for Infinite Talk:', item.thumbnailUrl);
           return item.thumbnailUrl;
         }
-        
+
         // 로컬 웹 경로가 있으면 사용 (이미지)
         if (options.imageWebPath) {
-          console.log('🖼️ Using external web path for Infinite Talk thumbnail:', options.imageWebPath);
           return options.imageWebPath;
         }
-        
+
         // 로컬 웹 경로가 있으면 사용 (비디오)
         if (options.videoWebPath) {
-          console.log('🎬 Using external web path for Infinite Talk thumbnail (video):', options.videoWebPath);
           return options.videoWebPath;
         }
-        
+
         // 입력 이미지 파일명이 있으면 웹 경로로 변환
         if (options.imageFileName) {
           // 실제 저장된 파일명으로 변환 (input/infinitetalk/input_${jobId}_${originalName})
           const actualFileName = `input/infinitetalk/input_${item.id}_${options.imageFileName}`;
           const webPath = `/results/${actualFileName}`; // 슬래시는 인코딩하지 않음
-          console.log('🖼️ Using actual image file name for Infinite Talk thumbnail:', webPath);
           return webPath;
         }
-        
+
         // 입력 비디오 파일명이 있으면 웹 경로로 변환
         if (options.videoFileName) {
           // 실제 저장된 파일명으로 변환 (input/infinitetalk/input_${jobId}_${originalName})
           const actualFileName = `input/infinitetalk/input_${item.id}_${options.videoFileName}`;
           const webPath = `/results/${actualFileName}`; // 슬래시는 인코딩하지 않음
-          console.log('🎬 Using actual video file name for Infinite Talk thumbnail:', webPath);
           return webPath;
         }
-        
-        console.log('⚠️ No suitable thumbnail found for Infinite Talk');
       } catch (e) {
-        console.warn('Failed to parse Infinite Talk options:', e);
+        // Silent fail
       }
     }
-    
+
     // WAN Animate의 경우 입력 이미지/비디오를 썸네일로 사용
     if (item.type === 'wan-animate' && item.options) {
       try {
         const options = JSON.parse(item.options);
-        console.log('🔍 WAN Animate options for thumbnail:', options);
-        
+
         // 로컬 웹 경로가 있으면 우선 사용 (가장 안정적)
         if (options.imageWebPath) {
-          console.log('🖼️ Using local web path for WAN Animate thumbnail:', options.imageWebPath);
           return options.imageWebPath;
         }
-        
+
         // 입력 이미지가 있으면 사용 (폴백)
         if (options.hasImage && options.s3ImagePath) {
           // S3 경로를 로컬 웹 경로로 변환
           const fileName = options.s3ImagePath.split('/').pop();
           if (fileName) {
             const webPath = `/results/${fileName}`;
-            console.log('🖼️ Using input image for WAN Animate thumbnail:', webPath);
             return webPath;
           }
         }
-        
+
         // 로컬 비디오 웹 경로가 있으면 사용
         if (options.videoWebPath) {
-          console.log('🎬 Using local video web path for WAN Animate thumbnail:', options.videoWebPath);
           return options.videoWebPath;
         }
-        
+
         // 입력 비디오가 있으면 사용 (폴백)
         if (options.hasVideo && options.s3VideoPath) {
           // S3 경로를 로컬 웹 경로로 변환
           const fileName = options.s3VideoPath.split('/').pop();
           if (fileName) {
             const webPath = `/results/${fileName}`;
-            console.log('🎬 Using input video for WAN Animate thumbnail:', webPath);
             return webPath;
           }
         }
-        
+
         // 결과 비디오가 있으면 사용
         if (item.resultUrl) {
-          console.log('🎬 Using result video for WAN Animate thumbnail:', item.resultUrl);
           return item.resultUrl;
         }
-        
-        console.log('⚠️ No suitable thumbnail found for WAN Animate');
       } catch (e) {
-        console.warn('Failed to parse WAN Animate options:', e);
+        // Silent fail
       }
     }
-    
+
     // Video Upscale의 경우 썸네일 URL 우선 사용
     if (item.type === 'video-upscale' && item.thumbnailUrl) {
-      console.log('🎬 Using thumbnail URL for video-upscale:', item.thumbnailUrl);
       return item.thumbnailUrl;
     }
-    
+
     // 다른 타입의 경우 결과 URL 사용
     if (item.status === 'completed' && item.resultUrl) {
       return item.resultUrl;
     }
-    
+
     return item.thumbnailUrl;
   };
 
   const thumbnailUrl = getThumbnailUrl();
-  console.log(`🎬 Thumbnail URL for ${item.type} (${item.id}):`, thumbnailUrl);
   const createdTime = new Date(item.createdAt).toLocaleTimeString();
   const completedTime = item.completedAt ? new Date(item.completedAt).toLocaleTimeString() : null;
 
@@ -333,7 +299,6 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
 
   // 드래그 시작 핸들러
   const handleDragStart = (e: React.DragEvent) => {
-    console.log('🖱️ 드래그 시작:', item.type, item.id);
     setIsDragging(true);
     
     // 드래그할 데이터 구성
@@ -1539,24 +1504,7 @@ export default function Library() {
 
   const handleReuseInputs = (item: JobItem) => {
     try {
-      console.log('🔄 입력값 재사용 시작:', item);
-      
       const options = item.options ? JSON.parse(item.options) : {};
-      console.log('📋 파싱된 옵션:', options);
-      console.log('🔍 LoRA 필드 확인 (Library):', {
-        selectedLora: options.selectedLora,
-        lora: options.lora,
-        loraWeight: options.loraWeight
-      });
-      console.log('🔍 전체 options 객체:', options);
-
-      // WAN Animate 디버깅 - 저장 시점
-      if (item.type === 'wan-animate') {
-        console.log('🎬 [Library] WAN Animate Job 데이터:');
-        console.log('  - item.type:', item.type);
-        console.log('  - options.mode (DB에서):', options.mode);
-        console.log('  - options 전체:', options);
-      }
 
       // 필요한 설정값만 추출 (용량 절약)
       const essentialOptions = {
@@ -1585,7 +1533,7 @@ export default function Library() {
         loraPairs: options.loraPairs,
         loraCount: options.loraCount
       };
-      
+
       // 입력값 재사용을 위한 데이터 구성 (최소한의 데이터만)
       const reuseData = {
         type: item.type,
@@ -1636,33 +1584,10 @@ export default function Library() {
         })
       };
 
-      console.log('💾 재사용 데이터 (압축됨):', reuseData);
-      console.log('📏 데이터 크기:', JSON.stringify(reuseData).length, 'bytes');
-
-      // WAN Animate 디버깅 로그
-      if (item.type === 'wan-animate') {
-        console.log('🎬 [WAN Animate] essentialOptions.mode:', essentialOptions.mode);
-        console.log('🎬 [WAN Animate] options.mode (원본):', options.mode);
-        console.log('🎬 [WAN Animate] reuseData 생성 전:', reuseData);
-        console.log('🎬 [WAN Animate] reuseData.mode (생성됨):', reuseData.mode);
-      }
-
       // 로컬 스토리지에 저장하여 다른 페이지에서 사용할 수 있도록 함
       const reuseDataString = JSON.stringify(reuseData);
-      if (item.type === 'wan-animate') {
-        console.log('🎬 [WAN Animate] localStorage 저장 전 문자열:', reuseDataString);
-      }
       localStorage.setItem('reuseInputs', reuseDataString);
 
-      // 저장된 데이터 확인
-      const savedData = localStorage.getItem('reuseInputs');
-      if (item.type === 'wan-animate' && savedData) {
-        const parsedData = JSON.parse(savedData);
-        console.log('🎬 [WAN Animate] 저장된 localStorage 데이터 전체:', JSON.stringify(parsedData, null, 2));
-        console.log('🎬 [WAN Animate] 저장된 mode:', parsedData.mode);
-        console.log('🎬 [WAN Animate] 저장된 mode 타입:', typeof parsedData.mode);
-      }
-      
       // 해당 타입의 페이지로 이동
       const pageMap: { [key: string]: string } = {
         'multitalk': '/multitalk',
@@ -1675,13 +1600,11 @@ export default function Library() {
       };
 
       const targetPage = pageMap[item.type];
-      console.log('🎯 이동할 페이지:', targetPage, '타입:', item.type);
-      
+
       if (targetPage) {
-        console.log('✅ 페이지 이동 시작:', targetPage);
         window.location.href = targetPage;
       } else {
-        console.error('❌ 페이지를 찾을 수 없음:', item.type);
+        console.error('Page not found:', item.type);
         alert(safeT('library.pageNotFound'));
       }
     } catch (error) {
