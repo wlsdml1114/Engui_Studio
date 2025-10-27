@@ -238,6 +238,10 @@ export const translations = {
       inputRequired: '이미지 또는 비디오 파일을 업로드해주세요.',
       promptRequired: '프롬프트를 입력해주세요.',
       generationStarted: '비디오 생성이 시작되었습니다. Job ID: {jobId}',
+      modeDescriptions: {
+        replace: 'Replace mode: 비디오의 인물을 이미지의 인물이 대체합니다.',
+        animate: 'Animate mode: 이미지의 인물이 비디오의 모션을 따라합니다.'
+      },
       dragAndDrop: {
         dropHere: '🎯 여기에 놓으세요!',
         selectImage: '이미지 파일 선택',
@@ -907,6 +911,10 @@ export const translations = {
       inputRequired: 'Please upload image or video file.',
       promptRequired: 'Please enter a prompt.',
       generationStarted: 'Video generation has started. Job ID: {jobId}',
+      modeDescriptions: {
+        replace: 'Replace mode: The person in the image replaces the person in the video.',
+        animate: 'Animate mode: The person in the image follows the motion of the video.'
+      },
       dragAndDrop: {
         dropHere: '🎯 Drop here!',
         selectImage: 'Select Image File',

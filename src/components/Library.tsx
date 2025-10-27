@@ -1549,7 +1549,15 @@ export default function Library() {
         loraWeight: options.loraWeight
       });
       console.log('🔍 전체 options 객체:', options);
-      
+
+      // WAN Animate 디버깅 - 저장 시점
+      if (item.type === 'wan-animate') {
+        console.log('🎬 [Library] WAN Animate Job 데이터:');
+        console.log('  - item.type:', item.type);
+        console.log('  - options.mode (DB에서):', options.mode);
+        console.log('  - options 전체:', options);
+      }
+
       // 필요한 설정값만 추출 (용량 절약)
       const essentialOptions = {
         // 공통 설정값들
@@ -1568,6 +1576,7 @@ export default function Library() {
         inputType: options.inputType,
         hasImage: options.hasImage,
         hasVideo: options.hasVideo,
+        mode: options.mode, // WAN Animate mode
         // LoRA 관련 (필요한 경우만)
         selectedLora: options.selectedLora || options.lora, // FLUX KREA는 'lora' 필드 사용
         lora: options.lora, // FLUX KREA 원본 필드도 포함
@@ -1602,7 +1611,8 @@ export default function Library() {
           imagePath: options.imageWebPath || options.s3ImagePath,
           videoPath: options.videoWebPath || options.s3VideoPath,
           hasImage: options.hasImage,
-          hasVideo: options.hasVideo
+          hasVideo: options.hasVideo,
+          mode: options.mode || 'replace'
         }),
         ...(item.type === 'infinitetalk' && {
           inputType: options.inputType,
@@ -1629,8 +1639,29 @@ export default function Library() {
       console.log('💾 재사용 데이터 (압축됨):', reuseData);
       console.log('📏 데이터 크기:', JSON.stringify(reuseData).length, 'bytes');
 
+      // WAN Animate 디버깅 로그
+      if (item.type === 'wan-animate') {
+        console.log('🎬 [WAN Animate] essentialOptions.mode:', essentialOptions.mode);
+        console.log('🎬 [WAN Animate] options.mode (원본):', options.mode);
+        console.log('🎬 [WAN Animate] reuseData 생성 전:', reuseData);
+        console.log('🎬 [WAN Animate] reuseData.mode (생성됨):', reuseData.mode);
+      }
+
       // 로컬 스토리지에 저장하여 다른 페이지에서 사용할 수 있도록 함
-      localStorage.setItem('reuseInputs', JSON.stringify(reuseData));
+      const reuseDataString = JSON.stringify(reuseData);
+      if (item.type === 'wan-animate') {
+        console.log('🎬 [WAN Animate] localStorage 저장 전 문자열:', reuseDataString);
+      }
+      localStorage.setItem('reuseInputs', reuseDataString);
+
+      // 저장된 데이터 확인
+      const savedData = localStorage.getItem('reuseInputs');
+      if (item.type === 'wan-animate' && savedData) {
+        const parsedData = JSON.parse(savedData);
+        console.log('🎬 [WAN Animate] 저장된 localStorage 데이터 전체:', JSON.stringify(parsedData, null, 2));
+        console.log('🎬 [WAN Animate] 저장된 mode:', parsedData.mode);
+        console.log('🎬 [WAN Animate] 저장된 mode 타입:', typeof parsedData.mode);
+      }
       
       // 해당 타입의 페이지로 이동
       const pageMap: { [key: string]: string } = {

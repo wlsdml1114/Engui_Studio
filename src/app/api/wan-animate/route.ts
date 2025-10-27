@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
         const prompt = formData.get('prompt') as string;
         const imageFile = formData.get('image') as File;
         const videoFile = formData.get('video') as File;
-        
+
         // 추가 설정값들
         let seed = parseInt(formData.get('seed') as string) || -1;
         const cfg = parseFloat(formData.get('cfg') as string) || 1.0;
@@ -64,7 +64,9 @@ export async function POST(request: NextRequest) {
         const width = parseInt(formData.get('width') as string) || 512;
         const height = parseInt(formData.get('height') as string) || 512;
         const fps = parseInt(formData.get('fps') as string) || 30;
+        const mode = (formData.get('mode') as string) || 'replace';
         console.log('🎬 수신된 FPS:', fps);
+        console.log('🎭 수신된 Mode:', mode);
         const pointsStore = formData.get('points_store') as string;
         const coordinates = formData.get('coordinates') as string;
         const negCoordinates = formData.get('neg_coordinates') as string;
@@ -134,7 +136,7 @@ export async function POST(request: NextRequest) {
                 status: 'processing',
                 type: 'wan-animate',
                 prompt,
-                options: JSON.stringify({ 
+                options: JSON.stringify({
                     prompt,
                     hasImage: !!imageFile,
                     hasVideo: !!videoFile,
@@ -144,6 +146,7 @@ export async function POST(request: NextRequest) {
                     width,
                     height,
                     fps,
+                    mode,
                     pointsStore,
                     coordinates,
                     negCoordinates
@@ -153,6 +156,10 @@ export async function POST(request: NextRequest) {
         });
 
         console.log(`📝 Created job record: ${job.id}`);
+        console.log('📝 저장된 options JSON:', job.options);
+        const savedOptions = JSON.parse(job.options || '{}');
+        console.log('📝 저장된 options 파싱됨:', savedOptions);
+        console.log('📝 저장된 mode:', savedOptions.mode);
 
         // Deduct credit
         await prisma.creditActivity.create({
@@ -258,6 +265,7 @@ export async function POST(request: NextRequest) {
             width: width,
             height: height,
             fps: fps, // 비디오 FPS 추가
+            mode: mode, // mode 추가
         };
 
         // 인물 선택이 있을 때만 포인트 관련 필드 추가
@@ -271,41 +279,15 @@ export async function POST(request: NextRequest) {
             runpodInput.neg_coordinates = negCoordinates;
         }
 
-        console.log('🔧 Final RunPod input structure:');
-        console.log('  - prompt:', runpodInput.prompt);
-        console.log('  - image_path:', runpodInput.image_path);
-        console.log('  - video_path:', runpodInput.video_path);
-        console.log('  - positive_prompt:', runpodInput.positive_prompt);
-        console.log('  - seed:', runpodInput.seed);
-        console.log('  - cfg:', runpodInput.cfg);
-        console.log('  - steps:', runpodInput.steps);
-        console.log('  - width:', runpodInput.width);
-        console.log('  - height:', runpodInput.height);
-        console.log('  - fps:', runpodInput.fps);
-        if (runpodInput.points_store) {
-            console.log('  - points_store:', runpodInput.points_store);
-        }
-        if (runpodInput.coordinates) {
-            console.log('  - coordinates:', runpodInput.coordinates);
-        }
-        if (runpodInput.neg_coordinates) {
-            console.log('  - neg_coordinates:', runpodInput.neg_coordinates);
-        }
-
-        // RunPod 입력 로그 출력
-        console.log('🚀 Submitting job to RunPod...', runpodInput);
-
         // Submit job to RunPod using user settings
         let runpodJobId: string;
         try {
-            console.log('🔧 Creating RunPod service with user settings...');
             const runpodService = new RunPodService(
                 runpodSettings.apiKey,
                 runpodSettings.endpoints['wan-animate'],
                 runpodSettings.generateTimeout || 3600
             );
 
-            console.log('🔧 Submitting to RunPod with input:', runpodInput);
             runpodJobId = await runpodService.submitJob(runpodInput);
 
             console.log(`✅ RunPod job submitted successfully: ${runpodJobId}`);
@@ -348,6 +330,8 @@ export async function POST(request: NextRequest) {
                     steps,
                     width,
                     height,
+                    fps,
+                    mode,
                     pointsStore,
                     coordinates,
                     negCoordinates,

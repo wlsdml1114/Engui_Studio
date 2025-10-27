@@ -66,6 +66,7 @@ interface WanAnimateInput {
   width: number;
   height: number;
   fps?: number;
+  mode?: string;
   points_store?: {
     positive: Array<{x: number, y: number}>;
     negative: Array<{x: number, y: number}>;
@@ -200,6 +201,7 @@ class RunPodService {
           width: input.width,
           height: input.height,
           ...(input.fps && { fps: input.fps }),
+          ...(input.mode && { mode: input.mode }),
           points_store: input.points_store,
           coordinates: input.coordinates,
           neg_coordinates: input.neg_coordinates,
@@ -208,20 +210,19 @@ class RunPodService {
         }
       };
 
-      console.log('🎭 WanAnimate payload created:');
-      console.log('  - prompt:', payload.input.prompt);
-      console.log('  - positive_prompt:', payload.input.positive_prompt);
-      console.log('  - seed:', payload.input.seed);
-      console.log('  - cfg:', payload.input.cfg);
-      console.log('  - steps:', payload.input.steps);
-      console.log('  - width:', payload.input.width);
-      console.log('  - height:', payload.input.height);
-      console.log('  - fps:', payload.input.fps || 'not set');
-      console.log('  - points_store:', payload.input.points_store);
-      console.log('  - coordinates:', payload.input.coordinates);
-      console.log('  - neg_coordinates:', payload.input.neg_coordinates);
-      console.log('  - image_path:', payload.input.image_path || 'not set');
-      console.log('  - video_path:', payload.input.video_path || 'not set');
+      console.log('🎭 WanAnimate payload created:', {
+        prompt: payload.input.prompt,
+        seed: payload.input.seed,
+        cfg: payload.input.cfg,
+        steps: payload.input.steps,
+        width: payload.input.width,
+        height: payload.input.height,
+        fps: payload.input.fps || 'not set',
+        mode: payload.input.mode || 'not set',
+        ...(payload.input.points_store && { points_store: '✓ set' }),
+        ...(payload.input.coordinates && { coordinates: '✓ set' }),
+        ...(payload.input.neg_coordinates && { neg_coordinates: '✓ set' })
+      });
     } else if ('cfg' in input && !('video_path' in input) && !('positive_prompt' in input)) {
       // Wan22 input
       payload = {

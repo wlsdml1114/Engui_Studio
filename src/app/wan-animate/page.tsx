@@ -24,6 +24,7 @@ export default function WanAnimatePage() {
   const [steps, setSteps] = useState(4);
   const [width, setWidth] = useState(512);
   const [height, setHeight] = useState(512);
+  const [mode, setMode] = useState<'animate' | 'replace'>('replace');
   
   // 인물 선택 관련 상태
   const [showPersonSelection, setShowPersonSelection] = useState(false);
@@ -54,9 +55,13 @@ export default function WanAnimatePage() {
   // 입력값 자동 로드 기능
   useEffect(() => {
     const reuseData = localStorage.getItem('reuseInputs');
+    console.log('📦 [WAN Animate] localStorage에서 reuseInputs 로드:', reuseData);
     if (reuseData) {
       try {
         const data = JSON.parse(reuseData);
+        console.log('📦 [WAN Animate] 파싱된 데이터:', data);
+        console.log('📦 [WAN Animate] data.type:', data.type);
+        console.log('📦 [WAN Animate] data.mode:', data.mode);
         if (data.type === 'wan-animate') {
           // 프롬프트 로드
           if (data.prompt) {
@@ -107,13 +112,33 @@ export default function WanAnimatePage() {
             if (options.width !== undefined) setWidth(options.width);
             if (options.height !== undefined) setHeight(options.height);
           }
-          
+
+          // Mode 로드
+          console.log('🎭 [WAN Animate] mode 로드 시작');
+          console.log('🎭 [WAN Animate] 현재 mode state:', mode);
+          console.log('🎭 [WAN Animate] data.mode 타입:', typeof data.mode);
+          console.log('🎭 [WAN Animate] data.mode 값:', data.mode);
+          console.log('🎭 [WAN Animate] data.mode 검사 (!!data.mode):', !!data.mode);
+
+          if (data.mode) {
+            console.log('🎭 [WAN Animate] mode 설정 시작:', data.mode);
+            console.log('🎭 [WAN Animate] setMode 실행 전 mode:', mode);
+            setMode(data.mode as 'animate' | 'replace');
+            console.log('🎭 [WAN Animate] setMode 호출 완료 (state는 다음 렌더링에 적용됨)');
+          } else {
+            console.log('🎭 [WAN Animate] data.mode이 없어서 기본값 사용');
+          }
+
           // 성공 메시지 표시
           setMessage({ type: 'success', text: t('messages.inputsLoaded') });
           setMessageType('inputsLoaded');
-          
+
+          console.log('🎭 [WAN Animate] localStorage 제거 전 mode:', mode);
+
           // 로컬 스토리지에서 데이터 제거 (한 번만 사용)
           localStorage.removeItem('reuseInputs');
+
+          console.log('🎭 [WAN Animate] localStorage 제거 완료');
         }
       } catch (error) {
         console.error('입력값 로드 중 오류:', error);
@@ -127,6 +152,11 @@ export default function WanAnimatePage() {
       setMessage({ type: 'success', text: t('messages.inputsLoaded') });
     }
   }, [language, messageType]);
+
+  // Mode 상태 변경 감지 (디버깅용)
+  useEffect(() => {
+    console.log('🎭 [WAN Animate] mode state 업데이트됨:', mode);
+  }, [mode]);
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -417,10 +447,12 @@ export default function WanAnimatePage() {
       formData.append('steps', steps.toString());
       formData.append('width', width.toString());
       formData.append('height', height.toString());
+      formData.append('mode', mode);
       // 비디오 FPS 추가 (기본값 30으로 설정)
       const fpsToSend = videoFps || 30;
       formData.append('fps', fpsToSend.toString());
       console.log('🎬 FPS 전송:', fpsToSend, '(원본:', videoFps, ')');
+      console.log('🎭 Mode 전송:', mode);
       // 선택된 포인트들을 올바른 형식으로 변환하여 전송
       if (selectedPoints.length > 0) {
         // 좌표를 출력 크기에 맞게 조정
@@ -815,6 +847,36 @@ export default function WanAnimatePage() {
                       ⚠️ {t('common.size.mustBeMultipleOf64')}. {t('common.size.recommended')}: {adjustToMultipleOf64(height)}px
                     </p>
                   )}
+                </div>
+
+                {/* Mode Selection */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2">Mode</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setMode('replace')}
+                      className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+                        mode === 'replace'
+                          ? 'bg-primary text-white'
+                          : 'bg-background border border-border hover:border-primary'
+                      }`}
+                    >
+                      Replace
+                    </button>
+                    <button
+                      onClick={() => setMode('animate')}
+                      className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+                        mode === 'animate'
+                          ? 'bg-primary text-white'
+                          : 'bg-background border border-border hover:border-primary'
+                      }`}
+                    >
+                      Animate
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t(`wanAnimate.modeDescriptions.${mode}`)}
+                  </p>
                 </div>
               </div>
             </div>
