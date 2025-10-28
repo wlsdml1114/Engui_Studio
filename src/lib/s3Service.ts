@@ -142,19 +142,22 @@ class S3Service {
   }
 
   // AWS CLI 명령어 실행 (execFile 사용)
-  private async runAwsCommand(args: string[]): Promise<{ stdout: string; stderr: string }> {
+  private async runAwsCommand(args: string[], options?: { silent?: boolean }): Promise<{ stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
+      const isSilent = options?.silent === true;
 
-      logger.emoji.search('🔍 Starting AWS CLI process with args:', args);
-      logger.emoji.search('🔐 AWS Config:', {
-        accessKeyId: this.config.accessKeyId ? '***' + this.config.accessKeyId.slice(-4) : 'MISSING',
-        accessKeyIdLength: this.config.accessKeyId?.length,
-        secretAccessKeyLength: this.config.secretAccessKey?.length,
-        secretAccessKey: this.config.secretAccessKey ? '***' : 'MISSING',
-        region: this.config.region,
-        bucketName: this.config.bucketName,
-        endpointUrl: this.config.endpointUrl,
-      });
+      if (!isSilent) {
+        logger.emoji.search('🔍 Starting AWS CLI process with args:', args);
+        logger.emoji.search('🔐 AWS Config:', {
+          accessKeyId: this.config.accessKeyId ? '***' + this.config.accessKeyId.slice(-4) : 'MISSING',
+          accessKeyIdLength: this.config.accessKeyId?.length,
+          secretAccessKeyLength: this.config.secretAccessKey?.length,
+          secretAccessKey: this.config.secretAccessKey ? '***' : 'MISSING',
+          region: this.config.region,
+          bucketName: this.config.bucketName,
+          endpointUrl: this.config.endpointUrl,
+        });
+      }
 
       // 자격증명 검증
       if (!this.config.accessKeyId || !this.config.secretAccessKey) {
@@ -180,20 +183,24 @@ class S3Service {
         AWS_REGION: this.config.region,
       };
 
-      logger.emoji.search('🔐 Env vars being set:', {
-        AWS_ACCESS_KEY_ID_SET: !!env.AWS_ACCESS_KEY_ID,
-        AWS_SECRET_ACCESS_KEY_SET: !!env.AWS_SECRET_ACCESS_KEY,
-        AWS_DEFAULT_REGION: env.AWS_DEFAULT_REGION,
-      });
+      if (!isSilent) {
+        logger.emoji.search('🔐 Env vars being set:', {
+          AWS_ACCESS_KEY_ID_SET: !!env.AWS_ACCESS_KEY_ID,
+          AWS_SECRET_ACCESS_KEY_SET: !!env.AWS_SECRET_ACCESS_KEY,
+          AWS_DEFAULT_REGION: env.AWS_DEFAULT_REGION,
+        });
 
-      logger.emoji.search('🚀 Executing AWS CLI command:', ['aws', ...args].join(' '));
+        logger.emoji.search('🚀 Executing AWS CLI command:', ['aws', ...args].join(' '));
+      }
 
       // 리전 정규화 (AWS CLI는 소문자 region을 기대함)
       const normalizedArgs = args.map((arg, idx, arr) => {
         if (arg === '--region' && idx + 1 < arr.length) {
           const region = arr[idx + 1];
           if (region !== region.toLowerCase()) {
-            logger.emoji.search(`📝 Normalizing region: ${region} → ${region.toLowerCase()}`);
+            if (!isSilent) {
+              logger.emoji.search(`📝 Normalizing region: ${region} → ${region.toLowerCase()}`);
+            }
             arr[idx + 1] = region.toLowerCase();
           }
         }
@@ -206,22 +213,28 @@ class S3Service {
         timeout: (this.config.timeout || 3600) * 1000,
         maxBuffer: 10 * 1024 * 1024, // 10MB 버퍼
       }, (error: any, stdout: string, stderr: string) => {
-        logger.emoji.search(`📊 AWS CLI process completed`);
-        logger.emoji.search('📤 stdout length:', stdout.length);
-        logger.emoji.search('stdout preview:', stdout.substring(0, 500));
-        logger.emoji.search('❌ stderr length:', stderr.length);
-        logger.emoji.search('❌ stderr content:', stderr);
-        logger.emoji.search('Exit code:', error?.code || 0);
+        if (!isSilent) {
+          logger.emoji.search(`📊 AWS CLI process completed`);
+          logger.emoji.search('📤 stdout length:', stdout.length);
+          logger.emoji.search('stdout preview:', stdout.substring(0, 500));
+          logger.emoji.search('❌ stderr length:', stderr.length);
+          logger.emoji.search('❌ stderr content:', stderr);
+          logger.emoji.search('Exit code:', error?.code || 0);
+        }
 
         if (error && error.code !== 0) {
           const errorMsg = stderr || stdout || error.message || `AWS CLI exited with code ${error.code}`;
-          logger.error(`❌ AWS CLI exited with code ${error.code}`);
-          logger.error('Error details:', errorMsg);
+          if (!isSilent) {
+            logger.error(`❌ AWS CLI exited with code ${error.code}`);
+            logger.error('Error details:', errorMsg);
+          }
           return reject(new Error(`AWS CLI exited with code ${error.code}: ${errorMsg}`));
         }
 
         if (error && error.signal) {
-          logger.error('❌ AWS CLI killed by signal:', error.signal);
+          if (!isSilent) {
+            logger.error('❌ AWS CLI killed by signal:', error.signal);
+          }
           return reject(new Error(`AWS CLI killed by signal ${error.signal}`));
         }
 
@@ -557,7 +570,7 @@ class S3Service {
             this.config.endpointUrl,
           ];
 
-          await this.runAwsCommand(checkArgs);
+          await this.runAwsCommand(checkArgs, { silent: true });
 
           // 파일이 존재하면 번호를 추가
           logger.emoji.search(`📂 File exists, checking for available numbered name...`);
@@ -581,7 +594,7 @@ class S3Service {
                 this.config.endpointUrl,
               ];
 
-              await this.runAwsCommand(checkDuplicateArgs);
+              await this.runAwsCommand(checkDuplicateArgs, { silent: true });
               counter++;
               newObjectKey = basePath
                 ? `${basePath}${fileNameWithoutExt}_${counter}${fileExt}`
