@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
       secretAccessKey: settings.s3.secretAccessKey,
       bucketName: volume,
       region: settings.s3.region || 'us-east-1',
+      useGlobalNetworking: settings.s3.useGlobalNetworking ?? false,
     });
 
     // 여러 파일 업로드

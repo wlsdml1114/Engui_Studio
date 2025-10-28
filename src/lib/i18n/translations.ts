@@ -57,6 +57,13 @@ export const translations = {
       s3UploadTimeout: 'S3 업로드 타임아웃 (초)',
       s3UploadTimeoutDesc: '💡 기본값: 3600초 (1시간). 큰 파일 업로드 시 늘릴 수 있습니다.',
       secretAccessKey: 'Secret Access Key',
+      globalNetworkMode: 'Global Network Mode',
+      globalNetworkModeDesc: 'Global Network Mode를 활성화하거나 비활성화합니다.',
+      globalNetworkEnabled: '✅ Global network mode enabled - Uses direct API calls',
+      globalNetworkDisabled: '⚠️ Local network mode - Uses AWS CLI with standard networking',
+      uploadMethods: '📋 Upload Methods:',
+      uploadMethodGlobal: '• Global Network (Enabled): Direct S3 API calls with global network access',
+      uploadMethodLocal: '• Local Network (Disabled): AWS CLI-based uploads suitable for restricted networks',
 
       // Status
       fullyConfigured: '완전히 구성됨',
@@ -740,6 +747,13 @@ export const translations = {
       s3UploadTimeout: 'S3 Upload Timeout (seconds)',
       s3UploadTimeoutDesc: '💡 Default: 3600 seconds (1 hour). Increase for large file uploads.',
       secretAccessKey: 'Secret Access Key',
+      globalNetworkMode: 'Global Network Mode',
+      globalNetworkModeDesc: 'Enable or disable Global Network Mode.',
+      globalNetworkEnabled: '✅ Global network mode enabled - Uses direct API calls',
+      globalNetworkDisabled: '⚠️ Local network mode - Uses AWS CLI with standard networking',
+      uploadMethods: '📋 Upload Methods:',
+      uploadMethodGlobal: '• Global Network (Enabled): Direct S3 API calls with global network access',
+      uploadMethodLocal: '• Local Network (Disabled): AWS CLI-based uploads suitable for restricted networks',
 
       // Status
       fullyConfigured: 'Fully Configured',

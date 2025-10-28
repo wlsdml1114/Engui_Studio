@@ -1345,8 +1345,10 @@ export default function Library() {
     { revalidateOnFocus: false }
   );
 
+  const workspaces = workspaceData?.workspaces || [];
+
   // 작업 데이터 가져오기 (워크스페이스 필터 포함)
-  const jobsUrl = selectedWorkspaceId 
+  const jobsUrl = selectedWorkspaceId
     ? `/api/jobs?page=${currentPage}&limit=${ITEMS_PER_PAGE}&workspaceId=${selectedWorkspaceId}`
     : `/api/jobs?page=${currentPage}&limit=${ITEMS_PER_PAGE}`;
     
@@ -1381,7 +1383,6 @@ export default function Library() {
 
   // 데이터 변수들 선언
   const jobs: JobItem[] = data?.jobs || [];
-  const workspaces: Workspace[] = workspaceData?.workspaces || [];
   const processingJobs = jobs.filter(job => job.status === 'processing').length;
   
   // 즐겨찾기 필터링
@@ -1418,6 +1419,8 @@ export default function Library() {
   useEffect(() => {
     const initializeWorkspace = async () => {
       try {
+        console.log('🔄 Initializing workspace...');
+
         // 기본 워크스페이스 초기화
         const response = await fetch('/api/workspaces/initialize', {
           method: 'POST',
@@ -1429,11 +1432,13 @@ export default function Library() {
           const { workspace, isNew } = await response.json();
           if (isNew) {
             console.log('✅ 기본 워크스페이스 생성됨:', workspace.name);
+          } else {
+            console.log('✅ 기본 워크스페이스 존재:', workspace.name);
           }
-          
+
           // 워크스페이스 새로고침
           await mutateWorkspaces();
-          
+
           // 마지막으로 선택된 워크스페이스를 설정으로부터 로드시도
           try {
             const settingsResponse = await fetch('/api/settings?userId=user-with-settings');
@@ -1441,15 +1446,18 @@ export default function Library() {
               const { settings } = await settingsResponse.json();
               const currentWorkspaceId = settings.workspace?.currentWorkspaceId || settings.workspace?.defaultWorkspaceId;
               if (currentWorkspaceId) {
+                console.log('✅ 저장된 워크스페이스 선택:', currentWorkspaceId);
                 setSelectedWorkspaceId(currentWorkspaceId);
               } else if (workspace.id) {
                 // 기본 워크스페이스를 현재 워크스페이스로 설정
+                console.log('✅ 기본 워크스페이스 선택:', workspace.id);
                 setSelectedWorkspaceId(workspace.id);
               }
             }
           } catch (error) {
             console.error('설정 로드 실패:', error);
             // 폴백: 생성된 워크스페이스를 선택
+            console.log('✅ 폴백: 초기화된 워크스페이스 선택:', workspace.id);
             setSelectedWorkspaceId(workspace.id);
           }
         }
@@ -1458,10 +1466,16 @@ export default function Library() {
       }
     };
 
-    if (!selectedWorkspaceId && workspaces.length === 0) {
+    // 워크스페이스가 로드되었는데 선택된 워크스페이스가 없으면 초기화
+    if (!selectedWorkspaceId && workspaces.length > 0) {
+      console.log('⚠️ 워크스페이스가 로드되었으나 선택된 워크스페이스가 없음. 초기화 시작...');
+      initializeWorkspace();
+    } else if (!selectedWorkspaceId && workspaces.length === 0) {
+      // 워크스페이스가 로드되지 않았으면 초기화
+      console.log('⚠️ 워크스페이스가 로드되지 않음. 초기화 시작...');
       initializeWorkspace();
     }
-  }, [selectedWorkspaceId, workspaces.length, mutateWorkspaces]);
+  }, [selectedWorkspaceId, workspaces, mutateWorkspaces]);
 
   const handleItemClick = (item: JobItem) => {
     setSelectedItem(item);

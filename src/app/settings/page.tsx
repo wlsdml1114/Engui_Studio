@@ -35,6 +35,7 @@ interface ServiceConfig {
     bucketName: string;
     region: string;
     timeout: number;
+    useGlobalNetworking?: boolean;
   };
 }
 
@@ -80,7 +81,8 @@ export default function SettingsPage() {
       secretAccessKey: '',
       bucketName: '',
       region: '',
-      timeout: 3600
+      timeout: 3600,
+      useGlobalNetworking: false
     }
   });
   
@@ -285,13 +287,20 @@ export default function SettingsPage() {
   };
 
   const updateSetting = (service: 'runpod' | 's3', key: string, value: string | number, subKey?: string) => {
+    let finalValue = value;
+
+    // S3 region을 자동으로 소문자로 변환
+    if (service === 's3' && key === 'region' && typeof value === 'string') {
+      finalValue = value.toLowerCase();
+    }
+
     setSettings(prev => ({
       ...prev,
       [service]: {
         ...prev[service],
-        ...(subKey 
-          ? { [key]: { ...(prev[service] as any)?.[key], [subKey]: value } }
-          : { [key]: value }
+        ...(subKey
+          ? { [key]: { ...(prev[service] as any)?.[key], [subKey]: finalValue } }
+          : { [key]: finalValue }
         )
       }
     } as any));
@@ -704,6 +713,39 @@ export default function SettingsPage() {
                 {getStatusText(status.s3)}
               </span>
             </h2>
+          </div>
+
+          {/* Global Network Toggle */}
+          <div className="mb-6 p-4 bg-background border border-border rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <label className="block text-sm font-semibold text-foreground mb-1">
+                  Global Network Mode
+                </label>
+                <p className="text-xs text-foreground/60">
+                  {settings.s3?.useGlobalNetworking
+                    ? '✅ Global network mode enabled - Uses direct API calls'
+                    : '⚠️ Local network mode - Uses AWS CLI with standard networking'}
+                </p>
+              </div>
+              <button
+                onClick={() => updateSetting('s3', 'useGlobalNetworking', !settings.s3?.useGlobalNetworking)}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  settings.s3?.useGlobalNetworking
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                    : 'bg-gray-600 hover:bg-gray-700 text-white'
+                }`}
+              >
+                {settings.s3?.useGlobalNetworking ? '🌍 Enabled' : '🔒 Disabled'}
+              </button>
+            </div>
+            <div className="mt-3 p-3 bg-secondary border border-border rounded text-xs text-foreground/70">
+              <strong>📋 Upload Methods:</strong>
+              <ul className="mt-2 space-y-1">
+                <li>• <strong>Global Network (Enabled):</strong> Direct S3 API calls with global network access</li>
+                <li>• <strong>Local Network (Disabled):</strong> AWS CLI-based uploads suitable for restricted networks</li>
+              </ul>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
