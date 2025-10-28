@@ -37,7 +37,7 @@ export default function S3StoragePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [selectedVolume, setSelectedVolume] = useState<string>('');
   const [newFolderName, setNewFolderName] = useState<string>('');
   const [showCreateFolder, setShowCreateFolder] = useState<boolean>(false);
@@ -94,7 +94,7 @@ export default function S3StoragePage() {
 
   // 파일 업로드
   const handleUpload = () => {
-    if (!uploadFile || !selectedVolume) return;
+    if (uploadFiles.length === 0 || !selectedVolume) return;
 
     setIsLoading(true);
     setError(null);
@@ -102,18 +102,23 @@ export default function S3StoragePage() {
     setUploadStatus(t('s3Storage.status.preparing'));
 
     console.log('🔍 Frontend - currentPath:', currentPath);
-    console.log('🔍 Frontend - uploadFile:', uploadFile.name);
+    console.log('🔍 Frontend - uploadFiles count:', uploadFiles.length);
 
     setUploadStatus(t('s3Storage.status.uploading'));
-    
+
     const formData = new FormData();
-    formData.append('file', uploadFile);
+
+    // 여러 파일을 FormData에 추가
+    uploadFiles.forEach((file) => {
+      formData.append('files', file);
+    });
+
     formData.append('volume', selectedVolume);
     formData.append('path', currentPath || '');
 
     // XMLHttpRequest를 사용하여 실제 업로드 진행률 추적
     const xhr = new XMLHttpRequest();
-    
+
     // 업로드 진행률 추적 (브라우저 → 서버 전송만 추적)
     xhr.upload.addEventListener('progress', (event) => {
       if (event.lengthComputable) {
@@ -132,7 +137,7 @@ export default function S3StoragePage() {
         // 서버 처리 중 시뮬레이션 (20% → 100%)
         setUploadStatus(t('s3Storage.status.processing'));
         setUploadProgress(20);
-        
+
         // 서버 처리 시뮬레이션
         const simulateServerProcessing = () => {
           setUploadProgress(40);
@@ -143,10 +148,10 @@ export default function S3StoragePage() {
               setTimeout(() => {
                 setUploadProgress(100);
                 setUploadStatus(t('s3Storage.status.complete'));
-                
+
                 // 성공 알림 표시
                 setTimeout(() => {
-                  setUploadFile(null);
+                  setUploadFiles([]);
                   setUploadProgress(0);
                   setUploadStatus('');
                   fetchFiles(currentPath); // 목록 새로고침
@@ -155,16 +160,16 @@ export default function S3StoragePage() {
             }, 500);
           }, 500);
         };
-        
+
         simulateServerProcessing();
       } else {
         setUploadStatus(t('s3Storage.status.failed'));
         setUploadProgress(0);
-        
+
         try {
           const errorData = JSON.parse(xhr.responseText);
           console.error('Upload error:', errorData);
-          
+
           // 경로 충돌 에러인 경우 특별한 메시지 표시
           if (errorData.error && (errorData.error.includes('경로 충돌') || errorData.error.includes('path conflict'))) {
             setError(errorData.error);
@@ -619,7 +624,8 @@ export default function S3StoragePage() {
                 <Input
                   id="file-upload"
                   type="file"
-                  onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                  multiple
+                  onChange={(e) => setUploadFiles(Array.from(e.target.files || []))}
                   accept=".pt,.pth,.ckpt,.safetensors,.lora"
                 />
               </div>
@@ -658,10 +664,26 @@ export default function S3StoragePage() {
                 </div>
               )}
               
+              {uploadFiles.length > 0 && (
+                <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                  <p className="text-sm text-blue-300">
+                    {uploadFiles.length} {t('s3Storage.filesSelected')}
+                  </p>
+                  <div className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+                    {uploadFiles.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between text-xs text-gray-300">
+                        <span className="truncate">{file.name}</span>
+                        <span className="text-gray-500 ml-2">({formatFileSize(file.size)})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="flex space-x-2">
-                <Button 
-                  onClick={handleUpload} 
-                  disabled={!uploadFile || !selectedVolume || isLoading}
+                <Button
+                  onClick={handleUpload}
+                  disabled={uploadFiles.length === 0 || !selectedVolume || isLoading}
                   className="flex-1"
                 >
                   <Upload className="w-4 h-4 mr-2" />
