@@ -301,6 +301,13 @@ export default function SettingsPage() {
     setShowSecrets(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
+  // Mask sensitive data: show first 4 characters, rest as asterisks
+  const maskSensitiveValue = (value: string, show: boolean): string => {
+    if (!value || show) return value;
+    if (value.length <= 4) return '*'.repeat(value.length);
+    return value.substring(0, 4) + '*'.repeat(value.length - 4);
+  };
+
   const getStatusIcon = (serviceStatus: 'configured' | 'partial' | 'missing') => {
     switch (serviceStatus) {
       case 'configured':
@@ -730,26 +737,52 @@ export default function SettingsPage() {
               <label className="block text-sm font-medium text-foreground/80 mb-2">
                 Access Key ID
               </label>
-              <input
-                type="text"
-                value={settings.s3?.accessKeyId || ''}
-                onChange={(e) => updateSetting('s3', 'accessKeyId', e.target.value)}
-                className="w-full px-3 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Access key ID"
-              />
+              <div className="relative">
+                <input
+                  type={showSecrets['s3-access-key'] ? 'text' : 'password'}
+                  value={settings.s3?.accessKeyId || ''}
+                  onChange={(e) => updateSetting('s3', 'accessKeyId', e.target.value)}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Access key ID"
+                />
+                <button
+                  type="button"
+                  onClick={() => toggleSecretVisibility('s3-access-key')}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-foreground/60 hover:text-foreground"
+                >
+                  {showSecrets['s3-access-key'] ? (
+                    <EyeSlashIcon className="w-4 h-4" />
+                  ) : (
+                    <EyeIcon className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-foreground/80 mb-2">
                 Bucket Name
               </label>
-              <input
-                type="text"
-                value={settings.s3?.bucketName || ''}
-                onChange={(e) => updateSetting('s3', 'bucketName', e.target.value)}
-                className="w-full px-3 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="bucket-name"
-              />
+              <div className="relative">
+                <input
+                  type={showSecrets['s3-bucket-name'] ? 'text' : 'password'}
+                  value={settings.s3?.bucketName || ''}
+                  onChange={(e) => updateSetting('s3', 'bucketName', e.target.value)}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="bucket-name"
+                />
+                <button
+                  type="button"
+                  onClick={() => toggleSecretVisibility('s3-bucket-name')}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-foreground/60 hover:text-foreground"
+                >
+                  {showSecrets['s3-bucket-name'] ? (
+                    <EyeSlashIcon className="w-4 h-4" />
+                  ) : (
+                    <EyeIcon className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div>
