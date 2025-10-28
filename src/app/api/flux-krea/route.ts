@@ -329,7 +329,15 @@ async function processFluxKreaJob(jobId: string, runpodJobId: string, runpodSett
                     options: JSON.stringify({
                         ...JSON.parse((await prisma.job.findUnique({ where: { id: jobId } }))?.options || '{}'),
                         runpodResultUrl,
-                        runpodOutput: result.output,
+                        runpodOutput: Object.keys(result.output || {}).reduce((acc: any, key: string) => {
+                            const value = result.output[key];
+                            if (typeof value === 'string' && value.length > 1000) {
+                                acc[key] = `${value.substring(0, 100)}... (${value.length} characters)`;
+                            } else {
+                                acc[key] = value;
+                            }
+                            return acc;
+                        }, {}),
                         completedAt: new Date().toISOString(),
                         processingTime: `${Math.round((Date.now() - new Date((await prisma.job.findUnique({ where: { id: jobId } }))?.createdAt || Date.now()).getTime()) / 1000)}초`
                     })

@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
       secretAccessKey: settings.s3.secretAccessKey,
       bucketName: settings.s3.bucketName || volume,
       region: settings.s3.region || 'us-east-1',
+      useGlobalNetworking: settings.s3.useGlobalNetworking ?? false,
     });
 
     // 파일 다운로드

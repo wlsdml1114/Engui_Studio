@@ -453,7 +453,15 @@ async function processMultiTalkJob(jobId: string, runpodJobId: string) {
                     options: JSON.stringify({
                         ...JSON.parse(job.options || '{}'),
                         runpodResultUrl,
-                        runpodOutput: result.output,
+                        runpodOutput: Object.keys(result.output || {}).reduce((acc: any, key: string) => {
+                            const value = result.output[key];
+                            if (typeof value === 'string' && value.length > 1000) {
+                                acc[key] = `${value.substring(0, 100)}... (${value.length} characters)`;
+                            } else {
+                                acc[key] = value;
+                            }
+                            return acc;
+                        }, {}),
                         completedAt: new Date().toISOString()
                     })
                 },

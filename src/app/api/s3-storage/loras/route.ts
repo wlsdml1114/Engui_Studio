@@ -44,7 +44,8 @@ export async function GET(request: NextRequest) {
             secretAccessKey: settings.s3.secretAccessKey,
             bucketName: volume, // 동적으로 선택된 볼륨 사용
             region: settings.s3.region || 'us-east-1',
-            timeout: settings.s3.timeout || 3600
+            timeout: settings.s3.timeout || 3600,
+            useGlobalNetworking: settings.s3.useGlobalNetworking ?? false
         });
         
         // loras/ 폴더에서 .safetensors 파일만 가져오기

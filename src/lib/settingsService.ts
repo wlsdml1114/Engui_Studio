@@ -54,6 +54,7 @@ interface S3Config {
   bucketName: string;
   region: string;
   timeout?: number;
+  useGlobalNetworking?: boolean;
 }
 
 interface Settings {
@@ -127,7 +128,8 @@ class SettingsService {
           secretAccessKey: '',
           bucketName: '',
           region: '',
-          timeout: 3600 // 기본값 3600초 (1시간)
+          timeout: 3600, // 기본값 3600초 (1시간)
+          useGlobalNetworking: false // 기본값 false (Local network mode)
         },
         workspace: {
           currentWorkspaceId: '',
@@ -167,10 +169,15 @@ class SettingsService {
             }
           } else if (setting.serviceName === 's3') {
             if (['endpointUrl', 'accessKeyId', 'secretAccessKey', 'bucketName', 'region'].includes(setting.configKey)) {
-              settings.s3[setting.configKey as keyof typeof settings.s3] = value;
+              // Region을 소문자로 정규화 (AWS CLI expects lowercase)
+              const processedValue = setting.configKey === 'region' ? value.toLowerCase() : value;
+              settings.s3[setting.configKey as keyof typeof settings.s3] = processedValue;
             } else if (setting.configKey === 'timeout') {
               // timeout은 숫자로 변환
               settings.s3.timeout = parseInt(value) || 3600;
+            } else if (setting.configKey === 'useGlobalNetworking') {
+              // useGlobalNetworking은 boolean으로 변환
+              settings.s3.useGlobalNetworking = value === 'true';
             }
           } else if (setting.serviceName === 'workspace') {
             if (setting.configKey === 'currentWorkspaceId') {

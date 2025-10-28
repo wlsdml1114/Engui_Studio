@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
       secretAccessKey: settings.s3.secretAccessKey,
       bucketName: volume,
       region: settings.s3.region || 'us-east-1',
+      useGlobalNetworking: settings.s3.useGlobalNetworking ?? false,
     });
 
     // 폴더 생성 전에 충돌 확인

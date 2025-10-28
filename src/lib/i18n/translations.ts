@@ -57,6 +57,13 @@ export const translations = {
       s3UploadTimeout: 'S3 업로드 타임아웃 (초)',
       s3UploadTimeoutDesc: '💡 기본값: 3600초 (1시간). 큰 파일 업로드 시 늘릴 수 있습니다.',
       secretAccessKey: 'Secret Access Key',
+      globalNetworkMode: 'Global Network Mode',
+      globalNetworkModeDesc: 'Global Network Mode를 활성화하거나 비활성화합니다.',
+      globalNetworkEnabled: '✅ Global network mode enabled - Uses direct API calls',
+      globalNetworkDisabled: '⚠️ Local network mode - Uses AWS CLI with standard networking',
+      uploadMethods: '📋 Upload Methods:',
+      uploadMethodGlobal: '• Global Network (Enabled): Direct S3 API calls with global network access',
+      uploadMethodLocal: '• Local Network (Disabled): AWS CLI-based uploads suitable for restricted networks',
 
       // Status
       fullyConfigured: '완전히 구성됨',
@@ -238,6 +245,10 @@ export const translations = {
       inputRequired: '이미지 또는 비디오 파일을 업로드해주세요.',
       promptRequired: '프롬프트를 입력해주세요.',
       generationStarted: '비디오 생성이 시작되었습니다. Job ID: {jobId}',
+      modeDescriptions: {
+        replace: 'Replace mode: 비디오의 인물을 이미지의 인물이 대체합니다.',
+        animate: 'Animate mode: 이미지의 인물이 비디오의 모션을 따라합니다.'
+      },
       dragAndDrop: {
         dropHere: '🎯 여기에 놓으세요!',
         selectImage: '이미지 파일 선택',
@@ -422,6 +433,7 @@ export const translations = {
       fileList: '파일 목록',
       itemsCount: '개 항목',
       uploadLocation: '업로드 위치',
+      uploadLocationHelper: '파일이 이 위치에 업로드됩니다',
       refresh: '새로고침',
       parentFolder: '상위 폴더',
       createFolder: '폴더 생성',
@@ -429,6 +441,11 @@ export const translations = {
       cancel: '취소',
       uploading: '업로드 중...',
       uploadComplete: '업로드가 완료되었습니다!',
+      fileUpload: '파일 업로드',
+      uploadDescription: '모델이나 LoRA 파일을 네트워크 볼륨에 업로드하세요',
+      selectFile: '파일 선택',
+      filesSelected: '개 파일 선택됨',
+      loading: '로딩 중...',
       folderCreateNote: 'S3에서는 폴더가 자동으로 생성됩니다. 파일을 업로드하면 해당 경로의 폴더가 자동으로 만들어집니다.',
       uploadDesc: '모델이나 LoRA 파일을 네트워크 볼륨에 업로드하세요',
       uploadLocationNote: '파일이 이 위치에 업로드됩니다',
@@ -438,11 +455,15 @@ export const translations = {
         processing: '서버에서 처리 중...',
         complete: '업로드 완료!',
         failed: '업로드 실패',
+        cancelled: '업로드 취소됨',
         creatingFolder: '폴더 생성 중...',
         folderCreated: '폴더 생성 완료!',
         folderCreateFailed: '폴더 생성 실패'
       },
       noFiles: '파일이 없습니다',
+      fetchFilesFailed: '파일 목록을 가져올 수 없습니다.',
+      deleteConflictFile: '충돌 파일 삭제',
+      close: '닫기',
       fileType: {
         directory: 'directory',
         model: 'model',
@@ -451,7 +472,7 @@ export const translations = {
       },
       errors: {
         volumeInitFailed: '볼륨을 초기화할 수 없습니다.',
-        fileListFailed: '파일 목록을 가져올 수 없습니다.',
+        fetchFilesFailed: '파일 목록을 가져올 수 없습니다.',
         serverUnstable: 'RunPod S3 서버가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.',
         uploadFailed: '파일 업로드에 실패했습니다.',
         pathConflict: '경로 충돌',
@@ -726,6 +747,13 @@ export const translations = {
       s3UploadTimeout: 'S3 Upload Timeout (seconds)',
       s3UploadTimeoutDesc: '💡 Default: 3600 seconds (1 hour). Increase for large file uploads.',
       secretAccessKey: 'Secret Access Key',
+      globalNetworkMode: 'Global Network Mode',
+      globalNetworkModeDesc: 'Enable or disable Global Network Mode.',
+      globalNetworkEnabled: '✅ Global network mode enabled - Uses direct API calls',
+      globalNetworkDisabled: '⚠️ Local network mode - Uses AWS CLI with standard networking',
+      uploadMethods: '📋 Upload Methods:',
+      uploadMethodGlobal: '• Global Network (Enabled): Direct S3 API calls with global network access',
+      uploadMethodLocal: '• Local Network (Disabled): AWS CLI-based uploads suitable for restricted networks',
 
       // Status
       fullyConfigured: 'Fully Configured',
@@ -907,6 +935,10 @@ export const translations = {
       inputRequired: 'Please upload image or video file.',
       promptRequired: 'Please enter a prompt.',
       generationStarted: 'Video generation has started. Job ID: {jobId}',
+      modeDescriptions: {
+        replace: 'Replace mode: The person in the image replaces the person in the video.',
+        animate: 'Animate mode: The person in the image follows the motion of the video.'
+      },
       dragAndDrop: {
         dropHere: '🎯 Drop here!',
         selectImage: 'Select Image File',
@@ -1091,6 +1123,7 @@ export const translations = {
       fileList: 'File List',
       itemsCount: 'items',
       uploadLocation: 'Upload Location',
+      uploadLocationHelper: 'Files will be uploaded to this location',
       refresh: 'Refresh',
       parentFolder: 'Parent Folder',
       createFolder: 'Create Folder',
@@ -1098,6 +1131,11 @@ export const translations = {
       cancel: 'Cancel',
       uploading: 'Uploading...',
       uploadComplete: 'Upload completed!',
+      fileUpload: 'File Upload',
+      uploadDescription: 'Upload models or LoRA files to network volume',
+      selectFile: 'Select File',
+      filesSelected: 'files selected',
+      loading: 'Loading...',
       folderCreateNote: 'In S3, folders are created automatically. When you upload files, folders for that path are automatically created.',
       uploadDesc: 'Upload models or LoRA files to network volume',
       uploadLocationNote: 'Files will be uploaded to this location',
@@ -1107,11 +1145,15 @@ export const translations = {
         processing: 'Processing on server...',
         complete: 'Upload complete!',
         failed: 'Upload failed',
+        cancelled: 'Upload cancelled',
         creatingFolder: 'Creating folder...',
         folderCreated: 'Folder created!',
         folderCreateFailed: 'Folder creation failed'
       },
       noFiles: 'No files',
+      fetchFilesFailed: 'Failed to get file list.',
+      deleteConflictFile: 'Delete Conflict File',
+      close: 'Close',
       fileType: {
         directory: 'directory',
         model: 'model',
@@ -1120,7 +1162,7 @@ export const translations = {
       },
       errors: {
         volumeInitFailed: 'Failed to initialize volume.',
-        fileListFailed: 'Failed to get file list.',
+        fetchFilesFailed: 'Failed to get file list.',
         serverUnstable: 'RunPod S3 server is temporarily unstable. Please try again later.',
         uploadFailed: 'File upload failed.',
         pathConflict: 'Path conflict',

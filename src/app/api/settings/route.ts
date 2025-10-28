@@ -136,6 +136,11 @@ function validateSettings(settings: any): string | null {
         return `S3 ${field} must be a string`;
       }
     }
+
+    // Validate useGlobalNetworking if provided
+    if (settings.s3.useGlobalNetworking !== undefined && typeof settings.s3.useGlobalNetworking !== 'boolean') {
+      return 'S3 useGlobalNetworking must be a boolean';
+    }
   }
   
   return null;

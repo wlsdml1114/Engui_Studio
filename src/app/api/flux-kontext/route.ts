@@ -335,7 +335,15 @@ async function processFluxKontextJob(jobId: string) {
                 options: JSON.stringify({
                     ...JSON.parse(job.options || '{}'),
                     localFilePath, // 로컬 파일 경로 저장
-                    runpodOutput: result.output,
+                    runpodOutput: Object.keys(result.output || {}).reduce((acc: any, key: string) => {
+                        const value = result.output[key];
+                        if (typeof value === 'string' && value.length > 1000) {
+                            acc[key] = `${value.substring(0, 100)}... (${value.length} characters)`;
+                        } else {
+                            acc[key] = value;
+                        }
+                        return acc;
+                    }, {}),
                     completedAt: new Date().toISOString()
                 })
             },

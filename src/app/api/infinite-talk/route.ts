@@ -161,7 +161,15 @@ async function processInfiniteTalkJob(jobId: string, runpodJobId: string, langua
           completedAt: new Date(),
           options: JSON.stringify({
             ...JSON.parse((await prisma.job.findUnique({ where: { id: jobId } }))?.options || '{}'),
-            runpodOutput: result.output,
+            runpodOutput: Object.keys(result.output || {}).reduce((acc: any, key: string) => {
+              const value = result.output[key];
+              if (typeof value === 'string' && value.length > 1000) {
+                acc[key] = `${value.substring(0, 100)}... (${value.length} characters)`;
+              } else {
+                acc[key] = value;
+              }
+              return acc;
+            }, {}),
             runpodResultUrl,
           })
         },
