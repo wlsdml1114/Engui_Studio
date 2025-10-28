@@ -1319,7 +1319,8 @@ export default function Library() {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   
   // 워크스페이스 관련 상태
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null | undefined>(undefined);
+  const [workspaceInitialized, setWorkspaceInitialized] = useState(false);
   const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [showWorkspaceDropdown, setShowWorkspaceDropdown] = useState(false);
@@ -1444,11 +1445,11 @@ export default function Library() {
             const settingsResponse = await fetch('/api/settings?userId=user-with-settings');
             if (settingsResponse.ok) {
               const { settings } = await settingsResponse.json();
-              const currentWorkspaceId = settings.workspace?.currentWorkspaceId || settings.workspace?.defaultWorkspaceId;
-              if (currentWorkspaceId) {
+              const currentWorkspaceId = settings.workspace?.currentWorkspaceId;
+              if (currentWorkspaceId !== undefined) {
                 console.log('✅ 저장된 워크스페이스 선택:', currentWorkspaceId);
                 setSelectedWorkspaceId(currentWorkspaceId);
-              } else if (workspace.id) {
+              } else {
                 // 기본 워크스페이스를 현재 워크스페이스로 설정
                 console.log('✅ 기본 워크스페이스 선택:', workspace.id);
                 setSelectedWorkspaceId(workspace.id);
@@ -1460,19 +1461,16 @@ export default function Library() {
             console.log('✅ 폴백: 초기화된 워크스페이스 선택:', workspace.id);
             setSelectedWorkspaceId(workspace.id);
           }
+          setWorkspaceInitialized(true);
         }
       } catch (error) {
         console.error('워크스페이스 초기화 실패:', error);
       }
     };
 
-    // 워크스페이스가 로드되었는데 선택된 워크스페이스가 없으면 초기화
-    if (!selectedWorkspaceId && workspaces.length > 0) {
-      console.log('⚠️ 워크스페이스가 로드되었으나 선택된 워크스페이스가 없음. 초기화 시작...');
-      initializeWorkspace();
-    } else if (!selectedWorkspaceId && workspaces.length === 0) {
-      // 워크스페이스가 로드되지 않았으면 초기화
-      console.log('⚠️ 워크스페이스가 로드되지 않음. 초기화 시작...');
+    // 아직 초기화되지 않았을 때만 초기화 실행
+    if (!workspaceInitialized && selectedWorkspaceId === undefined) {
+      console.log('⚠️ 워크스페이스 초기화 시작...');
       initializeWorkspace();
     }
   }, [selectedWorkspaceId, workspaces, mutateWorkspaces]);
@@ -1676,23 +1674,21 @@ export default function Library() {
   const handleWorkspaceChange = async (workspaceId: string | null) => {
     setSelectedWorkspaceId(workspaceId);
     setCurrentPage(1); // 페이지 리셋
-    
-    // 현재 워크스페이스를 설정으로 저장
+
+    // 현재 워크스페이스를 설정으로 저장 (All Jobs 포함)
     try {
-      if (workspaceId) {
-        await fetch('/api/settings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: 'user-with-settings',
-            settings: {
-              workspace: {
-                currentWorkspaceId: workspaceId
-              }
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-with-settings',
+          settings: {
+            workspace: {
+              currentWorkspaceId: workspaceId
             }
-          })
-        });
-      }
+          }
+        })
+      });
     } catch (error) {
       console.error('워크스페이스 설정 저장 실패:', error);
     }
@@ -1834,7 +1830,9 @@ export default function Library() {
               className="w-full bg-gradient-to-r from-secondary/80 to-secondary/60 border border-border/50 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all duration-200 hover:from-secondary/90 hover:to-secondary/70 hover:border-border/70 shadow-sm backdrop-blur-sm text-foreground flex items-center justify-between group"
             >
               <div className="flex items-center gap-3">
-                {selectedWorkspaceId ? (
+                {selectedWorkspaceId === null ? (
+                  <span className="text-foreground/90">📁 {safeT('library.allJobs')}</span>
+                ) : selectedWorkspaceId ? (
                   (() => {
                     const selectedWorkspace = workspaces.find(w => w.id === selectedWorkspaceId);
                     return (
@@ -1844,7 +1842,7 @@ export default function Library() {
                     );
                   })()
                 ) : (
-                  <span className="text-foreground/90">📁 {safeT('library.allJobs')}</span>
+                  <span className="text-foreground/90">...</span>
                 )}
               </div>
               <svg 
@@ -1869,7 +1867,7 @@ export default function Library() {
                         setShowWorkspaceDropdown(false);
                       }}
                       className={`w-full px-4 py-3 text-left text-sm transition-all duration-200 flex items-center gap-3 hover:bg-primary/10 ${
-                        !selectedWorkspaceId ? 'bg-primary/15 text-primary font-semibold' : 'text-foreground hover:text-primary'
+                        selectedWorkspaceId === null ? 'bg-primary/15 text-primary font-semibold' : 'text-foreground hover:text-primary'
                       }`}
                     >
                       <span>📁 {safeT('library.allJobs')}</span>
