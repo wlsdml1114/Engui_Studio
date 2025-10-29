@@ -30,6 +30,9 @@ EnguiStudio는 RunPod Serverless 인프라를 활용하여 다양한 오픈소�
   > [![Runpod](https://api.runpod.io/badge/wlsdml1114/Flux-tontext_Runpod_hub)](https://console.runpod.io/hub/wlsdml1114/Flux-tontext_Runpod_hub)
 - **🎨 FLUX KREA**: LoRA 지원이 포함된 고급 이미지 생성 모델
   > [![Runpod](https://api.runpod.io/badge/wlsdml1114/Flux-krea_Runpod_hub)](https://console.runpod.io/hub/wlsdml1114/Flux-krea_Runpod_hub)
+- **✏️ Qwen Image Edit**: AI 기반 이미지 편집 모델
+  > 
+  > [![Runpod](https://api.runpod.io/badge/wlsdml1114/qwen_image_edit)](https://console.runpod.io/hub/wlsdml1114/qwen_image_edit)
 - **🎤 MultiTalk**(권장하지 않음): Audio 2 Video 모델
   > [![Runpod](https://api.runpod.io/badge/wlsdml1114/Multitalk_Runpod_hub)](https://console.runpod.io/hub/wlsdml1114/Multitalk_Runpod_hub)
 - **🎭 Infinite Talk**(권장): 이미지와 오디오를 결합한 말하는 영상 생성 모델
@@ -134,6 +137,7 @@ npm run db:validate
     - **Video Generation** (WAN 2.2)
     - **FLUX KONTEXT** (이미지 변환)
     - **FLUX KREA** (이미지 생성)
+    - **Qwen Image Edit** (이미지 편집)
     - **MultiTalk** (Audio 2 Video)
     - **Infinite Talk** (말하는 영상)
     - **Video Upscale** (비디오 향상)
