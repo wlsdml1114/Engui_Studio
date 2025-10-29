@@ -327,10 +327,11 @@ async function processQwenImageEditJob(jobId: string) {
             console.log('🖼️ Checking for image data in RunPod result...');
             console.log('🔍 Available output keys:', Object.keys(result.output));
 
-            // Handler에서 base64로 반환된 이미지 처리
-            if (result.output.image) {
+            // Handler에서 base64로 반환된 이미지 처리 (image 또는 image_base64)
+            resultBase64 = result.output.image || result.output.image_base64;
+
+            if (resultBase64) {
                 console.log('🖼️ Image data (base64) received from Handler');
-                resultBase64 = result.output.image; // Handler에서 base64 문자열로 반환
 
                 try {
                     const imageBuffer = Buffer.from(resultBase64, 'base64');
@@ -350,30 +351,6 @@ async function processQwenImageEditJob(jobId: string) {
                     resultUrl = `/api/results/${jobId}.png`;
                     localFilePath = 'failed_to_save';
                 }
-
-            } else if (result.output.image_base64) {
-                console.log('🖼️ Image base64 data received from Handler');
-                resultBase64 = result.output.image_base64;
-
-                try {
-                    const imageBuffer = Buffer.from(resultBase64, 'base64');
-                    console.log('🖼️ Decoded image buffer size:', imageBuffer.length);
-
-                    const resultImagePath = join(LOCAL_STORAGE_DIR, `result_${jobId}.png`);
-                    writeFileSync(resultImagePath, imageBuffer);
-
-                    console.log('✅ Result image saved locally:', resultImagePath);
-                    console.log('📁 File size:', imageBuffer.length, 'bytes');
-
-                    resultUrl = `/results/result_${jobId}.png`;
-                    localFilePath = resultImagePath;
-
-                } catch (saveError) {
-                    console.error('❌ Failed to save result image locally:', saveError);
-                    resultUrl = `/api/results/${jobId}.png`;
-                    localFilePath = 'failed_to_save';
-                }
-
             } else {
                 console.log('⚠️ No image data found in RunPod result');
                 console.log('🔍 Available output keys:', Object.keys(result.output));
@@ -425,18 +402,6 @@ async function processQwenImageEditJob(jobId: string) {
                     completedAt: new Date(),
                     options: JSON.stringify({
                         ...JSON.parse(job.options || '{}'),
-                        error: error instanceof Error ? error.message : String(error),
-                        completedAt: new Date().toISOString()
-                    })
-                },
-            });
-        } else {
-            await prisma.job.update({
-                where: { id: jobId },
-                data: {
-                    status: 'failed',
-                    completedAt: new Date(),
-                    options: JSON.stringify({
                         error: error instanceof Error ? error.message : String(error),
                         completedAt: new Date().toISOString()
                     })
