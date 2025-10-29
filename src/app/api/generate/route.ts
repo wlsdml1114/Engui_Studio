@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { callAiWorker } from '@/lib/aiWorker';
 import SettingsService from '@/lib/settingsService';
+import { v4 as uuidv4 } from 'uuid';
 
 const prisma = new PrismaClient();
 
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
     // 1. Create a new job record in the database with 'processing' status
     const job = await prisma.job.create({
       data: {
-        id: Math.random().toString(36).substring(2, 15), // Simple unique ID for now
+        id: uuidv4(),
         userId,
         workspaceId: currentWorkspaceId,
         status: 'processing',

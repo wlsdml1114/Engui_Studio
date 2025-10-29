@@ -30,6 +30,8 @@ EnguiStudio is a platform that enables easy access to various open-source AI mod
   > [![Runpod](https://api.runpod.io/badge/wlsdml1114/Flux-tontext_Runpod_hub)](https://console.runpod.io/hub/wlsdml1114/Flux-tontext_Runpod_hub)
 - **🎨 FLUX KREA**: Advanced image generation model with LoRA support
   > [![Runpod](https://api.runpod.io/badge/wlsdml1114/Flux-krea_Runpod_hub)](https://console.runpod.io/hub/wlsdml1114/Flux-krea_Runpod_hub)
+- **✏️ Qwen Image Edit**: AI-powered image editing model
+  > [![Runpod](https://api.runpod.io/badge/wlsdml1114/qwen_image_edit)](https://console.runpod.io/hub/wlsdml1114/qwen_image_edit)
 - **🎤 MultiTalk**(not recommended): Audio 2 Video model
   > [![Runpod](https://api.runpod.io/badge/wlsdml1114/Multitalk_Runpod_hub)](https://console.runpod.io/hub/wlsdml1114/Multitalk_Runpod_hub)
 - **🎭 Infinite Talk**(recommend): Talking video generation model combining images and audio
@@ -101,6 +103,7 @@ Navigate to `/settings` in your browser
     - **Video Generation** (WAN 2.2)
     - **FLUX KONTEXT** (Image transformation)
     - **FLUX KREA** (Image generation)
+    - **Qwen Image Edit** (Image editing)
     - **MultiTalk** (Audio 2 Video)
     - **Infinite Talk** (Talking video)
     - **WAN Animate** (Image-to-video animation)

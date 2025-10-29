@@ -21,7 +21,7 @@ interface JobItem {
   userId: string;
   workspaceId?: string;
   status: 'processing' | 'completed' | 'failed';
-  type: 'video' | 'multitalk' | 'flux-kontext' | 'flux-krea' | 'wan22' | 'wan-animate' | 'infinitetalk'|'video-upscale';
+  type: 'video' | 'multitalk' | 'flux-kontext' | 'flux-krea' | 'wan22' | 'wan-animate' | 'infinitetalk'|'video-upscale'|'qwen-image-edit';
   prompt?: string;
   options?: string;
   resultUrl?: string;
@@ -308,7 +308,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
       jobId: item.id,
       prompt: item.prompt || '',
       // 미디어 타입과 URL 정보
-      mediaType: item.type === 'flux-kontext' || item.type === 'flux-krea' ? 'image' : 'video',
+      mediaType: item.type === 'flux-kontext' || item.type === 'flux-krea' || item.type === 'qwen-image-edit' ? 'image' : 'video',
       mediaUrl: item.resultUrl || thumbnailUrl,
       thumbnailUrl: thumbnailUrl,
       // 실제 결과 URL (비디오의 경우 실제 비디오 파일)
@@ -320,6 +320,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
       }),
       ...(item.type === 'flux-kontext' && { inputImagePath: getThumbnailUrl() }),
       ...(item.type === 'flux-krea' && { imageUrl: getThumbnailUrl() }),
+      ...(item.type === 'qwen-image-edit' && { imageUrl: getThumbnailUrl() }),
       ...(item.type === 'wan22' && { 
         inputImagePath: getThumbnailUrl(),
         videoUrl: item.resultUrl // 실제 비디오 URL 추가
@@ -443,7 +444,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
         
         <div className="flex justify-between items-center">
           <span className={`text-xs px-2 py-1 rounded-full capitalize font-medium ${
-            item.type === 'flux-kontext' || item.type === 'flux-krea' 
+            item.type === 'flux-kontext' || item.type === 'flux-krea' || item.type === 'qwen-image-edit'
               ? 'bg-purple-500/20 text-purple-300' // 이미지 타입 - 보라색
               : 'bg-blue-500/20 text-blue-300'     // 비디오 타입 - 파란색
           }`}>
@@ -694,9 +695,9 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
               ) : item.type === 'flux-krea' ? (
                 // FLUX KREA는 이미지 결과만 표시
                 <div className="space-y-4">
-                  <img 
-                    src={resultUrl} 
-                    alt="Generated FLUX KREA image" 
+                  <img
+                    src={resultUrl}
+                    alt="Generated FLUX KREA image"
                     className="w-full max-h-96 object-contain rounded-lg bg-background"
                     onError={(e) => console.error('FLUX KREA image error:', e)}
                     onLoad={() => console.log('✅ FLUX KREA image loaded successfully:', resultUrl)}
@@ -704,6 +705,62 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                   <div className="text-sm text-foreground/60">
                     🎨 {safeT('library.fluxKreaImage')}
                   </div>
+                </div>
+              ) : item.type === 'qwen-image-edit' ? (
+                // Qwen Image Edit은 결과 이미지와 입력 이미지를 비교
+                <div className="space-y-6">
+                  {/* 결과 이미지 */}
+                  <div className="space-y-3">
+                    <h4 className="font-medium">{safeT('library.resultImage')}</h4>
+                    <img
+                      src={resultUrl}
+                      alt="Generated Qwen Image Edit result"
+                      className="w-full max-h-96 object-contain rounded-lg bg-background"
+                      onError={(e) => console.error('Qwen Image Edit image error:', e)}
+                      onLoad={() => console.log('✅ Qwen Image Edit image loaded successfully:', resultUrl)}
+                    />
+                    <div className="text-sm text-foreground/60">
+                      🎨 {safeT('library.qwenImageEditImage')}
+                    </div>
+                  </div>
+
+                  {/* 입력 이미지 비교 */}
+                  {options.imageWebPath && (
+                    <div className="border-t border-border/30 pt-4">
+                      <h4 className="font-medium mb-3">{safeT('library.inputImageCompare')}</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* 첫 번째 입력 이미지 */}
+                        <div className="space-y-2">
+                          <img
+                            src={options.imageWebPath}
+                            alt="Input image 1"
+                            className="w-full max-h-64 object-contain rounded-lg bg-background"
+                            onError={(e) => {
+                              console.error('Input image 1 error:', e);
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                          <p className="text-xs text-foreground/50 text-center">{safeT('library.inputImage1')}</p>
+                        </div>
+
+                        {/* 두 번째 입력 이미지 (있는 경우) */}
+                        {options.imageWebPath2 && (
+                          <div className="space-y-2">
+                            <img
+                              src={options.imageWebPath2}
+                              alt="Input image 2"
+                              className="w-full max-h-64 object-contain rounded-lg bg-background"
+                              onError={(e) => {
+                                console.error('Input image 2 error:', e);
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                            <p className="text-xs text-foreground/50 text-center">{safeT('library.inputImage2')}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -1527,6 +1584,7 @@ export default function Library() {
         cfg: options.cfg,
         steps: options.steps,
         guidance: options.guidance,
+        guidance_scale: options.guidance_scale,
         model: options.model,
         length: options.length,
         step: options.step,
@@ -1593,6 +1651,13 @@ export default function Library() {
         ...(item.type === 'video-upscale' && {
           videoPath: options.videoWebPath || options.s3VideoPath,
           videoFileName: options.videoFileName
+        }),
+        ...(item.type === 'qwen-image-edit' && {
+          imagePath: options.imageWebPath,
+          imageName: options.imageName,
+          imagePath2: options.imageWebPath2,
+          imageName2: options.imageName2,
+          hasSecondImage: options.hasSecondImage
         })
       };
 
@@ -1608,7 +1673,8 @@ export default function Library() {
         'wan22': '/video-generation',
         'wan-animate': '/wan-animate',
         'infinitetalk': '/infinite-talk',
-        'video-upscale': '/video-upscale'
+        'video-upscale': '/video-upscale',
+        'qwen-image-edit': '/qwen-image-edit'
       };
 
       const targetPage = pageMap[item.type];

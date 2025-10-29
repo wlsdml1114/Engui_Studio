@@ -33,6 +33,7 @@ export const translations = {
       wanAnimateEndpoint: 'WAN Animate Endpoint ID',
       infiniteTalkEndpoint: 'Infinite Talk Endpoint ID',
       videoUpscaleEndpoint: 'Video Upscale Endpoint ID',
+      qwenImageEditEndpoint: 'Qwen Image Edit Endpoint ID',
 
       // Endpoint Placeholders
       enterEndpoint: 'Enter {name} endpoint ID',
@@ -95,6 +96,7 @@ export const translations = {
       videoUpscale: 'Video Upscale',
       fluxKontext: 'FLUX KONTEXT',
       fluxKrea: 'FLUX KREA',
+      qwenImageEdit: 'Qwen Image Edit',
       multitalk: 'MultiTalk',
       infiniteTalk: 'Infinite Talk',
       s3Storage: 'S3 Storage',
@@ -314,6 +316,35 @@ export const translations = {
       guidanceTip: '💡 높을수록 프롬프트를 더 엄격하게 따름 (2.5 권장)',
       generationTime: '이미지 생성에는 몇 분 정도 소요될 수 있습니다.',
       jobStarted: 'FLUX KONTEXT 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.',
+      inputRequired: '이미지와 프롬프트를 모두 입력해주세요.',
+      dragAndDrop: {
+        dropHere: '🎯 여기에 놓으세요!',
+        clickToUpload: '이미지를 클릭하여 업로드하세요',
+        dragFromLibrary: '라이브러리의 결과물을 드래그하세요',
+        supportedFormats: 'PNG, JPG, WEBP 지원',
+        reusedAsInput: '라이브러리에서 {jobType} 결과물을 입력 이미지로 사용했습니다!'
+      }
+    },
+
+    // Qwen Image Edit
+    qwenImageEdit: {
+      title: 'Qwen Image Edit',
+      inputImage: '입력 이미지',
+      inputImage1: '입력 이미지 (1/2)',
+      inputImage2: '입력 이미지 (2/2)',
+      inputImage2Optional: '입력 이미지 (2/2) - 선택사항',
+      prompt: '편집 프롬프트',
+      promptTip: '💡 편집하고 싶은 내용을 자세히 설명하세요.',
+      seedValue: 'Seed 값',
+      seedTip: '💡 -1은 랜덤, 고정값은 동일한 결과 생성',
+      guidanceValue: 'Guidance Scale',
+      guidanceTip: '💡 높을수록 프롬프트를 더 엄격하게 따름 (7.5 권장)',
+      stepsValue: 'Steps',
+      stepsTip: '💡 생성 단계 수 (30 권장)',
+      detailSettings: '디테일 설정',
+      generateBtn: '이미지 편집',
+      generationTime: '이미지 편집에는 몇 분 정도 소요될 수 있습니다.',
+      jobStarted: 'Qwen Image Edit 작업이 백그라운드에서 처리되고 있습니다. Library에서 진행 상황을 확인하세요.',
       inputRequired: '이미지와 프롬프트를 모두 입력해주세요.',
       dragAndDrop: {
         dropHere: '🎯 여기에 놓으세요!',
@@ -553,6 +584,11 @@ export const translations = {
       videoNotPlaying: '비디오가 재생되지 않는 경우, 직접 다운로드하여 확인해보세요.',
       fluxKontextImage: 'FLUX KONTEXT로 생성된 이미지입니다.',
       fluxKreaImage: 'FLUX KREA로 생성된 이미지입니다.',
+      qwenImageEditImage: 'Qwen Image Edit로 생성된 이미지입니다.',
+      resultImage: '결과 이미지',
+      inputImageCompare: '입력 이미지 (비교)',
+      inputImage1: '이미지 1',
+      inputImage2: '이미지 2 (선택사항)',
       inputImageInfo: '입력 이미지 정보를 찾을 수 없습니다.',
       inputImageParseError: '입력 이미지 정보를 파싱할 수 없습니다.',
       workspace: '워크스페이스',
@@ -723,6 +759,7 @@ export const translations = {
       wanAnimateEndpoint: 'WAN Animate Endpoint ID',
       infiniteTalkEndpoint: 'Infinite Talk Endpoint ID',
       videoUpscaleEndpoint: 'Video Upscale Endpoint ID',
+      qwenImageEditEndpoint: 'Qwen Image Edit Endpoint ID',
 
       // Endpoint Placeholders
       enterEndpoint: 'Enter {name} endpoint ID',
@@ -785,6 +822,7 @@ export const translations = {
       videoUpscale: 'Video Upscale',
       fluxKontext: 'FLUX KONTEXT',
       fluxKrea: 'FLUX KREA',
+      qwenImageEdit: 'Qwen Image Edit',
       multitalk: 'MultiTalk',
       infiniteTalk: 'Infinite Talk',
       s3Storage: 'S3 Storage',
@@ -829,6 +867,7 @@ export const translations = {
       status: 'Status',
       style: 'Style',
       resolution: 'Resolution',
+      random: 'Random',
       placeholder: {
         prompt: 'e.g., A person walking in a beautiful garden...',
         width: '720',
@@ -1004,6 +1043,35 @@ export const translations = {
       guidanceTip: '💡 Higher values follow prompt more strictly (2.5 recommended)',
       generationTime: 'Image generation may take several minutes.',
       jobStarted: 'FLUX KONTEXT job is being processed in the background. Check progress in Library.',
+      inputRequired: 'Please enter both image and prompt.',
+      dragAndDrop: {
+        dropHere: '🎯 Drop here!',
+        clickToUpload: 'Click on image to upload',
+        dragFromLibrary: 'Drag results from Library here',
+        supportedFormats: 'PNG, JPG, WEBP supported',
+        reusedAsInput: 'Used {jobType} result from library as input image!'
+      }
+    },
+
+    // Qwen Image Edit
+    qwenImageEdit: {
+      title: 'Qwen Image Edit',
+      inputImage: 'Input Image',
+      inputImage1: 'Input Image (1/2)',
+      inputImage2: 'Input Image (2/2)',
+      inputImage2Optional: 'Input Image (2/2) - Optional',
+      prompt: 'Edit Prompt',
+      promptTip: '💡 Describe what you want to edit in detail.',
+      seedValue: 'Seed Value',
+      seedTip: '💡 -1 is random, fixed values generate same results',
+      guidanceValue: 'Guidance Scale',
+      guidanceTip: '💡 Higher values follow prompt more strictly (7.5 recommended)',
+      stepsValue: 'Steps',
+      stepsTip: '💡 Number of generation steps (30 recommended)',
+      detailSettings: 'Detail Settings',
+      generateBtn: 'Edit Image',
+      generationTime: 'Image editing may take several minutes.',
+      jobStarted: 'Qwen Image Edit job is being processed in the background. Check progress in Library.',
       inputRequired: 'Please enter both image and prompt.',
       dragAndDrop: {
         dropHere: '🎯 Drop here!',
@@ -1243,6 +1311,11 @@ export const translations = {
       videoNotPlaying: 'If the video does not play, please download and check it directly.',
       fluxKontextImage: 'Image generated with FLUX KONTEXT.',
       fluxKreaImage: 'Image generated with FLUX KREA.',
+      qwenImageEditImage: 'Image generated with Qwen Image Edit.',
+      resultImage: 'Result Image',
+      inputImageCompare: 'Input Image (Compare)',
+      inputImage1: 'Image 1',
+      inputImage2: 'Image 2 (Optional)',
       inputImageInfo: 'Input image information not found.',
       inputImageParseError: 'Could not parse input image information.',
       workspace: 'Workspace',

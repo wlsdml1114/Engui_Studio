@@ -6,6 +6,17 @@ import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
+interface QwenImageEditPayload {
+  prompt: string;
+  image_base64: string;
+  image_base64_2?: string;
+  seed: number;
+  width: number;
+  height: number;
+  steps?: number;
+  guidance_scale: number;
+}
+
 const prisma = new PrismaClient();
 const settingsService = new SettingsService();
 
@@ -19,25 +30,57 @@ try {
     console.log('📁 Results directory already exists or cannot be created');
 }
 
+// Handler 노드 매핑 설정
+interface HandlerNodeMapping {
+    imageNode: number;
+    imageNode2?: number;
+    promptNode: number;
+    seedNode: number;
+    widthNode: number;
+    heightNode: number;
+    stepsNode?: number;
+    guidanceNode?: number;
+    workflowSingleImage?: string;
+    workflowDualImage?: string;
+}
+
+// 기본 Handler 노드 설정
+const DEFAULT_HANDLER_NODES: HandlerNodeMapping = {
+    imageNode: 78,
+    imageNode2: 123,
+    promptNode: 111,
+    seedNode: 3,
+    widthNode: 128,
+    heightNode: 129,
+    stepsNode: 130,
+    guidanceNode: 131,
+    workflowSingleImage: '/qwen_image_edit_1.json',
+    workflowDualImage: '/qwen_image_edit_2.json'
+};
+
 export async function POST(request: NextRequest) {
     try {
-        console.log('🎨 Processing FLUX KONTEXT image generation request...');
+        console.log('🎨 Processing Qwen Image Edit request...');
 
         const formData = await request.formData();
 
         // Extract form data
         const userId = formData.get('userId') as string;
-        const imageFile = formData.get('image') as File;
+        const imageBase64 = formData.get('image') as string; // Base64 encoded image
+        const image2Base64 = formData.get('image2') as string | null; // Optional second image
+        const imageName = formData.get('imageName') as string; // First image filename
+        const imageName2 = formData.get('imageName2') as string | null; // Optional second image filename
         const prompt = formData.get('prompt') as string;
         const width = parseInt(formData.get('width') as string);
         const height = parseInt(formData.get('height') as string);
         const seed = parseInt(formData.get('seed') as string);
-        const cfg = parseFloat(formData.get('cfg') as string);
+        const steps = parseInt(formData.get('steps') as string);
+        const guidance = parseFloat(formData.get('guidance') as string);
 
         // Validate required data
-        if (!imageFile || !prompt || !width || !height) {
+        if (!imageBase64 || !prompt || !width || !height) {
             return NextResponse.json({
-                error: 'Missing required fields: image, prompt, width, height',
+                error: 'Missing required fields: image (base64), prompt, width, height',
                 requiresSetup: true,
             }, { status: 400 });
         }
@@ -45,14 +88,22 @@ export async function POST(request: NextRequest) {
         // Load user settings
         console.log('📖 Loading user settings...');
         const { settings } = await settingsService.getSettings(userId);
-        
+
         // Validate RunPod configuration
-        if (!settings.runpod?.apiKey || !settings.runpod?.endpoints?.['flux-kontext']) {
+        if (!settings.runpod?.apiKey || !settings.runpod?.endpoints?.['qwen-image-edit']) {
             return NextResponse.json({
-                error: 'RunPod configuration incomplete. Please configure your API key and FLUX KONTEXT endpoint in Settings.',
+                error: 'RunPod configuration incomplete. Please configure your API key and Qwen Image Edit endpoint in Settings.',
                 requiresSetup: true,
             }, { status: 400 });
         }
+
+        // Get Handler node mapping from settings or use defaults
+        const handlerNodes: HandlerNodeMapping = {
+            ...DEFAULT_HANDLER_NODES,
+            ...((settings as any).qwenImageEditHandler || {})
+        };
+
+        console.log('🔧 Handler node mapping:', handlerNodes);
 
         // 현재 워크스페이스 ID 가져오기
         const currentWorkspaceId = await settingsService.getCurrentWorkspaceId(userId);
@@ -63,12 +114,21 @@ export async function POST(request: NextRequest) {
             data: {
                 id: uuidv4(),
                 userId,
-                workspaceId: currentWorkspaceId, // 워크스페이드 ID 추가
+                workspaceId: currentWorkspaceId,
                 status: 'processing',
-                type: 'flux-kontext',
+                type: 'qwen-image-edit',
                 prompt,
-                runpodJobId: '', // 초기값으로 빈 문자열 설정
-                options: JSON.stringify({ width, height, seed, cfg }),
+                runpodJobId: '',
+                options: JSON.stringify({
+                    width,
+                    height,
+                    seed,
+                    steps,
+                    guidance,
+                    hasSecondImage: !!image2Base64,
+                    imageName,
+                    imageName2: imageName2 || null
+                }),
                 createdAt: new Date(),
             },
         });
@@ -79,48 +139,62 @@ export async function POST(request: NextRequest) {
         await prisma.creditActivity.create({
             data: {
                 userId,
-                activity: `Generated FLUX KONTEXT image (Job ID: ${job.id})`,
-                amount: -1, // FLUX KONTEXT costs 1 credit
+                activity: `Generated Qwen Image Edit (Job ID: ${job.id})`,
+                amount: -1,
             },
         });
 
-        // 입력 이미지를 로컬에 저장
-        const inputImageBuffer = Buffer.from(await imageFile.arrayBuffer());
-        const inputImagePath = join(LOCAL_STORAGE_DIR, `input_${job.id}_${imageFile.name}`);
-        
-        try {
-            writeFileSync(inputImagePath, inputImageBuffer);
-            console.log('✅ Input image saved locally:', inputImagePath);
-        } catch (saveError) {
-            console.error('❌ Failed to save input image locally:', saveError);
-            
-            // Update job status to failed
-            await prisma.job.update({
-                where: { id: job.id },
-                data: {
-                    status: 'failed',
-                    completedAt: new Date(),
-                },
-            });
+        // 입력 이미지를 base64로 변환 (File 객체에서)
+        const imageFileBuffer = Buffer.from(imageBase64, 'base64');
 
-            return NextResponse.json({
-                error: `Failed to save input image locally: ${saveError}`,
-                jobId: job.id,
-                status: 'failed',
-            }, { status: 500 });
+        // 두 번째 이미지도 처리
+        let image2FileBuffer: Buffer | null = null;
+        if (image2Base64) {
+            image2FileBuffer = Buffer.from(image2Base64, 'base64');
         }
 
-        // RunPod 입력 준비
+        // 입력 이미지를 로컬에 저장 (input reuse를 위해)
+        let imageWebPath = null;
+        let imageWebPath2 = null;
+        try {
+            const inputImagePath = join(LOCAL_STORAGE_DIR, `input_${job.id}.png`);
+            writeFileSync(inputImagePath, imageFileBuffer);
+            imageWebPath = `/results/input_${job.id}.png`;
+            console.log('✅ Input image saved locally:', inputImagePath);
+
+            // 두 번째 이미지도 저장
+            if (image2FileBuffer) {
+                const inputImagePath2 = join(LOCAL_STORAGE_DIR, `input_${job.id}_2.png`);
+                writeFileSync(inputImagePath2, image2FileBuffer);
+                imageWebPath2 = `/results/input_${job.id}_2.png`;
+                console.log('✅ Second input image saved locally:', inputImagePath2);
+            }
+        } catch (saveError) {
+            console.error('❌ Failed to save input image locally:', saveError);
+        }
+
+        // RunPod 입력 준비 - Handler 형식
         const runpodInput = {
             prompt: prompt,
-            image_path: inputImageBuffer.toString('base64'), // base64 데이터로 전송
+            image_base64: imageFileBuffer.toString('base64'), // base64로 인코딩된 첫 번째 이미지
+            ...(image2FileBuffer && { image_base64_2: image2FileBuffer.toString('base64') }), // 두 번째 이미지
+            seed: seed === -1 ? 42 : seed,
             width: width,
             height: height,
-            seed: seed === -1 ? 42 : seed, // -1일 때 기본값 42 사용
-            guidance: cfg // cfg 값을 guidance 필드로 전달
-        };
+            ...(steps && { steps: steps }),
+            ...(guidance && { guidance_scale: guidance })
+        } as QwenImageEditPayload;
 
-        console.log('🚀 RunPod input:', runpodInput);
+        console.log('🚀 RunPod input (Handler format):', {
+            prompt: runpodInput.prompt,
+            image_base64: `[base64 data - ${imageFileBuffer.length} bytes]`,
+            image_base64_2: image2FileBuffer ? `[base64 data - ${image2FileBuffer.length} bytes]` : undefined,
+            seed: runpodInput.seed,
+            width: runpodInput.width,
+            height: runpodInput.height,
+            steps: runpodInput.steps,
+            guidance_scale: runpodInput.guidance_scale
+        });
 
         // Submit job to RunPod
         let runpodJobId: string;
@@ -128,11 +202,11 @@ export async function POST(request: NextRequest) {
             console.log('🔧 Creating RunPod service with user settings...');
             const runpodService = new RunPodService(
                 settings.runpod.apiKey,
-                settings.runpod.endpoints['flux-kontext'],
+                settings.runpod.endpoints['qwen-image-edit'],
                 settings.runpod.generateTimeout || 3600
             );
 
-            console.log('🔧 Submitting to RunPod with input:', JSON.stringify(runpodInput, null, 2));
+            console.log('🔧 Submitting to RunPod with base64 encoded image...');
             runpodJobId = await runpodService.submitJob(runpodInput);
 
             console.log(`✅ RunPod job submitted successfully: ${runpodJobId}`);
@@ -155,27 +229,31 @@ export async function POST(request: NextRequest) {
             }, { status: 500 });
         }
 
-        // Update job with RunPod job ID and input image info
+        // Update job with RunPod job ID and input image paths
         await prisma.job.update({
             where: { id: job.id },
             data: {
-                runpodJobId, // 실제 RunPod job ID로 업데이트
+                runpodJobId,
                 options: JSON.stringify({
                     width,
                     height,
                     seed,
-                    cfg,
+                    steps,
+                    guidance,
+                    hasSecondImage: !!image2Base64,
                     runpodJobId,
-                    inputImagePath: inputImagePath, // 로컬 입력 이미지 경로
-                    inputImageName: `input_${job.id}_${imageFile.name}`, // 실제 저장된 파일명
+                    imageWebPath,
+                    imageWebPath2,
+                    imageName,
+                    imageName2: imageName2 || null,
                 }),
             },
         });
 
-        console.log(`✅ FLUX KONTEXT job submitted: ${job.id} (RunPod: ${runpodJobId})`);
+        console.log(`✅ Qwen Image Edit job submitted: ${job.id} (RunPod: ${runpodJobId})`);
 
         // Start background processing
-        processFluxKontextJob(job.id).catch(error => {
+        processQwenImageEditJob(job.id).catch(error => {
             console.error(`❌ Background processing error for job ${job.id}:`, error);
             console.error(`❌ Error details:`, {
                 message: error instanceof Error ? error.message : String(error),
@@ -192,128 +270,87 @@ export async function POST(request: NextRequest) {
         });
 
     } catch (error) {
-        console.error('❌ FLUX KONTEXT generation error:', error);
+        console.error('❌ Qwen Image Edit generation error:', error);
         return NextResponse.json(
-            { error: `FLUX KONTEXT generation failed: ${error}` },
+            { error: `Qwen Image Edit generation failed: ${error}` },
             { status: 500 }
         );
     }
 }
 
 // Background processing function
-async function processFluxKontextJob(jobId: string) {
-    let job: any = null; // job 변수를 함수 스코프에서 선언
-    
+async function processQwenImageEditJob(jobId: string) {
+    let job: any = null;
+
     try {
         console.log(`🔄 Starting background processing for job ${jobId}`);
-        
+
         // Get job details
         job = await prisma.job.findUnique({
             where: { id: jobId },
         });
-        
+
         if (!job) {
             console.error(`❌ Job ${jobId} not found`);
             return;
         }
-        
+
         // Get user settings
         const settingsResult = await settingsService.getSettings('user-with-settings');
-        
-        // SettingsService는 { settings, status } 형태로 반환
+
         if (!settingsResult.settings || !settingsResult.settings.runpod) {
             throw new Error('RunPod configuration not found');
         }
-        
+
         const settings = settingsResult.settings;
-        
+
         // Initialize RunPod service
         const runpodService = new RunPodService(
             settings.runpod!.apiKey,
-            settings.runpod!.endpoints['flux-kontext'],
+            settings.runpod!.endpoints['qwen-image-edit'],
             settings.runpod!.generateTimeout || 3600
         );
-        
+
         // Wait for RunPod job completion
         console.log('⏳ Waiting for RunPod job completion...');
         const result = await runpodService.waitForCompletion(job.runpodJobId!);
-        
+
         console.log('✅ RunPod job completed!');
         console.log('📊 RunPod result structure:', Object.keys(result));
         console.log('📊 RunPod result output keys:', result.output ? Object.keys(result.output) : 'No output');
-        
+
         let resultUrl = null;
+        let resultBase64 = null;
         let localFilePath = null;
-        
+
         if (result.output) {
-            console.log('�� Checking for image data in RunPod result...');
+            console.log('🖼️ Checking for image data in RunPod result...');
             console.log('🔍 Available output keys:', Object.keys(result.output));
-            console.log('🔍 Full output structure:', JSON.stringify(result.output, null, 2));
-            
-            // RunPod 응답에서 image 필드 찾기 (image_base64가 아님!)
-            if (result.output.image) {
-                console.log('🖼️ Image data received from RunPod');
-                console.log('🖼️ Image data length:', result.output.image.length);
-                
+
+            // Handler에서 base64로 반환된 이미지 처리 (image 또는 image_base64)
+            resultBase64 = result.output.image || result.output.image_base64;
+
+            if (resultBase64) {
+                console.log('🖼️ Image data (base64) received from Handler');
+
                 try {
-                    const imageBuffer = Buffer.from(result.output.image, 'base64');
+                    const imageBuffer = Buffer.from(resultBase64, 'base64');
                     console.log('🖼️ Decoded image buffer size:', imageBuffer.length);
-                    
-                    // 로컬에 결과 이미지 저장 (PNG 확장자 명시)
+
                     const resultImagePath = join(LOCAL_STORAGE_DIR, `result_${jobId}.png`);
                     writeFileSync(resultImagePath, imageBuffer);
-                    
+
                     console.log('✅ Result image saved locally:', resultImagePath);
                     console.log('📁 File size:', imageBuffer.length, 'bytes');
-                    
-                    // 웹에서 접근 가능한 경로 설정
+
                     resultUrl = `/results/result_${jobId}.png`;
                     localFilePath = resultImagePath;
-                    
+
                 } catch (saveError) {
                     console.error('❌ Failed to save result image locally:', saveError);
-                    console.error('❌ Save error details:', saveError);
                     resultUrl = `/api/results/${jobId}.png`;
                     localFilePath = 'failed_to_save';
                 }
-                
-            } else if (result.output.image_base64) {
-                // 기존 image_base64 지원 (하위 호환성)
-                console.log('🖼️ Image base64 data received from RunPod (legacy)');
-                console.log('🖼️ Base64 length:', result.output.image_base64.length, 'characters');
-                
-                try {
-                    const imageBuffer = Buffer.from(result.output.image_base64, 'base64');
-                    console.log('🖼️ Decoded image buffer size:', imageBuffer.length);
-                    
-                    // 로컬에 결과 이미지 저장 (PNG 확장자 명시)
-                    const resultImagePath = join(LOCAL_STORAGE_DIR, `result_${jobId}.png`);
-                    writeFileSync(resultImagePath, imageBuffer);
-                    
-                    console.log('✅ Result image saved locally:', resultImagePath);
-                    console.log('📁 File size:', imageBuffer.length, 'bytes');
-                    
-                    // 웹에서 접근 가능한 경로 설정
-                    resultUrl = `/results/result_${jobId}.png`;
-                    localFilePath = resultImagePath;
-                    
-                } catch (saveError) {
-                    console.error('❌ Failed to save result image locally:', saveError);
-                    console.error('❌ Save error details:', saveError);
-                    resultUrl = `/api/results/${jobId}.png`;
-                    localFilePath = 'failed_to_save';
-                }
-                
-            } else if (result.output.image_url) {
-                console.log('🖼️ Image URL received:', result.output.image_url);
-                resultUrl = result.output.image_url;
-                localFilePath = 'url_result';
-                
-            } else if (result.output.output_url) {
-                console.log('🖼️ Output URL received:', result.output.output_url);
-                resultUrl = result.output.output_url;
-                localFilePath = 'url_result';
-                
             } else {
                 console.log('⚠️ No image data found in RunPod result');
                 console.log('🔍 Available output keys:', Object.keys(result.output));
@@ -325,7 +362,7 @@ async function processFluxKontextJob(jobId: string) {
             resultUrl = `/api/results/${jobId}.png`;
             localFilePath = 'no_output';
         }
-        
+
         // Update job status to completed with result URL
         await prisma.job.update({
             where: { id: jobId },
@@ -335,7 +372,8 @@ async function processFluxKontextJob(jobId: string) {
                 completedAt: new Date(),
                 options: JSON.stringify({
                     ...JSON.parse(job.options || '{}'),
-                    localFilePath, // 로컬 파일 경로 저장
+                    localFilePath,
+                    resultBase64: resultBase64 ? `[base64 data - ${resultBase64.length} characters]` : null,
                     runpodOutput: Object.keys(result.output || {}).reduce((acc: any, key: string) => {
                         const value = result.output[key];
                         if (typeof value === 'string' && value.length > 1000) {
@@ -349,14 +387,13 @@ async function processFluxKontextJob(jobId: string) {
                 })
             },
         });
-        
+
         console.log(`✅ Job ${jobId} marked as completed with result URL: ${resultUrl}`);
         console.log(`✅ Local file path: ${localFilePath}`);
-        
+
     } catch (error) {
         console.error(`❌ Background processing failed for job ${jobId}:`, error);
-        
-        // Update job status to failed - job 변수가 정의된 경우에만 사용
+
         if (job) {
             await prisma.job.update({
                 where: { id: jobId },
@@ -365,19 +402,6 @@ async function processFluxKontextJob(jobId: string) {
                     completedAt: new Date(),
                     options: JSON.stringify({
                         ...JSON.parse(job.options || '{}'),
-                        error: error instanceof Error ? error.message : String(error),
-                        completedAt: new Date().toISOString()
-                    })
-                },
-            });
-        } else {
-            // job을 찾을 수 없는 경우 기본 정보로 업데이트
-            await prisma.job.update({
-                where: { id: jobId },
-                data: {
-                    status: 'failed',
-                    completedAt: new Date(),
-                    options: JSON.stringify({
                         error: error instanceof Error ? error.message : String(error),
                         completedAt: new Date().toISOString()
                     })

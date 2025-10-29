@@ -25,6 +25,7 @@ interface ServiceConfig {
       'wan-animate': string; // WAN Animate endpoint 추가
       'infinite-talk': string; // Infinite Talk endpoint 추가
       'video-upscale': string; // Video Upscale endpoint 추가
+      'qwen-image-edit': string; // Qwen Image Edit endpoint 추가
     };
     generateTimeout?: number; // RunPod AI 생성 작업 타임아웃 (초 단위)
   };
@@ -71,7 +72,8 @@ export default function SettingsPage() {
         wan22: '', // WAN 2.2 endpoint 추가
         'wan-animate': '', // WAN Animate endpoint 추가
         'infinite-talk': '', // Infinite Talk endpoint 추가
-        'video-upscale': '' // Video Upscale endpoint 추가
+        'video-upscale': '', // Video Upscale endpoint 추가
+        'qwen-image-edit': '' // Qwen Image Edit endpoint 추가
       },
       generateTimeout: 3600 // 기본값 3600초 (1시간)
     },
@@ -226,7 +228,7 @@ export default function SettingsPage() {
   };
 
   // Endpoint 테스트 함수
-  const testEndpoint = async (endpointType: 'multitalk' | 'flux-kontext' | 'flux-krea' | 'wan22' | 'wan-animate' | 'infinite-talk' | 'video-upscale') => {
+  const testEndpoint = async (endpointType: 'multitalk' | 'flux-kontext' | 'flux-krea' | 'wan22' | 'wan-animate' | 'infinite-talk' | 'video-upscale' | 'qwen-image-edit') => {
     if (!settings.runpod?.apiKey || !settings.runpod?.endpoints?.[endpointType]) {
       return;
     }
@@ -686,8 +688,8 @@ export default function SettingsPage() {
               </div>
               {testResults['video-upscale'] && (
                 <div className={`mt-2 p-2 rounded-md text-sm ${
-                  testResults['video-upscale'].success 
-                    ? 'bg-green-100 text-green-800 border border-green-200' 
+                  testResults['video-upscale'].success
+                    ? 'bg-green-100 text-green-800 border border-green-200'
                     : 'bg-red-100 text-red-800 border border-red-200'
                 }`}>
                   {testResults['video-upscale'].message}
@@ -696,6 +698,42 @@ export default function SettingsPage() {
                   )}
                   {testResults['video-upscale'].statusCode && (
                     <span className="ml-2">Status: {testResults['video-upscale'].statusCode}</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Qwen Image Edit Endpoint ID */}
+            <div>
+              <label className="block text-sm font-medium mb-2">{t('settings.qwenImageEditEndpoint')}</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={settings.runpod?.endpoints?.['qwen-image-edit'] || ''}
+                  onChange={(e) => updateSetting('runpod', 'endpoints', e.target.value, 'qwen-image-edit')}
+                  placeholder={t('settings.enterEndpoint', { name: 'Qwen Image Edit' })}
+                  className="flex-1 p-2 border rounded-md bg-background"
+                />
+                <button
+                  onClick={() => testEndpoint('qwen-image-edit')}
+                  disabled={!settings.runpod?.apiKey || !settings.runpod?.endpoints?.['qwen-image-edit'] || testing['qwen-image-edit']}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {testing['qwen-image-edit'] ? 'Testing...' : 'Test'}
+                </button>
+              </div>
+              {testResults['qwen-image-edit'] && (
+                <div className={`mt-2 p-2 rounded-md text-sm ${
+                  testResults['qwen-image-edit'].success
+                    ? 'bg-green-100 text-green-800 border border-green-200'
+                    : 'bg-red-100 text-red-800 border border-red-200'
+                }`}>
+                  {testResults['qwen-image-edit'].message}
+                  {testResults['qwen-image-edit'].responseTime && (
+                    <span className="ml-2">({testResults['qwen-image-edit'].responseTime}ms)</span>
+                  )}
+                  {testResults['qwen-image-edit'].statusCode && (
+                    <span className="ml-2">Status: {testResults['qwen-image-edit'].statusCode}</span>
                   )}
                 </div>
               )}
