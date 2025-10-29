@@ -6,6 +6,7 @@ import S3Service from '@/lib/s3Service';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { getApiMessage } from '@/lib/apiMessages';
+import { v4 as uuidv4 } from 'uuid';
 
 const prisma = new PrismaClient();
 const settingsService = new SettingsService();
@@ -94,13 +95,13 @@ export async function POST(request: NextRequest) {
         // Create job record in database
         const job = await prisma.job.create({
             data: {
-                id: Math.random().toString(36).substring(2, 15),
+                id: uuidv4(),
                 userId,
                 workspaceId: currentWorkspaceId, // 워크스페이스 ID 추가
                 status: 'processing',
                 type: 'video-upscale',
                 prompt: `Video upscale task: ${taskType}`,
-                options: JSON.stringify({ 
+                options: JSON.stringify({
                     taskType,
                     originalFileName: videoFile.name,
                     fileSize: videoFile.size

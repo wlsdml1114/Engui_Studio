@@ -4,6 +4,7 @@ import RunPodService from '@/lib/runpodService';
 import SettingsService from '@/lib/settingsService';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { v4 as uuidv4 } from 'uuid';
 
 interface QwenImageEditPayload {
   prompt: string;
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest) {
         // Create job record in database
         const job = await prisma.job.create({
             data: {
-                id: Math.random().toString(36).substring(2, 15),
+                id: uuidv4(),
                 userId,
                 workspaceId: currentWorkspaceId,
                 status: 'processing',
