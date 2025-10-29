@@ -93,7 +93,18 @@ interface VideoUpscaleInput {
   video_path: string; // S3 경로
 }
 
-type RunPodInput = MultiTalkInput | FluxKontextInput | FluxKreaInput | Wan22Input | WanAnimateInput | InfiniteTalkInput | VideoUpscaleInput;
+interface QwenImageEditInput {
+  prompt: string;
+  image_base64: string; // base64 인코딩된 이미지 데이터
+  image_base64_2?: string; // optional second image
+  seed: number;
+  width: number;
+  height: number;
+  steps?: number;
+  guidance_scale: number;
+}
+
+type RunPodInput = MultiTalkInput | FluxKontextInput | FluxKreaInput | Wan22Input | WanAnimateInput | InfiniteTalkInput | VideoUpscaleInput | QwenImageEditInput;
 
 class RunPodService {
   private apiKey: string;
@@ -296,8 +307,32 @@ class RunPodService {
       console.log('  - video_path:', payload.input.video_path);
       console.log('  - task_type:', payload.input.task_type);
       console.log('  - network_volume:', payload.input.network_volume);
+    } else if ('guidance_scale' in input && 'image_base64' in input && 'width' in input) {
+      // Qwen Image Edit input
+      payload = {
+        input: {
+          prompt: input.prompt,
+          image_base64: input.image_base64,
+          ...(input.image_base64_2 && { image_base64_2: input.image_base64_2 }),
+          seed: input.seed,
+          width: input.width,
+          height: input.height,
+          ...(input.steps && { steps: input.steps }),
+          guidance_scale: input.guidance_scale
+        }
+      };
+
+      console.log('🎨 Qwen Image Edit payload created:');
+      console.log('  - prompt:', payload.input.prompt);
+      console.log('  - image_base64:', `[base64 data] (${payload.input.image_base64.length} characters)`);
+      console.log('  - image_base64_2:', payload.input.image_base64_2 ? `[base64 data] (${payload.input.image_base64_2.length} characters)` : 'not set');
+      console.log('  - seed:', payload.input.seed);
+      console.log('  - width:', payload.input.width);
+      console.log('  - height:', payload.input.height);
+      console.log('  - steps:', payload.input.steps || 'not set');
+      console.log('  - guidance_scale:', payload.input.guidance_scale);
     }
-    
+
     const requestBody = JSON.stringify(payload);
     
     try {

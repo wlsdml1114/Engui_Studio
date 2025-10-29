@@ -18,6 +18,7 @@ export default function Sidebar() {
     { href: '/video-upscale', label: t('menu.videoUpscale'), icon: ArrowUpIcon },
     { href: '/flux-kontext', label: t('menu.fluxKontext'), icon: SparklesIcon },
     { href: '/flux-krea', label: t('menu.fluxKrea'), icon: PhotoIcon },
+    { href: '/qwen-image-edit', label: t('menu.qwenImageEdit'), icon: PhotoIcon },
     { href: '/multitalk', label: t('menu.multitalk'), icon: ChatBubbleLeftRightIcon },
     { href: '/infinite-talk', label: t('menu.infiniteTalk'), icon: MicrophoneIcon },
     { href: '/s3-storage', label: t('menu.s3Storage'), icon: CloudIcon },

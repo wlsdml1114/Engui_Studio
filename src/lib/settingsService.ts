@@ -20,6 +20,20 @@ interface ServiceConfig {
   s3: S3Config;
   workspace?: WorkspaceConfig;
   ui?: UIConfig;
+  qwenImageEditHandler?: QwenImageEditHandlerConfig;
+}
+
+interface QwenImageEditHandlerConfig {
+  imageNode?: number;
+  imageNode2?: number;
+  promptNode?: number;
+  seedNode?: number;
+  widthNode?: number;
+  heightNode?: number;
+  stepsNode?: number;
+  guidanceNode?: number;
+  workflowSingleImage?: string;
+  workflowDualImage?: string;
 }
 
 interface WorkspaceConfig {
@@ -44,6 +58,7 @@ interface RunPodConfig {
     'wan-animate': string; // WAN Animate endpoint 추가
     'infinite-talk': string; // Infinite Talk endpoint 추가
     'video-upscale': string; // Video Upscale endpoint 추가
+    'qwen-image-edit': string; // Qwen Image Edit endpoint 추가
   };
 }
 
@@ -118,7 +133,8 @@ class SettingsService {
             wan22: '', // WAN 2.2 endpoint 추가
             'wan-animate': '', // WAN Animate endpoint 추가
             'infinite-talk': '', // Infinite Talk endpoint 추가
-            'video-upscale': '' // Video Upscale endpoint 추가
+            'video-upscale': '', // Video Upscale endpoint 추가
+            'qwen-image-edit': '' // Qwen Image Edit endpoint 추가
           },
           generateTimeout: 3600 // 기본값 3600초 (1시간)
         },
@@ -137,6 +153,18 @@ class SettingsService {
         },
         ui: {
           language: 'ko' // 기본값 한국어
+        },
+        qwenImageEditHandler: {
+          imageNode: 78,
+          imageNode2: 123,
+          promptNode: 111,
+          seedNode: 3,
+          widthNode: 128,
+          heightNode: 129,
+          stepsNode: 130,
+          guidanceNode: 131,
+          workflowSingleImage: '/qwen_image_edit_1.json',
+          workflowDualImage: '/qwen_image_edit_2.json'
         }
       };
 
@@ -160,7 +188,7 @@ class SettingsService {
               settings.runpod.apiKey = value;
             } else             if (setting.configKey.startsWith('endpoints.')) {
               const endpointType = setting.configKey.split('.')[1];
-              if (endpointType && ['image', 'video', 'multitalk', 'flux-kontext', 'flux-krea', 'wan22', 'wan-animate', 'infinite-talk', 'video-upscale'].includes(endpointType)) {
+              if (endpointType && ['image', 'video', 'multitalk', 'flux-kontext', 'flux-krea', 'wan22', 'wan-animate', 'infinite-talk', 'video-upscale', 'qwen-image-edit'].includes(endpointType)) {
                 settings.runpod.endpoints[endpointType as keyof typeof settings.runpod.endpoints] = value;
               }
             } else if (setting.configKey === 'generateTimeout') {
@@ -189,8 +217,19 @@ class SettingsService {
             if (setting.configKey === 'language') {
               settings.ui.language = value as 'ko' | 'en';
             }
+          } else if (setting.serviceName === 'qwenImageEditHandler') {
+            if (!settings.qwenImageEditHandler) {
+              settings.qwenImageEditHandler = {};
+            }
+            // 숫자 타입의 필드들
+            if (['imageNode', 'imageNode2', 'promptNode', 'seedNode', 'widthNode', 'heightNode', 'stepsNode', 'guidanceNode'].includes(setting.configKey)) {
+              settings.qwenImageEditHandler[setting.configKey as keyof typeof settings.qwenImageEditHandler] = parseInt(value) || 0;
+            } else {
+              // 문자열 타입의 필드들 (workflow paths)
+              settings.qwenImageEditHandler[setting.configKey as keyof typeof settings.qwenImageEditHandler] = value;
+            }
           }
-          
+
           successfulDecryptions++;
           
         } catch (decryptError) {
@@ -328,6 +367,20 @@ class SettingsService {
         });
       }
 
+      // Process Qwen Image Edit Handler settings
+      if (settings.qwenImageEditHandler) {
+        Object.entries(settings.qwenImageEditHandler).forEach(([key, value]) => {
+          if (value !== undefined && value !== '' && value !== null) {
+            flatSettings.push({
+              serviceName: 'qwenImageEditHandler',
+              configKey: key,
+              configValue: String(value),
+              isEncrypted: false
+            });
+          }
+        });
+      }
+
       logger.emoji.testing(`Flattened ${flatSettings.length} settings to save`);
 
       // Save each setting using upsert
@@ -402,14 +455,15 @@ class SettingsService {
     const runpodStatus = this.getServiceStatus(settings.runpod, [
       'apiKey',
       'endpoints.image',
-      'endpoints.video', 
+      'endpoints.video',
       'endpoints.multitalk',
       'endpoints.flux-kontext',
       'endpoints.flux-krea',
       'endpoints.wan22',
       'endpoints.wan-animate',
       'endpoints.infinite-talk',
-      'endpoints.video-upscale'
+      'endpoints.video-upscale',
+      'endpoints.qwen-image-edit'
       // generateTimeout은 선택적 설정이므로 상태 계산에서 제외
     ]);
 
