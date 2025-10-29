@@ -198,6 +198,7 @@ async function processInfiniteTalkJob(jobId: string, runpodJobId: string, langua
 }
 
 export async function POST(request: NextRequest) {
+  let language: 'ko' | 'en' = 'ko';
   try {
     const formData = await request.formData();
     const userId = formData.get('userId') as string;
@@ -214,7 +215,7 @@ export async function POST(request: NextRequest) {
     const prompt = formData.get('prompt') as string;
     const width = parseInt(formData.get('width') as string) || 640;
     const height = parseInt(formData.get('height') as string) || 640;
-    const language = formData.get('language') as 'ko' | 'en' || 'ko';
+    language = (formData.get('language') as 'ko' | 'en') || 'ko';
 
     // 입력 타입과 인물 수 검증
     if (!['image', 'video'].includes(inputType)) {

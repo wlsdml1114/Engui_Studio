@@ -6,10 +6,10 @@ const prisma = new PrismaClient();
 // 작업을 워크스페이스로 이동
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; jobId: string } }
+  { params }: { params: Promise<{ id: string; jobId: string }> }
 ) {
   try {
-    const { id: workspaceId, jobId } = params;
+    const { id: workspaceId, jobId } = await params;
 
     // 워크스페이스 존재 확인
     const workspace = await prisma.workspace.findUnique({
@@ -57,10 +57,10 @@ export async function PUT(
 // 작업을 워크스페이스에서 제거 (워크스페이스 분류 해제)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; jobId: string } }
+  { params }: { params: Promise<{ id: string; jobId: string }> }
 ) {
   try {
-    const { id: workspaceId, jobId } = params;
+    const { id: workspaceId, jobId } = await params;
 
     // 작업 존재 확인
     const job = await prisma.job.findUnique({

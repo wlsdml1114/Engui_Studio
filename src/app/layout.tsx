@@ -1,10 +1,10 @@
-
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import Library from "@/components/Library";
 import { I18nProvider } from "@/lib/i18n/context";
+import LayoutWrapper from "@/components/LayoutWrapper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,13 +32,13 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased custom-scrollbar`}
       >
         <I18nProvider>
-          <div className="flex h-screen bg-background text-foreground">
+          <LayoutWrapper>
             <Sidebar />
             <main className="flex-1 flex flex-col overflow-hidden custom-scrollbar">
               {children}
             </main>
             <Library />
-          </div>
+          </LayoutWrapper>
         </I18nProvider>
       </body>
     </html>
