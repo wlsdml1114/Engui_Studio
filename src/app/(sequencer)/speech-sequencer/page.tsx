@@ -51,10 +51,11 @@ export default function SpeechSequencerPage() {
 
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
   const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const trackRefsMap = useRef<Map<string, HTMLDivElement>>(new Map());
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const playbackAudioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const timelineHeaderRef = useRef<HTMLDivElement>(null);
+  const timelineTracksRef = useRef<HTMLDivElement>(null);
 
   // 컴포넌트 마운트 시 저장된 시퀀스 로드
   useEffect(() => {
@@ -68,19 +69,70 @@ export default function SpeechSequencerPage() {
     }
   }, []);
 
+  // 타임라인 헤더와 트랙 스크롤 동기화
+  useEffect(() => {
+    const headerElement = timelineHeaderRef.current;
+    const tracksElement = timelineTracksRef.current;
+
+    if (!headerElement || !tracksElement) return;
+
+    const handleTracksScroll = () => {
+      // 트랙 스크롤 시 헤더도 같은 양만큼 스크롤
+      const scrollLeft = tracksElement.scrollLeft;
+      headerElement.scrollLeft = scrollLeft;
+    };
+
+    tracksElement.addEventListener('scroll', handleTracksScroll);
+    return () => {
+      tracksElement.removeEventListener('scroll', handleTracksScroll);
+    };
+  }, []);
+
   // Segment 드래그 처리
   useEffect(() => {
     if (!isDraggingSegment || !draggedSegment) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      const newX = e.clientX - dragStartX;
-      const newStartTime = Math.max(0, newX / PIXELS_PER_SECOND);
+      if (!timelineTracksRef.current) return;
+
+      // Timeline Track 컨테이너의 위치 및 스크롤 정보
+      const tracksRect = timelineTracksRef.current.getBoundingClientRect();
+      const scrollLeft = timelineTracksRef.current.scrollLeft;
+
+      // dragStartX = e.clientX - segment.startTime * PIXELS_PER_SECOND 로 설정됨
+      // mousemove에서: newX = e.clientX - dragStartX
+      // newX = e.clientX - (e.clientX - segment.startTime * PIXELS_PER_SECOND)
+      // newX = segment.startTime * PIXELS_PER_SECOND
+      // 이는 segment의 left position과 동일
+
+      // Segment가 위치한 Timeline Track 내의 상대 위치
+      const newXInTimeline = e.clientX - dragStartX;
+
+      // Timeline Track 시작 위치(Speaker label 제외)부터의 거리
+      // Timeline Track 내에서 segment의 left는 이미 Speaker label을 제외한 위치
+      // 따라서 scrollLeft와 newXInTimeline으로 실제 시간 위치 계산
+      const timeInContent = (scrollLeft + newXInTimeline) / PIXELS_PER_SECOND;
+      const newStartTime = Math.max(0, timeInContent);
 
       updateSegmentStartTime(
         draggedSegment.sequenceId,
         draggedSegment.segmentId,
         newStartTime
       );
+
+      // 드래그 중에 자동 스크롤 (화면 끝에 도달하면)
+      const dragThreshold = 100; // 화면 끝에서 100px 안에 도달하면 스크롤
+      const maxScroll = timelineTracksRef.current.scrollWidth - timelineTracksRef.current.clientWidth;
+
+      if (e.clientX > tracksRect.right - dragThreshold) {
+        // 오른쪽으로 스크롤
+        const newScroll = Math.min(maxScroll, scrollLeft + 10);
+        timelineTracksRef.current.scrollLeft = newScroll;
+      } else if (e.clientX < tracksRect.left + dragThreshold) {
+        // 왼쪽으로 스크롤
+        const newScroll = Math.max(0, scrollLeft - 10);
+        timelineTracksRef.current.scrollLeft = newScroll;
+      }
     };
 
     const handleMouseUp = () => {
@@ -95,7 +147,7 @@ export default function SpeechSequencerPage() {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDraggingSegment, draggedSegment, dragStartX]);
+  }, [isDraggingSegment, draggedSegment]);
 
   // 파일 업로드 핸들러
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -249,6 +301,32 @@ export default function SpeechSequencerPage() {
     setPreviewingSegment(null);
   };
 
+  // 재생바 클릭으로 위치 변경
+  const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!timelineTracksRef.current || totalDuration === 0) return;
+
+    // 클릭 위치를 기준으로 시간 계산
+    const tracksRect = timelineTracksRef.current.getBoundingClientRect();
+    const clickX = e.clientX - tracksRect.left + timelineTracksRef.current.scrollLeft;
+
+    // Speaker 레이블 공간(96px)을 제외한 위치 계산
+    const timelineStartX = 96;
+    const relativeX = Math.max(0, clickX - timelineStartX);
+
+    // 클릭한 시간 계산
+    const newTime = Math.min(relativeX / PIXELS_PER_SECOND, totalDuration);
+
+    setCurrentTime(newTime);
+
+    // 재생 중이면 새로운 위치부터 재생하도록 중지했다가 다시 시작
+    if (isPlaying) {
+      stopPlayback();
+      setTimeout(() => {
+        startPlayback();
+      }, 50);
+    }
+  };
+
   // 재생 시작
   const startPlayback = async () => {
     // 이전 재생 중지
@@ -269,10 +347,9 @@ export default function SpeechSequencerPage() {
       return;
     }
 
-    setCurrentTime(0);
     setIsPlaying(true);
 
-    let currentPlaybackTime = 0;
+    let currentPlaybackTime = currentTime; // 현재 시간부터 시작
     const audioElementsMap = new Map<string, HTMLAudioElement>();
     const playingAudios = new Set<string>();
     let isPlaybackActive = true;
@@ -291,11 +368,11 @@ export default function SpeechSequencerPage() {
     playbackAudioElementsRef.current = audioElementsMap;
 
     // 타이머로 재생 제어
-    const startTime = Date.now();
+    const startTime = Date.now() - currentTime * 1000; // currentTime만큼 오프셋 적용
     playbackIntervalRef.current = setInterval(() => {
       if (!isPlaybackActive) return;
 
-      // 실제 경과 시간으로 계산
+      // 실제 경과 시간으로 계산 (currentTime부터 시작)
       currentPlaybackTime = (Date.now() - startTime) / 1000;
 
       setCurrentTime(currentPlaybackTime);
@@ -364,7 +441,6 @@ export default function SpeechSequencerPage() {
   // 재생 중지
   const stopPlayback = () => {
     setIsPlaying(false);
-    setCurrentTime(0);
     if (playbackIntervalRef.current) {
       clearInterval(playbackIntervalRef.current);
       playbackIntervalRef.current = null;
@@ -432,7 +508,8 @@ export default function SpeechSequencerPage() {
   };
 
   const totalDuration = getTotalDuration();
-  const timelineWidth = Math.max(800, totalDuration * PIXELS_PER_SECOND);
+  const TIMELINE_PADDING = 300; // 오른쪽 여백 (px)
+  const timelineWidth = Math.max(800, totalDuration * PIXELS_PER_SECOND + TIMELINE_PADDING);
 
   return (
     <div className="w-full h-screen bg-background flex flex-col">
@@ -590,59 +667,83 @@ export default function SpeechSequencerPage() {
 
         {/* 우측: 타임라인 (가로 방향) */}
         <div className="flex-1 overflow-hidden flex flex-col">
-          {/* 타이머 표시 */}
-          <div className="bg-secondary/30 border-b border-border px-4 py-2 text-sm font-mono text-foreground/70">
-            {currentTime.toFixed(2)}s / {totalDuration.toFixed(2)}s
-          </div>
 
-          {/* 시간축 */}
-          <div className="bg-secondary/50 border-b border-border h-8 flex-shrink-0 overflow-x-auto overflow-y-hidden">
-            <div
-              className="h-full flex relative"
-              style={{ width: `${timelineWidth}px` }}
-            >
-              {Array.from({ length: Math.ceil(totalDuration) + 1 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="flex items-end justify-start"
-                  style={{
-                    width: `${PIXELS_PER_SECOND}px`,
-                    borderLeft: '1px solid',
-                    borderColor: 'rgb(var(--border-rgb) / 0.3)'
-                  }}
-                >
-                  <span className="text-xs text-foreground/50 ml-1">{i}s</span>
-                </div>
-              ))}
+          {/* Available Segments (맨 위, 고정 - scroll 밖) */}
+          {audioFiles.size > 0 && (
+            <div className="bg-secondary/30 border-b border-border px-4 py-3 flex-shrink-0">
+              <p className="text-xs font-medium mb-2 text-foreground/70">
+                Available Segments (drag to tracks)
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {Array.from(audioFiles.entries()).map(([id, file]) => (
+                  <div
+                    key={id}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer?.setData('audioId', id);
+                    }}
+                    className="px-2 py-1 bg-primary text-primary-foreground rounded text-xs cursor-move hover:opacity-80 transition"
+                  >
+                    {file.name.substring(0, 20)}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* 시퀀스 트랙 */}
-          <div className="flex-1 overflow-auto flex flex-col" ref={scrollContainerRef}>
+          <div
+            className="flex-1 overflow-hidden flex flex-col cursor-pointer"
+            onClick={handleTimelineClick}
+          >
+            <div
+              className="flex-1 overflow-auto"
+              ref={timelineTracksRef}
+            >
             {audioFiles.size === 0 ? (
               <div className="flex items-center justify-center h-full text-foreground/50">
                 <p>Upload audio files to get started</p>
               </div>
             ) : (
               <>
-                {/* Available Segments */}
-                <div className="bg-secondary/30 border-b border-border px-4 py-3 flex-shrink-0">
-                  <p className="text-xs font-medium mb-2 text-foreground/70">
-                    Available Segments (drag to tracks)
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {Array.from(audioFiles.entries()).map(([id, file]) => (
-                      <div
-                        key={id}
-                        draggable
-                        onDragStart={(e) => {
-                          e.dataTransfer?.setData('audioId', id);
-                        }}
-                        className="px-2 py-1 bg-primary text-primary-foreground rounded text-xs cursor-move hover:opacity-80 transition"
-                      >
-                        {file.name.substring(0, 20)}
-                      </div>
-                    ))}
+                {/* 시간축 (sticky 고정) */}
+                <div className="bg-secondary/50 border-b border-border h-8 flex-shrink-0 flex sticky top-0 z-20">
+                  {/* Speaker 레이블 공간 (고정) */}
+                  <div className="w-24 flex-shrink-0 border-r border-border sticky left-0 z-20 bg-secondary/50" />
+
+                  {/* 타임라인 헤더 */}
+                  <div
+                    ref={timelineHeaderRef}
+                    className="flex-1 overflow-hidden"
+                  >
+                    <div
+                      className="h-full relative"
+                      style={{ width: `${timelineWidth}px` }}
+                    >
+                      {Array.from({ length: Math.ceil(totalDuration) + 1 }).map((_, i) => (
+                        <div
+                          key={i}
+                          className="absolute top-0 bottom-0"
+                          style={{
+                            left: `${i * PIXELS_PER_SECOND}px`,
+                            width: '1px',
+                            borderLeft: '1px solid',
+                            borderColor: 'rgb(var(--border-rgb) / 0.3)'
+                          }}
+                        >
+                          <span
+                            className="text-xs text-foreground/50 absolute pointer-events-none"
+                            style={{
+                              left: '2px',
+                              top: '4px',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {i}s
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -650,35 +751,48 @@ export default function SpeechSequencerPage() {
                 {sequences.map(sequence => (
                   <div
                     key={sequence.id}
-                    className="border-b border-border flex-shrink-0"
+                    className="border-b border-border flex-shrink-0 relative"
                   >
-                    <div className="flex h-24">
-                      {/* Speaker Label */}
-                      <div className="w-24 bg-secondary/50 border-r border-border p-3 flex items-center flex-shrink-0">
+                    <div className="flex h-24 relative">
+                      {/* Speaker Label (고정) */}
+                      <div className="w-24 bg-secondary/50 border-r border-border p-3 flex items-center flex-shrink-0 sticky left-0 z-10">
                         <p className="font-medium text-sm">{sequence.speaker}</p>
                       </div>
 
-                      {/* Timeline Track */}
-                      <div
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => {
-                          const audioId = e.dataTransfer?.getData('audioId');
-                          if (audioId) {
-                            e.preventDefault();
-                            addSegmentToSequence(sequence.id, audioId);
-                          }
-                        }}
-                        className="flex-1 bg-background relative overflow-hidden"
-                        style={{ minWidth: `${timelineWidth}px` }}
+                      {/* Timeline Track with Playhead */}
+                      <div className="flex-1 bg-background relative overflow-hidden" style={{ minWidth: `${timelineWidth}px` }}>
+                        {/* Playhead (재생바) */}
+                        {totalDuration > 0 && (
+                          <div
+                            className="absolute top-0 bottom-0 w-0.5 pointer-events-none z-10"
+                            style={{
+                              left: `${currentTime * PIXELS_PER_SECOND}px`,
+                              backgroundColor: isPlaying ? 'rgb(239, 68, 68)' : 'rgb(107, 114, 128)',
+                              transition: 'left 0.05s linear'
+                            }}
+                          />
+                        )}
+
+                        {/* Timeline Track Container */}
+                        <div
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => {
+                            const audioId = e.dataTransfer?.getData('audioId');
+                            if (audioId) {
+                              e.preventDefault();
+                              addSegmentToSequence(sequence.id, audioId);
+                            }
+                          }}
+                          className="h-full relative"
                       >
                         {/* Grid Background */}
                         <div className="absolute inset-0 pointer-events-none">
-                          {Array.from({ length: Math.ceil(totalDuration) }).map((_, i) => (
+                          {Array.from({ length: Math.ceil(totalDuration) + 1 }).map((_, i) => (
                             <div
                               key={i}
                               className="absolute top-0 bottom-0 border-r border-border/30"
                               style={{
-                                left: `${(i + 1) * PIXELS_PER_SECOND}px`,
+                                left: `${i * PIXELS_PER_SECOND}px`,
                                 width: '1px'
                               }}
                             />
@@ -705,8 +819,13 @@ export default function SpeechSequencerPage() {
                                 }, 200);
                               }
 
+                              // 드래그 시작 위치 계산
+                              // dragStartX = e.clientX 에서 segment 위치의 pixel 차이를 빼면
+                              // mousemove에서 newX = e.clientX - dragStartX 하면 segment.startTime * PIXELS_PER_SECOND 값이 나옴
+                              const dragStartXValue = e.clientX - segment.startTime * PIXELS_PER_SECOND;
+
                               setDraggedSegment({ sequenceId: sequence.id, segmentId: segment.id });
-                              setDragStartX(e.clientX - segment.startTime * PIXELS_PER_SECOND);
+                              setDragStartX(dragStartXValue);
                               setIsDraggingSegment(true);
                               e.preventDefault();
                             }}
@@ -762,27 +881,18 @@ export default function SpeechSequencerPage() {
                             Drag segments here
                           </div>
                         )}
+                        </div>
                       </div>
                     </div>
                   </div>
                 ))}
               </>
             )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Playhead (진행 표시선) */}
-      {isPlaying && totalDuration > 0 && (
-        <div
-          className="absolute top-0 w-0.5 bg-red-500 pointer-events-none"
-          style={{
-            left: `calc(320px + ${currentTime * PIXELS_PER_SECOND}px)`,
-            height: '100%',
-            transition: 'left 0.05s linear'
-          }}
-        />
-      )}
     </div>
   );
 }
