@@ -243,10 +243,57 @@ export default function InfiniteTalkPage() {
       console.log('🎯 Infinite Talk에 드롭된 데이터:', dragData);
 
       // 미디어 타입 감지
-      const isVideo = dragData.mediaType === 'video' || dragData.jobType === 'multitalk' || 
-                     dragData.jobType === 'wan22' || dragData.jobType === 'wan-animate' || 
+      const isVideo = dragData.mediaType === 'video' || dragData.jobType === 'multitalk' ||
+                     dragData.jobType === 'wan22' || dragData.jobType === 'wan-animate' ||
                      dragData.jobType === 'infinitetalk' || dragData.jobType === 'video-upscale';
-      
+      const isAudio = dragData.mediaType === 'audio' || dragData.jobType === 'audio';
+
+      // 오디오 처리
+      if (isAudio && dragData.audioUrl) {
+        console.log('🎵 오디오 드롭 처리:', dragData.audioUrl);
+
+        try {
+          const audioUrl = dragData.audioUrl;
+          const audioName = dragData.audioName || 'dropped_audio.wav';
+
+          // 어느 오디오 슬롯에 드롭할지 판단: 첫 번째가 비어있으면 첫 번째, 아니면 두 번째
+          const useSecondSlot = audioFile !== null && audioFile2 === null && personCount === 'multi';
+
+          if (useSecondSlot) {
+            // 두 번째 슬롯에 저장
+            setAudioPreviewUrl2(audioUrl);
+            const file = await createFileFromUrl(audioUrl, audioName, 'audio/wav');
+            setAudioFile2(file);
+            console.log('✅ 드롭된 오디오 File 객체 생성 완료 (슬롯 2)');
+
+            setMessage({
+              type: 'success',
+              text: `🎵 오디오 2 로드 완료: ${audioName}`
+            });
+          } else {
+            // 첫 번째 슬롯에 저장
+            setAudioPreviewUrl(audioUrl);
+            const file = await createFileFromUrl(audioUrl, audioName, 'audio/wav');
+            setAudioFile(file);
+            console.log('✅ 드롭된 오디오 File 객체 생성 완료 (슬롯 1)');
+
+            setMessage({
+              type: 'success',
+              text: `🎵 오디오 로드 완료: ${audioName}`
+            });
+          }
+          setMessageType(null);
+        } catch (error) {
+          console.error('❌ 드롭된 오디오 File 객체 생성 실패:', error);
+          setMessage({
+            type: 'error',
+            text: t('infiniteTalk.dragAndDrop.processError')
+          });
+          setMessageType(null);
+        }
+        return;
+      }
+
       // 미디어 타입에 따라 적절한 URL 선택
       let mediaUrl;
       if (isVideo) {
@@ -256,11 +303,11 @@ export default function InfiniteTalkPage() {
         // 이미지인 경우 이미지 URL 우선
         mediaUrl = dragData.inputImagePath || dragData.imageUrl || dragData.resultUrl || dragData.thumbnailUrl;
       }
-      
+
       if (mediaUrl) {
         console.log('🎬 미디어 드롭 처리:', mediaUrl);
         console.log('🔍 미디어 타입:', isVideo ? '비디오' : '이미지');
-        
+
         try {
           if (isVideo) {
             // 비디오 처리
@@ -277,7 +324,7 @@ export default function InfiniteTalkPage() {
             setImageFile(file);
             console.log('✅ 드롭된 이미지 File 객체 생성 완료');
           }
-          
+
           setMessage({
             type: 'success',
             text: t('infiniteTalk.dragAndDrop.reusedAsMedia', {
@@ -610,7 +657,16 @@ export default function InfiniteTalkPage() {
               <label className="block text-sm font-medium mb-2">
                 {t('infiniteTalk.firstAudioFile')} <span className="text-red-400">*</span>
               </label>
-              <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors">
+              <div
+                className={`border-2 border-dashed rounded-lg p-6 text-center transition-all duration-200 ${
+                  isDragOver
+                    ? 'border-primary bg-primary/10 border-solid'
+                    : 'border-border hover:border-primary'
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
                 <input
                   ref={audioInputRef}
                   type="file"
@@ -664,7 +720,16 @@ export default function InfiniteTalkPage() {
                 <label className="block text-sm font-medium mb-2">
                   {t('infiniteTalk.secondAudioFile')} <span className="text-red-400">*</span>
                 </label>
-                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors">
+                <div
+                  className={`border-2 border-dashed rounded-lg p-6 text-center transition-all duration-200 ${
+                    isDragOver
+                      ? 'border-primary bg-primary/10 border-solid'
+                      : 'border-border hover:border-primary'
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
                   <input
                     ref={audioInputRef2}
                     type="file"

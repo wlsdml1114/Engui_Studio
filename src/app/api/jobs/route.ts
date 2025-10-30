@@ -7,6 +7,61 @@ const prisma = new PrismaClient();
 const cache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_DURATION = 5000; // 5초 캐시
 
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const {
+      userId,
+      workspaceId,
+      type,
+      status = 'completed',
+      prompt,
+      resultUrl,
+      thumbnailUrl,
+      options
+    } = body;
+
+    // 필수 필드 검증
+    if (!userId || !type || !resultUrl) {
+      return NextResponse.json(
+        { error: 'Missing required fields: userId, type, resultUrl' },
+        { status: 400 }
+      );
+    }
+
+    // Job 생성
+    const job = await prisma.job.create({
+      data: {
+        userId,
+        workspaceId: workspaceId || null,
+        type,
+        status,
+        prompt: prompt || null,
+        resultUrl,
+        thumbnailUrl: thumbnailUrl || null,
+        options: options ? JSON.stringify(options) : null,
+        createdAt: new Date(),
+        completedAt: status === 'completed' ? new Date() : null
+      }
+    });
+
+    // 캐시 무효화 (해당 사용자의 모든 캐시 제거)
+    for (const [key, _] of cache.entries()) {
+      if (key.includes(userId)) {
+        cache.delete(key);
+      }
+    }
+
+    return NextResponse.json({ success: true, job }, { status: 201 });
+  } catch (error) {
+    console.error('Error creating job:', error);
+    return NextResponse.json(
+      { error: 'Failed to create job' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);

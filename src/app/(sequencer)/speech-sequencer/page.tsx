@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { TrashIcon, PlayIcon, PauseIcon, PlusIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { useRouter } from 'next/navigation';
+import { TrashIcon, PlayIcon, PauseIcon, PlusIcon, CheckIcon, HomeIcon } from '@heroicons/react/24/outline';
 
 interface AudioSegment {
   id: string;
@@ -29,6 +30,8 @@ const SPEAKERS = ['Speaker 1', 'Speaker 2'];
 const PIXELS_PER_SECOND = 50; // 1초 = 50px
 
 export default function SpeechSequencerPage() {
+  const router = useRouter();
+
   // 상태 관리
   const [audioFiles, setAudioFiles] = useState<Map<string, File>>(new Map());
   const [sequences, setSequences] = useState<Sequence[]>(
@@ -50,6 +53,10 @@ export default function SpeechSequencerPage() {
   const [dragStartX, setDragStartX] = useState(0);
   const [previewingSegment, setPreviewingSegment] = useState<string | null>(null);
   const [waveformScale, setWaveformScale] = useState(1);
+  const [selectedWorkspace, setSelectedWorkspace] = useState<string>('');
+  const [availableWorkspaces, setAvailableWorkspaces] = useState<Array<{ id: string; name: string; isDefault?: boolean }>>([]);
+  const [currentProject, setCurrentProject] = useState<string>('');
+  const [savedProjects, setSavedProjects] = useState<Array<{ id: string; name: string; savedAt: string }>>([]);
 
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
   const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -59,7 +66,7 @@ export default function SpeechSequencerPage() {
   const timelineHeaderRef = useRef<HTMLDivElement>(null);
   const timelineTracksRef = useRef<HTMLDivElement>(null);
 
-  // 컴포넌트 마운트 시 저장된 시퀀스 로드
+  // 컴포넌트 마운트 시 저장된 시퀀스 및 workspace 로드
   useEffect(() => {
     const saved = localStorage.getItem('saved_sequences');
     if (saved) {
@@ -69,6 +76,39 @@ export default function SpeechSequencerPage() {
         console.error('Failed to load saved sequences:', e);
       }
     }
+
+    // API에서 Workspace 로드
+    const loadWorkspaces = async () => {
+      try {
+        const res = await fetch('/api/workspaces?userId=user-with-settings');
+        const data = await res.json();
+        const workspaces = data.workspaces || [];
+
+        setAvailableWorkspaces(workspaces);
+
+        // 이전에 선택된 workspace 찾기
+        const lastWorkspaceId = localStorage.getItem('lastSelectedWorkspaceId');
+        if (lastWorkspaceId) {
+          const found = workspaces.find((w: any) => w.id === lastWorkspaceId);
+          if (found) {
+            setSelectedWorkspace(found.id);
+            return;
+          }
+        }
+
+        // Default workspace 찾기
+        const defaultWorkspace = workspaces.find((w: any) => w.isDefault === true);
+        if (defaultWorkspace) {
+          setSelectedWorkspace(defaultWorkspace.id);
+        } else if (workspaces.length > 0) {
+          setSelectedWorkspace(workspaces[0].id);
+        }
+      } catch (e) {
+        console.error('Failed to load workspaces:', e);
+      }
+    };
+
+    loadWorkspaces();
   }, []);
 
   // 타임라인 헤더와 트랙 스크롤 동기화
@@ -303,8 +343,71 @@ export default function SpeechSequencerPage() {
     );
   };
 
+  // Segment를 playhead 위치에서 자르기
+  const cutSegmentAtPlayhead = (sequenceId: string, segmentId: string) => {
+    setSequences(prevs =>
+      prevs.map(seq =>
+        seq.id === sequenceId
+          ? {
+              ...seq,
+              segments: seq.segments.flatMap(seg => {
+                if (seg.id !== segmentId) return seg;
+
+                // Segment의 시작과 끝 시간
+                const segmentStart = seg.startTime;
+                const segmentEnd = seg.startTime + seg.duration;
+
+                // playhead가 segment 내에 있는지 확인
+                if (currentTime <= segmentStart || currentTime >= segmentEnd) {
+                  return seg;
+                }
+
+                // Playhead 위치에서 자르기
+                const cutPoint = currentTime - segmentStart; // segment 내에서의 상대 위치
+
+                // 첫 번째 부분
+                const firstSegment: AudioSegment = {
+                  ...seg,
+                  id: `${seg.id}-1-${Date.now()}`,
+                  duration: cutPoint,
+                  waveformData: seg.waveformData
+                    ? seg.waveformData.slice(
+                        0,
+                        Math.floor((cutPoint / seg.duration) * seg.waveformData.length)
+                      )
+                    : undefined
+                };
+
+                // 두 번째 부분
+                const secondSegment: AudioSegment = {
+                  ...seg,
+                  id: `${seg.id}-2-${Date.now()}`,
+                  startTime: currentTime,
+                  duration: segmentEnd - currentTime,
+                  waveformData: seg.waveformData
+                    ? seg.waveformData.slice(
+                        Math.floor((cutPoint / seg.duration) * seg.waveformData.length)
+                      )
+                    : undefined
+                };
+
+                return [firstSegment, secondSegment];
+              })
+            }
+          : seq
+      )
+    );
+  };
+
   // 미리듣기
   const playSegmentPreview = (segment: AudioSegment) => {
+    // segment.file 검증
+    if (!segment.file) {
+      console.warn('⚠️ Segment file not available:', segment.name);
+      alert('Audio file not available for this segment');
+      return;
+    }
+
     // 이전 재생이 있으면 중지
     if (previewAudioRef.current) {
       previewAudioRef.current.pause();
@@ -490,31 +593,495 @@ export default function SpeechSequencerPage() {
     audioRefs.current.clear();
   };
 
-  // 시퀀스 저장
-  const saveSequence = () => {
+  // 각 speaker별 오디오 렌더링 (시간에 맞춰 silence와 함께)
+  const renderAudioForSpeaker = async (speakerId: string): Promise<Blob | null> => {
+    const sequence = sequences.find(s => s.id === speakerId);
+    if (!sequence || sequence.segments.length === 0) return null;
+
+    // File 객체가 없는 segments 확인 (로드된 프로젝트의 경우)
+    const segmentsWithFile = sequence.segments.filter(seg => seg.file);
+    const segmentsWithoutFile = sequence.segments.filter(seg => !seg.file);
+
+    if (segmentsWithFile.length === 0) {
+      console.warn(`⚠️ No audio files for ${sequence.speaker}. This might be a loaded project without original audio files.`);
+      return null;
+    }
+
+    if (segmentsWithoutFile.length > 0) {
+      console.warn(`⚠️ ${segmentsWithoutFile.length} segment(s) in ${sequence.speaker} have no audio file (from loaded project)`);
+    }
+
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const maxDuration = getTotalDuration();
+    const sampleRate = audioContext.sampleRate;
+    const totalSamples = Math.ceil(maxDuration * sampleRate);
+    const audioBuffer = audioContext.createBuffer(1, totalSamples, sampleRate);
+    const channelData = audioBuffer.getChannelData(0);
+
+    // 각 segment를 순서대로 렌더링 (File이 있는 것만)
+    for (const segment of segmentsWithFile) {
+      if (!segment.file) continue;
+
+      const fileReader = new FileReader();
+      const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+        fileReader.onload = (e) => resolve(e.target?.result as ArrayBuffer);
+        fileReader.onerror = () => reject(new Error('Failed to read file'));
+        fileReader.readAsArrayBuffer(segment.file);
+      });
+
+      const segmentAudioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      const segmentData = segmentAudioBuffer.getChannelData(0);
+      const startSample = Math.floor(segment.startTime * sampleRate);
+
+      // Segment 데이터를 버퍼에 복사
+      for (let i = 0; i < segmentData.length; i++) {
+        if (startSample + i < totalSamples) {
+          channelData[startSample + i] = segmentData[i];
+        }
+      }
+    }
+
+    // AudioBuffer를 WAV Blob으로 변환
+    const offlineContext = new OfflineAudioContext(1, totalSamples, sampleRate);
+    const source = offlineContext.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(offlineContext.destination);
+    source.start(0);
+
+    const renderedBuffer = await offlineContext.startRendering();
+    const wavData = audioBufferToWave(renderedBuffer);
+    return new Blob([wavData], { type: 'audio/wav' });
+  };
+
+  // AudioBuffer를 WAV 형식으로 변환
+  const audioBufferToWave = (audioBuffer: AudioBuffer): ArrayBuffer => {
+    const numberOfChannels = audioBuffer.numberOfChannels;
+    const sampleRate = audioBuffer.sampleRate;
+    const format = 1; // PCM
+    const bitDepth = 16;
+
+    const bytesPerSample = bitDepth / 8;
+    const blockAlign = numberOfChannels * bytesPerSample;
+
+    const data = new Float32Array(audioBuffer.length * numberOfChannels);
+    const channelData = [];
+    for (let i = 0; i < numberOfChannels; i++) {
+      channelData.push(audioBuffer.getChannelData(i));
+    }
+
+    let offset = 0;
+    for (let i = 0; i < audioBuffer.length; i++) {
+      for (let channel = 0; channel < numberOfChannels; channel++) {
+        data[offset++] = channelData[channel][i];
+      }
+    }
+
+    const dataLength = data.length * bytesPerSample;
+    const buffer = new ArrayBuffer(44 + dataLength);
+    const view = new DataView(buffer);
+
+    const writeString = (offset: number, string: string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + dataLength, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, format, true);
+    view.setUint16(22, numberOfChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * blockAlign, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitDepth, true);
+    writeString(36, 'data');
+    view.setUint32(40, dataLength, true);
+
+    let index = 44;
+    const volume = 0.8;
+    for (let i = 0; i < data.length; i++) {
+      view.setInt16(index, data[i] < 0 ? data[i] * 0x8000 : data[i] * 0x7fff, true);
+      index += 2;
+    }
+
+    return buffer;
+  };
+
+  // 프로젝트 저장
+  const saveProject = async (projectName: string) => {
+    if (!projectName.trim()) {
+      alert('Please enter a project name');
+      return;
+    }
+
+    try {
+      const projectId = `project-${Date.now()}`;
+
+      // 각 segment의 audio file을 public/upload에 저장
+      const segmentsWithFilePaths = await Promise.all(
+        sequences.map(async (seq) => ({
+          ...seq,
+          segments: await Promise.all(
+            seq.segments.map(async (seg) => {
+              let audioPath = null;
+
+              if (seg.file) {
+                // 파일을 public/upload에 저장
+                const fileName = `${projectId}_${seg.id}_${seg.name}`;
+                const formData = new FormData();
+                formData.append('file', seg.file, fileName);
+
+                const uploadRes = await fetch('/api/save-project-audio', {
+                  method: 'POST',
+                  body: formData
+                });
+
+                if (uploadRes.ok) {
+                  const uploadData = await uploadRes.json();
+                  audioPath = uploadData.filePath;
+                  console.log(`✅ Segment file saved: ${audioPath}`);
+                } else {
+                  console.warn(`⚠️ Failed to save segment file ${seg.name}`);
+                }
+              }
+
+              return {
+                id: seg.id,
+                name: seg.name,
+                duration: seg.duration,
+                startTime: seg.startTime,
+                waveformData: seg.waveformData,
+                audioPath: audioPath,
+                audioMimeType: seg.file?.type || 'audio/wav'
+              };
+            })
+          )
+        }))
+      );
+
+      const projectData = {
+        id: projectId,
+        name: projectName,
+        sequences: segmentsWithFilePaths,
+        currentTime,
+        waveformScale,
+        savedAt: new Date().toLocaleString()
+      };
+
+      // localStorage에 저장
+      const existingProjects = JSON.parse(localStorage.getItem('speech_sequencer_projects') || '[]');
+      const updatedProjects = existingProjects.filter((p: any) => p.id !== projectId);
+      updatedProjects.push(projectData);
+      localStorage.setItem('speech_sequencer_projects', JSON.stringify(updatedProjects));
+
+      // 프로젝트 목록 업데이트
+      setSavedProjects(updatedProjects.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        savedAt: p.savedAt
+      })));
+
+      setCurrentProject(projectId);
+      alert(`Project "${projectName}" saved successfully!`);
+      console.log('💾 Project saved:', projectName);
+    } catch (error) {
+      console.error('Error saving project:', error);
+      alert('Failed to save project');
+    }
+  };
+
+  // 프로젝트 로드
+  const loadProject = async (projectId: string) => {
+    try {
+      console.log('🔄 Loading project:', projectId);
+      const projects = JSON.parse(localStorage.getItem('speech_sequencer_projects') || '[]');
+      console.log('📋 Total projects in storage:', projects.length);
+
+      const projectData = projects.find((p: any) => p.id === projectId);
+
+      if (!projectData) {
+        console.error('❌ Project not found:', projectId);
+        alert('Project not found');
+        return;
+      }
+
+      console.log('📂 Project data found:', projectData.name);
+      console.log('📊 Sequences count:', projectData.sequences.length);
+
+      // 파일 경로에서 File 객체로 복구
+      const sequencesWithFiles = await Promise.all(
+        projectData.sequences.map(async (seq: any, seqIdx: number) => {
+          console.log(`Processing sequence ${seqIdx}:`, seq.speaker, 'segments:', seq.segments.length);
+
+          return {
+            ...seq,
+            segments: await Promise.all(
+              seq.segments.map(async (seg: any) => {
+                let fileObj = null;
+
+                if (seg.audioPath) {
+                  // 저장된 파일을 fetch해서 File 객체로 변환
+                  try {
+                    console.log(`📥 Fetching file from: ${seg.audioPath}`);
+                    const response = await fetch(seg.audioPath);
+                    if (!response.ok) {
+                      throw new Error(`HTTP ${response.status}`);
+                    }
+                    const blob = await response.blob();
+                    fileObj = new File([blob], seg.name, { type: seg.audioMimeType });
+                    console.log(`✅ Loaded segment file: ${seg.name} (${blob.size} bytes)`);
+                  } catch (fetchError) {
+                    console.warn(`⚠️ Failed to load segment file: ${seg.audioPath}`, fetchError);
+                  }
+                } else {
+                  console.log(`⚠️ No audioPath for segment: ${seg.name}`);
+                }
+
+                return {
+                  id: seg.id,
+                  name: seg.name,
+                  duration: seg.duration,
+                  startTime: seg.startTime,
+                  waveformData: seg.waveformData,
+                  file: fileObj
+                };
+              })
+            )
+          };
+        })
+      );
+
+      console.log('🔄 Setting sequences, count:', sequencesWithFiles.length);
+
+      // 시퀀스 복구
+      setSequences(sequencesWithFiles);
+      setCurrentTime(projectData.currentTime);
+      setWaveformScale(projectData.waveformScale);
+      setCurrentProject(projectId);
+
+      console.log('✅ Project loaded successfully');
+      alert(`Project "${projectData.name}" loaded successfully! ✓\n\nAll audio segments are restored and ready to save to library.`);
+    } catch (error) {
+      console.error('Error loading project:', error);
+      alert('Failed to load project: ' + (error instanceof Error ? error.message : String(error)));
+    }
+  };
+
+  // 프로젝트 삭제
+  const deleteProject = (projectId: string) => {
+    if (!confirm('Are you sure you want to delete this project?')) {
+      return;
+    }
+
+    try {
+      const projects = JSON.parse(localStorage.getItem('speech_sequencer_projects') || '[]');
+      const updatedProjects = projects.filter((p: any) => p.id !== projectId);
+      localStorage.setItem('speech_sequencer_projects', JSON.stringify(updatedProjects));
+
+      setSavedProjects(updatedProjects.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        savedAt: p.savedAt
+      })));
+
+      if (currentProject === projectId) {
+        setCurrentProject('');
+      }
+
+      console.log('🗑️ Project deleted');
+    } catch (error) {
+      console.error('Error deleting project:', error);
+    }
+  };
+
+  // 저장된 프로젝트 로드 (컴포넌트 마운트 시)
+  useEffect(() => {
+    try {
+      const projects = JSON.parse(localStorage.getItem('speech_sequencer_projects') || '[]');
+      setSavedProjects(projects.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        savedAt: p.savedAt
+      })));
+    } catch (e) {
+      console.error('Failed to load saved projects:', e);
+    }
+  }, []);
+
+  // 썸네일 이미지 생성
+  const generateThumbnail = (sequenceName: string, speaker: string): string => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 200;
+    canvas.height = 120;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+
+    // 배경 그라디언트
+    const gradient = ctx.createLinearGradient(0, 0, 200, 120);
+    if (speaker === 'Speaker 1') {
+      gradient.addColorStop(0, '#3b82f6');
+      gradient.addColorStop(1, '#1e40af');
+    } else {
+      gradient.addColorStop(0, '#8b5cf6');
+      gradient.addColorStop(1, '#6d28d9');
+    }
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 200, 120);
+
+    // 텍스트
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // 시퀀스 이름
+    ctx.fillText(sequenceName.substring(0, 15), 100, 40);
+
+    // Speaker 정보
+    ctx.font = 'bold 20px Arial';
+    ctx.fillText(speaker, 100, 75);
+
+    // 음성 아이콘 표현 (간단한 파형)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 2;
+    const wavePoints = [20, 50, 80, 110, 140, 170];
+    for (let i = 0; i < wavePoints.length; i++) {
+      const x = wavePoints[i];
+      const height = 15 + Math.sin(i) * 8;
+      ctx.beginPath();
+      ctx.moveTo(x, 100);
+      ctx.lineTo(x, 100 + height);
+      ctx.stroke();
+    }
+
+    return canvas.toDataURL('image/png');
+  };
+
+  // 시퀀스 저장 - Parent window (main library)에 전송
+  const saveSequence = async () => {
     if (!sequenceName.trim()) {
       alert('Please enter a sequence name');
       return;
     }
 
-    const newSaved: SavedSequence = {
-      id: `saved-${Date.now()}`,
-      name: sequenceName,
-      createdAt: new Date().toLocaleString(),
-      sequences: sequences.map(seq => ({
-        ...seq,
-        segments: seq.segments.map(seg => ({
-          ...seg,
-          file: seg.file
-        }))
-      }))
-    };
+    if (!selectedWorkspace) {
+      alert('Please select a workspace');
+      return;
+    }
 
-    const updated = [...savedSequences, newSaved];
-    setSavedSequences(updated);
-    localStorage.setItem('saved_sequences', JSON.stringify(updated));
-    setSequenceName('');
-    alert('Sequence saved successfully!');
+    try {
+      console.log('🎬 Starting sequence save...');
+
+      // 각 speaker별 오디오 렌더링
+      const audioBlobs: Record<string, Blob> = {};
+
+      for (const sequence of sequences) {
+        const blob = await renderAudioForSpeaker(sequence.id);
+        if (blob) {
+          audioBlobs[sequence.speaker] = blob;
+        }
+      }
+
+      if (Object.keys(audioBlobs).length === 0) {
+        alert('No audio segments to save. Make sure to load a project with audio files or add new segments.');
+        console.error('❌ Cannot save: No audio blobs generated. This usually happens when loading a saved project without the original audio files.');
+        return;
+      }
+
+      console.log('✅ Audio blobs created:', Object.keys(audioBlobs));
+
+      // selectedWorkspace는 이미 workspace ID입니다
+      const workspaceId = selectedWorkspace;
+      console.log('🔍 Using workspace ID:', workspaceId);
+
+      // 각 speaker별 오디오를 로컬에 저장하고 DB에 저장
+      for (const [speaker, blob] of Object.entries(audioBlobs)) {
+        console.log(`📁 Processing ${speaker}...`);
+
+        // 1. 썸네일 이미지 생성
+        const thumbnailDataUrl = generateThumbnail(sequenceName, speaker);
+        const thumbnailRes = await fetch(thumbnailDataUrl);
+        const thumbnailBlob = await thumbnailRes.blob();
+        const thumbnailFileName = `${sequenceName}_${speaker}_thumb_${Date.now()}.png`;
+
+        console.log(`🖼️ Saving thumbnail for ${speaker}...`);
+        const thumbFormData = new FormData();
+        thumbFormData.append('file', thumbnailBlob, thumbnailFileName);
+
+        const thumbUploadRes = await fetch('/api/save-audio', {
+          method: 'POST',
+          body: thumbFormData
+        });
+
+        let thumbnailPath = null;
+        if (thumbUploadRes.ok) {
+          const thumbData = await thumbUploadRes.json();
+          thumbnailPath = thumbData.filePath;
+          console.log(`✅ Thumbnail saved to: ${thumbnailPath}`);
+        } else {
+          console.warn(`⚠️ Failed to save thumbnail for ${speaker}, continuing...`);
+        }
+
+        // 2. 오디오 파일 저장
+        const fileName = `${sequenceName}_${speaker}_${Date.now()}.wav`;
+        console.log(`💾 Saving ${speaker} to local storage...`);
+
+        const formData = new FormData();
+        formData.append('file', blob, fileName);
+
+        const uploadRes = await fetch('/api/save-audio', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!uploadRes.ok) {
+          const errorText = await uploadRes.text();
+          console.error(`❌ Failed to save ${speaker}:`, errorText);
+          throw new Error(`Failed to save ${speaker} audio`);
+        }
+
+        const uploadData = await uploadRes.json();
+        const audioPath = uploadData.filePath;
+        console.log(`✅ ${speaker} saved to: ${audioPath}`);
+
+        // 3. Job 기록을 database에 생성
+        console.log(`📝 Creating job record for ${speaker}...`);
+        const jobRes = await fetch('/api/jobs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: 'user-with-settings',
+            workspaceId,
+            type: 'audio',
+            status: 'completed',
+            prompt: `${sequenceName} - ${speaker}`,
+            resultUrl: audioPath,
+            thumbnailUrl: thumbnailPath
+          })
+        });
+
+        if (!jobRes.ok) {
+          const errorText = await jobRes.text();
+          console.error(`❌ Job creation failed for ${speaker}:`, errorText);
+          throw new Error(`Failed to create job for ${speaker} audio`);
+        }
+
+        const jobData = await jobRes.json();
+        console.log(`✅ Job created for ${speaker}:`, jobData.job.id);
+      }
+
+      // 저장 완료 후 정리
+      setSequenceName('');
+      console.log('🎉 Sequence saved successfully!');
+      alert('Sequence saved to library!');
+    } catch (error) {
+      console.error('Error saving sequence:', error);
+      alert('Failed to save sequence. Please try again.');
+    }
   };
 
   // 저장된 시퀀스 로드
@@ -546,11 +1113,20 @@ export default function SpeechSequencerPage() {
   return (
     <div className="w-full h-screen bg-background flex flex-col">
       {/* 헤더 */}
-      <div className="border-b border-border bg-secondary/30 px-6 py-4">
-        <h1 className="text-2xl font-bold">Speech Sequencer</h1>
-        <p className="text-sm text-foreground/70">
-          Arrange audio segments by speaker and create perfectly timed sequences
-        </p>
+      <div className="border-b border-border bg-secondary/30 px-6 py-4 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Speech Sequencer</h1>
+          <p className="text-sm text-foreground/70">
+            Arrange audio segments by speaker and create perfectly timed sequences
+          </p>
+        </div>
+        <button
+          onClick={() => router.push('/')}
+          className="flex items-center gap-2 px-3 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg transition text-sm font-medium"
+        >
+          <HomeIcon className="w-4 h-4" />
+          Home
+        </button>
       </div>
 
       {/* 메인 콘텐츠 */}
@@ -645,6 +1221,25 @@ export default function SpeechSequencerPage() {
                   />
                 </div>
               </div>
+
+              <button
+                onClick={() => {
+                  // 현재 playhead 위치와 교차하는 모든 segment를 자르기
+                  sequences.forEach(seq => {
+                    seq.segments.forEach(seg => {
+                      const segmentStart = seg.startTime;
+                      const segmentEnd = seg.startTime + seg.duration;
+                      if (currentTime > segmentStart && currentTime < segmentEnd) {
+                        cutSegmentAtPlayhead(seq.id, seg.id);
+                      }
+                    });
+                  });
+                }}
+                disabled={audioFiles.size === 0 && sequences.every(s => s.segments.length === 0)}
+                className="w-full px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm font-medium"
+              >
+                Cut at Playhead
+              </button>
             </div>
           </div>
 
@@ -652,11 +1247,33 @@ export default function SpeechSequencerPage() {
           <div className="bg-card border border-border rounded-lg p-4">
             <h2 className="text-lg font-semibold mb-3">Save Sequence</h2>
             <div className="space-y-2">
+              {availableWorkspaces.length > 0 && (
+                <div>
+                  <label className="text-xs font-medium text-foreground/70 block mb-1">
+                    Workspace
+                  </label>
+                  <select
+                    value={selectedWorkspace}
+                    onChange={(e) => {
+                      setSelectedWorkspace(e.target.value);
+                      localStorage.setItem('lastSelectedWorkspaceId', e.target.value);
+                    }}
+                    className="w-full px-2 py-2 border border-border rounded-lg bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    {availableWorkspaces.map(workspace => (
+                      <option key={workspace.id} value={workspace.id}>
+                        {workspace.name} {workspace.isDefault ? '(Default)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <input
                 type="text"
                 value={sequenceName}
                 onChange={(e) => setSequenceName(e.target.value)}
-                placeholder="Enter name"
+                placeholder="Enter sequence name"
                 className="w-full px-2 py-2 border border-border rounded-lg bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary"
               />
               <button
@@ -665,8 +1282,68 @@ export default function SpeechSequencerPage() {
                 className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm"
               >
                 <CheckIcon className="w-4 h-4" />
-                Save
+                Save to Library
               </button>
+            </div>
+          </div>
+
+          {/* Project Management */}
+          <div className="bg-card border border-border rounded-lg p-4">
+            <h2 className="text-lg font-semibold mb-3">Project</h2>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  id="projectNameInput"
+                  placeholder="Project name"
+                  className="flex-1 px-2 py-2 border border-border rounded-lg bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <button
+                  onClick={async () => {
+                    const input = document.getElementById('projectNameInput') as HTMLInputElement;
+                    if (input) {
+                      await saveProject(input.value);
+                      input.value = '';
+                    }
+                  }}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm disabled:opacity-50"
+                >
+                  Save
+                </button>
+              </div>
+
+              {currentProject && (
+                <div className="text-xs text-green-400">
+                  ✓ Current: {savedProjects.find(p => p.id === currentProject)?.name}
+                </div>
+              )}
+
+              {savedProjects.length > 0 && (
+                <div className="max-h-40 overflow-y-auto custom-scrollbar">
+                  <div className="text-xs font-medium text-foreground/70 mb-2">Saved Projects:</div>
+                  {savedProjects.map(project => (
+                    <div
+                      key={project.id}
+                      className="p-2 bg-secondary rounded-lg text-xs flex justify-between items-center mb-1"
+                    >
+                      <div
+                        onClick={async () => await loadProject(project.id)}
+                        className="flex-1 cursor-pointer hover:text-primary transition"
+                      >
+                        <p className="font-medium">{project.name}</p>
+                        <p className="text-foreground/50 text-xs">{project.savedAt}</p>
+                      </div>
+                      <button
+                        onClick={() => deleteProject(project.id)}
+                        className="text-red-500 hover:text-red-700 transition"
+                        title="Delete"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -758,7 +1435,7 @@ export default function SpeechSequencerPage() {
               className="flex-1 overflow-auto"
               ref={timelineTracksRef}
             >
-            {audioFiles.size === 0 ? (
+            {audioFiles.size === 0 && sequences.every(seq => seq.segments.length === 0) ? (
               <div className="flex items-center justify-center h-full text-foreground/50">
                 <p>Upload audio files to get started</p>
               </div>

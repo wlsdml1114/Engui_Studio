@@ -21,7 +21,7 @@ interface JobItem {
   userId: string;
   workspaceId?: string;
   status: 'processing' | 'completed' | 'failed';
-  type: 'video' | 'multitalk' | 'flux-kontext' | 'flux-krea' | 'wan22' | 'wan-animate' | 'infinitetalk'|'video-upscale'|'qwen-image-edit';
+  type: 'video' | 'multitalk' | 'flux-kontext' | 'flux-krea' | 'wan22' | 'wan-animate' | 'infinitetalk'|'video-upscale'|'qwen-image-edit'|'audio';
   prompt?: string;
   options?: string;
   resultUrl?: string;
@@ -70,6 +70,11 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
 
   // MultiTalk의 경우 options에서 입력 이미지 경로 추출
   const getThumbnailUrl = () => {
+    // Audio의 경우 생성된 썸네일 사용
+    if (item.type === 'audio' && item.thumbnailUrl) {
+      return item.thumbnailUrl;
+    }
+
     // MultiTalk의 경우 입력 이미지를 썸네일로 사용
     if (item.type === 'multitalk' && item.options) {
       try {
@@ -308,33 +313,37 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
       jobId: item.id,
       prompt: item.prompt || '',
       // 미디어 타입과 URL 정보
-      mediaType: item.type === 'flux-kontext' || item.type === 'flux-krea' || item.type === 'qwen-image-edit' ? 'image' : 'video',
+      mediaType: item.type === 'flux-kontext' || item.type === 'flux-krea' || item.type === 'qwen-image-edit' ? 'image' : item.type === 'audio' ? 'audio' : 'video',
       mediaUrl: item.resultUrl || thumbnailUrl,
       thumbnailUrl: thumbnailUrl,
       // 실제 결과 URL (비디오의 경우 실제 비디오 파일)
       resultUrl: item.resultUrl,
       // 각 타입별 추가 정보
-      ...(item.type === 'multitalk' && { 
+      ...(item.type === 'multitalk' && {
         inputImagePath: getThumbnailUrl(),
         videoUrl: item.resultUrl // 실제 비디오 URL 추가
       }),
       ...(item.type === 'flux-kontext' && { inputImagePath: getThumbnailUrl() }),
       ...(item.type === 'flux-krea' && { imageUrl: getThumbnailUrl() }),
       ...(item.type === 'qwen-image-edit' && { imageUrl: getThumbnailUrl() }),
-      ...(item.type === 'wan22' && { 
+      ...(item.type === 'wan22' && {
         inputImagePath: getThumbnailUrl(),
         videoUrl: item.resultUrl // 실제 비디오 URL 추가
       }),
-      ...(item.type === 'wan-animate' && { 
+      ...(item.type === 'wan-animate' && {
         imageUrl: getThumbnailUrl(),
         videoUrl: item.resultUrl // 실제 비디오 URL 추가
       }),
-      ...(item.type === 'infinitetalk' && { 
+      ...(item.type === 'infinitetalk' && {
         inputType: 'video',
         videoUrl: item.resultUrl // 실제 비디오 URL 사용
       }),
-      ...(item.type === 'video-upscale' && { 
+      ...(item.type === 'video-upscale' && {
         videoUrl: item.resultUrl // 실제 비디오 URL 사용
+      }),
+      ...(item.type === 'audio' && {
+        audioUrl: item.resultUrl, // 실제 오디오 URL 사용
+        audioName: item.prompt || 'Audio' // 오디오 이름
       })
     };
 
@@ -342,12 +351,18 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
     e.dataTransfer.setData('application/json', JSON.stringify(dragData));
     e.dataTransfer.setData('text/plain', JSON.stringify(dragData)); // 폴백용
     
-    // 썸네일을 드래그 이미지로 설정
+    // 썸네일을 드래그 이미지로 설정 (또는 오디오의 경우 아이콘)
     const img = itemRef.current?.querySelector('img');
     if (img) {
       e.dataTransfer.setDragImage(img, 50, 30); // 드래그 시 보여질 썸네일 위치
+    } else if (item.type === 'audio') {
+      // 오디오는 아이콘을 드래그 이미지로 사용
+      const svg = itemRef.current?.querySelector('svg');
+      if (svg) {
+        e.dataTransfer.setDragImage(svg, 24, 24);
+      }
     }
-    
+
     console.log('📦 드래그 데이터:', dragData);
   };
 
@@ -382,7 +397,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
         `}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
-        draggable={item.status === 'completed' && (thumbnailUrl || item.resultUrl)}
+        draggable={item.status === 'completed' && (thumbnailUrl || item.resultUrl || item.type === 'audio')}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
@@ -446,6 +461,8 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
           <span className={`text-xs px-2 py-1 rounded-full capitalize font-medium ${
             item.type === 'flux-kontext' || item.type === 'flux-krea' || item.type === 'qwen-image-edit'
               ? 'bg-purple-500/20 text-purple-300' // 이미지 타입 - 보라색
+              : item.type === 'audio'
+              ? 'bg-amber-500/20 text-amber-300'   // 오디오 타입 - 황금색
               : 'bg-blue-500/20 text-blue-300'     // 비디오 타입 - 파란색
           }`}>
             {item.type}
@@ -1455,6 +1472,101 @@ export default function Library() {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
+
+  // Speech Sequencer에서 저장된 sequence 메시지 받기
+  useEffect(() => {
+    const handleMessage = async (event: MessageEvent) => {
+      console.log('📨 Message received in Library:', event.data.type);
+      if (event.data.type === 'SAVE_SEQUENCE_TO_LIBRARY') {
+        const { sequenceName, workspaceName, audioFiles } = event.data.payload;
+        console.log('💾 Saving sequence:', sequenceName, 'to workspace:', workspaceName);
+
+        try {
+          // 워크스페이스 ID 찾기 또는 생성
+          let workspaceId = workspaces.find(w => w.name === workspaceName)?.id;
+          console.log('🔍 Found workspace ID:', workspaceId);
+
+          if (!workspaceId) {
+            // 워크스페이스가 없으면 생성
+            const createRes = await fetch('/api/workspaces', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: workspaceName,
+                description: `Created for ${sequenceName}`,
+                userId: 'user-with-settings'
+              })
+            });
+            const newWorkspace = await createRes.json();
+            workspaceId = newWorkspace.id;
+            mutateWorkspaces();
+          }
+
+          // 각 speaker별 오디오를 library에 저장
+          for (const [speaker, dataUrl] of Object.entries(audioFiles)) {
+            console.log(`📁 Processing ${speaker}...`);
+            // Data URL을 Blob으로 변환
+            const res = await fetch(dataUrl as string);
+            const blob = await res.blob();
+            console.log(`📊 Blob size for ${speaker}: ${blob.size} bytes`);
+
+            // 1. S3에 파일 업로드
+            const formData = new FormData();
+            formData.append('file', blob, `${sequenceName}_${speaker}.wav`);
+
+            console.log(`🚀 Uploading ${speaker} to S3...`);
+            const uploadRes = await fetch('/api/upload', {
+              method: 'POST',
+              body: formData
+            });
+
+            if (!uploadRes.ok) {
+              throw new Error(`Failed to upload ${speaker} audio`);
+            }
+
+            const uploadData = await uploadRes.json();
+            const audioPath = uploadData.files.file;
+            console.log(`✅ ${speaker} uploaded to: ${audioPath}`);
+
+            // 2. Job 기록을 database에 생성
+            console.log(`📝 Creating job record for ${speaker}...`);
+            const jobRes = await fetch('/api/jobs', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: 'user-with-settings',
+                workspaceId,
+                type: 'audio',
+                status: 'completed',
+                prompt: `${sequenceName} - ${speaker}`,
+                resultUrl: audioPath,
+                thumbnailUrl: null
+              })
+            });
+
+            if (!jobRes.ok) {
+              const errorText = await jobRes.text();
+              console.error(`❌ Job creation failed for ${speaker}:`, errorText);
+              throw new Error(`Failed to create job for ${speaker} audio`);
+            }
+
+            const jobData = await jobRes.json();
+            console.log(`✅ Job created for ${speaker}:`, jobData.job.id);
+          }
+
+          // 라이브러리 갱신
+          mutate();
+          alert(`Sequence saved to ${workspaceName} workspace!`);
+        } catch (error) {
+          console.error('Error saving sequence to library:', error);
+          alert('Failed to save sequence to library');
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [workspaces, mutate, mutateWorkspaces]);
 
   // 워크스페이스 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
