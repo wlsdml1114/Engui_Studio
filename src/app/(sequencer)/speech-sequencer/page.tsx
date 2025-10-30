@@ -9,6 +9,7 @@ interface AudioSegment {
   name: string;
   duration: number;
   startTime: number;
+  waveformData?: number[];
 }
 
 interface Sequence {
@@ -48,6 +49,7 @@ export default function SpeechSequencerPage() {
   const [isDraggingSegment, setIsDraggingSegment] = useState(false);
   const [dragStartX, setDragStartX] = useState(0);
   const [previewingSegment, setPreviewingSegment] = useState<string | null>(null);
+  const [waveformScale, setWaveformScale] = useState(1);
 
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
   const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -213,29 +215,59 @@ export default function SpeechSequencerPage() {
     setDraggedSegment(null);
   };
 
+  // Waveform 데이터 추출
+  const extractWaveform = (audioBuffer: AudioBuffer, samples: number = 100) => {
+    const rawData = audioBuffer.getChannelData(0);
+    const blockSize = Math.floor(rawData.length / samples);
+    const waveform: number[] = [];
+
+    for (let i = 0; i < samples; i++) {
+      let sum = 0;
+      for (let j = 0; j < blockSize; j++) {
+        sum += Math.abs(rawData[i * blockSize + j]);
+      }
+      waveform.push(sum / blockSize);
+    }
+
+    return waveform;
+  };
+
   // Segment를 시퀀스에 추가
   const addSegmentToSequence = (sequenceId: string, audioId: string) => {
     const file = audioFiles.get(audioId);
     if (!file) return;
 
-    const audio = new Audio(URL.createObjectURL(file));
-    audio.onloadedmetadata = () => {
-      const segment: AudioSegment = {
-        id: `seg-${Date.now()}`,
-        file,
-        name: file.name,
-        duration: audio.duration,
-        startTime: 0
-      };
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const fileReader = new FileReader();
 
-      setSequences(prevs =>
-        prevs.map(seq =>
-          seq.id === sequenceId
-            ? { ...seq, segments: [...seq.segments, segment] }
-            : seq
-        )
-      );
+    fileReader.onload = (e) => {
+      const arrayBuffer = e.target?.result as ArrayBuffer;
+      audioContext.decodeAudioData(arrayBuffer, (audioBuffer) => {
+        const waveformData = extractWaveform(audioBuffer);
+
+        const audio = new Audio(URL.createObjectURL(file));
+        audio.onloadedmetadata = () => {
+          const segment: AudioSegment = {
+            id: `seg-${Date.now()}`,
+            file,
+            name: file.name,
+            duration: audio.duration,
+            startTime: 0,
+            waveformData
+          };
+
+          setSequences(prevs =>
+            prevs.map(seq =>
+              seq.id === sequenceId
+                ? { ...seq, segments: [...seq.segments, segment] }
+                : seq
+            )
+          );
+        };
+      });
     };
+
+    fileReader.readAsArrayBuffer(file);
   };
 
   // Segment 제거
@@ -638,6 +670,32 @@ export default function SpeechSequencerPage() {
             </div>
           </div>
 
+          {/* Waveform Scale Control */}
+          <div className="bg-card border border-border rounded-lg p-4">
+            <h2 className="text-lg font-semibold mb-3">Waveform</h2>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-xs font-medium">Scale</label>
+                <span className="text-xs font-mono bg-secondary px-2 py-1 rounded">
+                  {waveformScale.toFixed(2)}x
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0.5"
+                max="3"
+                step="0.1"
+                value={waveformScale}
+                onChange={(e) => setWaveformScale(parseFloat(e.target.value))}
+                className="w-full cursor-pointer"
+              />
+              <div className="text-xs text-foreground/50 flex justify-between">
+                <span>0.5x</span>
+                <span>3x</span>
+              </div>
+            </div>
+          </div>
+
           {/* 라이브러리 */}
           {savedSequences.length > 0 && (
             <div className="bg-card border border-border rounded-lg p-4">
@@ -842,8 +900,34 @@ export default function SpeechSequencerPage() {
                             }}
                             title={`Click to preview • Drag to move`}
                           >
-                            <div className="font-medium truncate">{segment.name.substring(0, 15)}</div>
-                            <div className="text-xs opacity-80">
+                            {/* Waveform */}
+                            {segment.waveformData && segment.waveformData.length > 0 && (
+                              <svg
+                                className="absolute inset-0 w-full h-full pointer-events-none"
+                                viewBox={`0 0 ${segment.waveformData.length} 100`}
+                                preserveAspectRatio="none"
+                              >
+                                <polyline
+                                  points={segment.waveformData
+                                    .map((value, i) => `${i},${50 - Math.min(value * 100 * waveformScale, 50)}`)
+                                    .join(' ')}
+                                  fill="none"
+                                  stroke="rgba(255,255,255,0.5)"
+                                  strokeWidth="0.5"
+                                />
+                                <polyline
+                                  points={segment.waveformData
+                                    .map((value, i) => `${i},${50 + Math.min(value * 100 * waveformScale, 50)}`)
+                                    .join(' ')}
+                                  fill="none"
+                                  stroke="rgba(255,255,255,0.5)"
+                                  strokeWidth="0.5"
+                                />
+                              </svg>
+                            )}
+
+                            <div className="font-medium truncate relative z-10">{segment.name.substring(0, 15)}</div>
+                            <div className="text-xs opacity-80 relative z-10">
                               {segment.startTime.toFixed(1)}s {previewingSegment === segment.id && '🔊'}
                             </div>
 
