@@ -709,7 +709,7 @@ export default function SpeechSequencerPage() {
                 {/* 시간축 (sticky 고정) */}
                 <div className="bg-secondary/50 border-b border-border h-8 flex-shrink-0 flex sticky top-0 z-20">
                   {/* Speaker 레이블 공간 (고정) */}
-                  <div className="w-24 flex-shrink-0 border-r border-border sticky left-0 z-20 bg-secondary/50" />
+                  <div className="w-24 flex-shrink-0 border-r border-border sticky left-0 z-20 bg-secondary" />
 
                   {/* 타임라인 헤더 */}
                   <div
@@ -755,7 +755,7 @@ export default function SpeechSequencerPage() {
                   >
                     <div className="flex h-24 relative">
                       {/* Speaker Label (고정) */}
-                      <div className="w-24 bg-secondary/50 border-r border-border p-3 flex items-center flex-shrink-0 sticky left-0 z-10">
+                      <div className="w-24 bg-secondary border-r border-border p-3 flex items-center flex-shrink-0 sticky left-0 z-30">
                         <p className="font-medium text-sm">{sequence.speaker}</p>
                       </div>
 
@@ -829,7 +829,7 @@ export default function SpeechSequencerPage() {
                               setIsDraggingSegment(true);
                               e.preventDefault();
                             }}
-                            className={`absolute top-1 bottom-1 rounded px-2 py-1 text-xs cursor-grab active:cursor-grabbing hover:opacity-90 transition group overflow-hidden ${
+                            className={`absolute top-1 bottom-1 rounded px-2 py-1 text-xs cursor-grab active:cursor-grabbing hover:opacity-90 transition group overflow-hidden z-0 ${
                               previewingSegment === segment.id
                                 ? 'bg-green-500 ring-2 ring-green-300'
                                 : 'bg-blue-500 hover:bg-blue-600'
@@ -837,7 +837,8 @@ export default function SpeechSequencerPage() {
                             style={{
                               left: `${segment.startTime * PIXELS_PER_SECOND}px`,
                               width: `${segment.duration * PIXELS_PER_SECOND}px`,
-                              minWidth: '60px'
+                              minWidth: '60px',
+                              zIndex: 'auto'
                             }}
                             title={`Click to preview • Drag to move`}
                           >
