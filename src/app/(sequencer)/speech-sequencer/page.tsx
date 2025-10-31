@@ -11,6 +11,9 @@ interface AudioSegment {
   duration: number;
   startTime: number;
   waveformData?: number[];
+  // Cut된 segment를 위한 정보
+  originalDuration?: number; // 원본 파일의 전체 길이
+  fileStartTime?: number; // 파일 내에서의 시작 위치 (초)
 }
 
 interface Sequence {
@@ -126,7 +129,9 @@ export default function SpeechSequencerPage() {
 
     tracksElement.addEventListener('scroll', handleTracksScroll);
     return () => {
-      tracksElement.removeEventListener('scroll', handleTracksScroll);
+      if (tracksElement) {
+        tracksElement.removeEventListener('scroll', handleTracksScroll);
+      }
     };
   }, []);
 
@@ -365,11 +370,17 @@ export default function SpeechSequencerPage() {
                 // Playhead 위치에서 자르기
                 const cutPoint = currentTime - segmentStart; // segment 내에서의 상대 위치
 
+                // Track original file info for cut segments
+                const originalFileStartTime = seg.fileStartTime ?? 0;
+                const originalDuration = seg.originalDuration ?? seg.duration;
+
                 // 첫 번째 부분
                 const firstSegment: AudioSegment = {
                   ...seg,
                   id: `${seg.id}-1-${Date.now()}`,
                   duration: cutPoint,
+                  originalDuration: originalDuration,
+                  fileStartTime: originalFileStartTime,
                   waveformData: seg.waveformData
                     ? seg.waveformData.slice(
                         0,
@@ -384,6 +395,8 @@ export default function SpeechSequencerPage() {
                   id: `${seg.id}-2-${Date.now()}`,
                   startTime: currentTime,
                   duration: segmentEnd - currentTime,
+                  originalDuration: originalDuration,
+                  fileStartTime: originalFileStartTime + cutPoint,
                   waveformData: seg.waveformData
                     ? seg.waveformData.slice(
                         Math.floor((cutPoint / seg.duration) * seg.waveformData.length)
@@ -633,10 +646,20 @@ export default function SpeechSequencerPage() {
       const segmentData = segmentAudioBuffer.getChannelData(0);
       const startSample = Math.floor(segment.startTime * sampleRate);
 
-      // Segment 데이터를 버퍼에 복사
+      // Handle cut segments: extract only the relevant portion of audio
+      const fileStartTime = segment.fileStartTime ?? 0;
+      const fileDuration = segment.originalDuration ?? segment.duration;
+      const fileStartSample = Math.floor(fileStartTime * sampleRate);
+      const fileEndSample = Math.floor((fileStartTime + segment.duration) * sampleRate);
+
+      // Segment 데이터를 버퍼에 복사 (cut boundaries 고려)
       for (let i = 0; i < segmentData.length; i++) {
-        if (startSample + i < totalSamples) {
-          channelData[startSample + i] = segmentData[i];
+        // Only copy the portion between fileStartSample and fileEndSample
+        if (i >= fileStartSample && i < fileEndSample) {
+          const outputIndex = startSample + (i - fileStartSample);
+          if (outputIndex < totalSamples) {
+            channelData[outputIndex] = segmentData[i];
+          }
         }
       }
     }
@@ -1538,21 +1561,7 @@ export default function SpeechSequencerPage() {
                           <div
                             key={segment.id}
                             onMouseDown={(e) => {
-                              // 우클릭이면 미리듣기, 좌클릭이면 드래그
-                              if (e.button === 0 && e.detail === 1) {
-                                // 싱글 클릭: 드래그 준비
-                                setTimeout(() => {
-                                  if (!isDraggingSegment) {
-                                    // 드래그가 시작되지 않았으면 미리듣기
-                                    if (previewingSegment === segment.id) {
-                                      stopSegmentPreview();
-                                    } else {
-                                      playSegmentPreview(segment);
-                                    }
-                                  }
-                                }, 200);
-                              }
-
+                              // 드래그만 처리 (클릭 시 자동 재생 제거)
                               // 드래그 시작 위치 계산
                               // scrollLeft를 고려하여 dragStartX를 설정
                               // dragStartX = e.clientX - (segment.startTime * PIXELS_PER_SECOND - scrollLeft)
@@ -1568,21 +1577,21 @@ export default function SpeechSequencerPage() {
                               setIsDraggingSegment(true);
                               e.preventDefault();
                             }}
-                            className={`absolute top-1 bottom-1 rounded px-2 py-1 text-xs cursor-grab active:cursor-grabbing hover:opacity-90 transition group overflow-hidden z-0 ${
+                            className={`absolute top-1 bottom-1 rounded px-2 py-1 text-xs cursor-grab active:cursor-grabbing hover:opacity-90 transition group overflow-visible z-0 ${
                               previewingSegment === segment.id
                                 ? 'bg-green-500 ring-2 ring-green-300'
                                 : 'bg-blue-500 hover:bg-blue-600'
-                            } text-white`}
+                            } text-white flex flex-col justify-between`}
                             style={{
                               left: `${segment.startTime * PIXELS_PER_SECOND}px`,
-                              width: `${segment.duration * PIXELS_PER_SECOND}px`,
-                              minWidth: '60px',
+                              width: `${Math.max(segment.duration * PIXELS_PER_SECOND, 30)}px`,
+                              minWidth: 'auto',
                               zIndex: 'auto'
                             }}
                             title={`Click to preview • Drag to move`}
                           >
                             {/* Waveform */}
-                            {segment.waveformData && segment.waveformData.length > 0 && (
+                            {segment.waveformData && segment.waveformData.length > 0 && segment.duration * PIXELS_PER_SECOND > 30 && (
                               <svg
                                 className="absolute inset-0 w-full h-full pointer-events-none"
                                 viewBox={`0 0 ${segment.waveformData.length} 100`}
@@ -1607,38 +1616,43 @@ export default function SpeechSequencerPage() {
                               </svg>
                             )}
 
-                            <div className="font-medium truncate relative z-10">{segment.name.substring(0, 15)}</div>
-                            <div className="text-xs opacity-80 relative z-10">
-                              {segment.startTime.toFixed(1)}s {previewingSegment === segment.id && '🔊'}
-                            </div>
+                            <div className="font-medium truncate relative z-10 text-[0.65rem]">{segment.name.substring(0, 10)}</div>
 
-                            {/* Controls on Hover */}
-                            <div className="hidden group-hover:flex gap-1 mt-1">
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.1"
-                                value={segment.startTime}
-                                onChange={(e) =>
-                                  updateSegmentStartTime(
-                                    sequence.id,
-                                    segment.id,
-                                    parseFloat(e.target.value) || 0
-                                  )
-                                }
-                                className="w-12 px-1 py-0.5 rounded bg-white/20 text-white text-xs"
-                                onClick={(e) => e.stopPropagation()}
-                              />
+                            {/* Control buttons (Play/Stop and Delete) */}
+                            <div className="absolute -right-14 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {/* Play/Stop button */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (previewingSegment === segment.id) {
+                                    stopSegmentPreview();
+                                  } else {
+                                    playSegmentPreview(segment);
+                                  }
+                                }}
+                                className={`px-2 py-0.5 rounded text-xs whitespace-nowrap font-medium ${
+                                  previewingSegment === segment.id
+                                    ? 'bg-green-600 hover:bg-green-700'
+                                    : 'bg-blue-600/80 hover:bg-blue-700'
+                                }`}
+                                title={previewingSegment === segment.id ? 'Stop preview' : 'Play preview'}
+                              >
+                                {previewingSegment === segment.id ? '⏹' : '▶'}
+                              </button>
+
+                              {/* Delete button */}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   removeSegment(sequence.id, segment.id);
                                 }}
-                                className="px-1 py-0.5 bg-red-600/80 hover:bg-red-700 rounded text-xs"
+                                className="px-1 py-0.5 bg-red-600/80 hover:bg-red-700 rounded text-xs whitespace-nowrap"
+                                title="Delete segment"
                               >
                                 ✕
                               </button>
                             </div>
+
                           </div>
                         ))}
 

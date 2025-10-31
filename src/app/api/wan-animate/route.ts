@@ -45,13 +45,14 @@ async function uploadToS3(file: File, fileName: string, language: 'ko' | 'en' = 
 
 export async function POST(request: NextRequest) {
     let job: any = null; // job 변수를 함수 스코프에서 선언
+    let language: 'ko' | 'en' = 'ko'; // language 변수를 함수 스코프에서 선언
 
     try {
         const formData = await request.formData();
 
         // Extract form data
         const userId = formData.get('userId') as string || 'user-with-settings';
-        const language = formData.get('language') as 'ko' | 'en' || 'ko';
+        language = formData.get('language') as 'ko' | 'en' || 'ko';
         const prompt = formData.get('prompt') as string;
         const imageFile = formData.get('image') as File;
         const videoFile = formData.get('video') as File;

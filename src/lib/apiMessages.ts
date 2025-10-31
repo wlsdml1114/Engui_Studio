@@ -36,12 +36,6 @@ export const ApiMessages = {
       FILE_AND_VOLUME_REQUIRED: '파일과 볼륨이 필요합니다.'
     },
 
-    // 워크스페이스 메시지
-    WORKSPACE: {
-      NAME_EXISTS: '워크스페이스 이름이 이미 존재합니다.',
-      DEFAULT_CANNOT_DELETE: '기본 워크스페이스는 삭제할 수 없습니다.'
-    },
-
     // RunPod 통합 메시지
     RUNPOD: {
       AUTH_FAILED: 'RunPod 인증 실패(401). Settings의 API Key/Endpoint ID를 다시 저장해주세요.',
@@ -222,12 +216,6 @@ export const ApiMessages = {
       VOLUME_AND_FOLDER_KEY_REQUIRED: 'Volume and folder key are required.',
       LORA_VOLUME_NOT_SPECIFIED: 'Volume not specified. Please select a volume in S3 Storage page.',
       FILE_AND_VOLUME_REQUIRED: 'File and volume are required.'
-    },
-
-    // 워크스페이스 메시지
-    WORKSPACE: {
-      NAME_EXISTS: 'Workspace name already exists.',
-      DEFAULT_CANNOT_DELETE: 'Default workspace cannot be deleted.'
     },
 
     // RunPod 통합 메시지

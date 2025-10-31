@@ -507,8 +507,8 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
               </div>
               <div className="max-h-40 overflow-y-auto custom-scrollbar">
                 {availableWorkspaces
-                  .filter(ws => ws.id !== item.workspaceId)
-                  .map((workspace) => (
+                  .filter((ws: any) => ws.id !== item.workspaceId)
+                  .map((workspace: any) => (
                     <button
                       key={workspace.id}
                       onClick={(e) => {
@@ -1458,10 +1458,10 @@ export default function Library() {
 
   // 데이터 변수들 선언
   const jobs: JobItem[] = data?.jobs || [];
-  const processingJobs = jobs.filter(job => job.status === 'processing').length;
-  
+  const processingJobs = jobs.filter((job: any) => job.status === 'processing').length;
+
   // 즐겨찾기 필터링
-  const filteredJobs = showFavoritesOnly ? jobs.filter(job => job.isFavorite) : jobs;
+  const filteredJobs = showFavoritesOnly ? jobs.filter((job: any) => job.isFavorite) : jobs;
 
   // 페이지 가시성 감지
   useEffect(() => {
@@ -1473,100 +1473,6 @@ export default function Library() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
-  // Speech Sequencer에서 저장된 sequence 메시지 받기
-  useEffect(() => {
-    const handleMessage = async (event: MessageEvent) => {
-      console.log('📨 Message received in Library:', event.data.type);
-      if (event.data.type === 'SAVE_SEQUENCE_TO_LIBRARY') {
-        const { sequenceName, workspaceName, audioFiles } = event.data.payload;
-        console.log('💾 Saving sequence:', sequenceName, 'to workspace:', workspaceName);
-
-        try {
-          // 워크스페이스 ID 찾기 또는 생성
-          let workspaceId = workspaces.find(w => w.name === workspaceName)?.id;
-          console.log('🔍 Found workspace ID:', workspaceId);
-
-          if (!workspaceId) {
-            // 워크스페이스가 없으면 생성
-            const createRes = await fetch('/api/workspaces', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                name: workspaceName,
-                description: `Created for ${sequenceName}`,
-                userId: 'user-with-settings'
-              })
-            });
-            const newWorkspace = await createRes.json();
-            workspaceId = newWorkspace.id;
-            mutateWorkspaces();
-          }
-
-          // 각 speaker별 오디오를 library에 저장
-          for (const [speaker, dataUrl] of Object.entries(audioFiles)) {
-            console.log(`📁 Processing ${speaker}...`);
-            // Data URL을 Blob으로 변환
-            const res = await fetch(dataUrl as string);
-            const blob = await res.blob();
-            console.log(`📊 Blob size for ${speaker}: ${blob.size} bytes`);
-
-            // 1. S3에 파일 업로드
-            const formData = new FormData();
-            formData.append('file', blob, `${sequenceName}_${speaker}.wav`);
-
-            console.log(`🚀 Uploading ${speaker} to S3...`);
-            const uploadRes = await fetch('/api/upload', {
-              method: 'POST',
-              body: formData
-            });
-
-            if (!uploadRes.ok) {
-              throw new Error(`Failed to upload ${speaker} audio`);
-            }
-
-            const uploadData = await uploadRes.json();
-            const audioPath = uploadData.files.file;
-            console.log(`✅ ${speaker} uploaded to: ${audioPath}`);
-
-            // 2. Job 기록을 database에 생성
-            console.log(`📝 Creating job record for ${speaker}...`);
-            const jobRes = await fetch('/api/jobs', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                userId: 'user-with-settings',
-                workspaceId,
-                type: 'audio',
-                status: 'completed',
-                prompt: `${sequenceName} - ${speaker}`,
-                resultUrl: audioPath,
-                thumbnailUrl: null
-              })
-            });
-
-            if (!jobRes.ok) {
-              const errorText = await jobRes.text();
-              console.error(`❌ Job creation failed for ${speaker}:`, errorText);
-              throw new Error(`Failed to create job for ${speaker} audio`);
-            }
-
-            const jobData = await jobRes.json();
-            console.log(`✅ Job created for ${speaker}:`, jobData.job.id);
-          }
-
-          // 라이브러리 갱신
-          mutate();
-          alert(`Sequence saved to ${workspaceName} workspace!`);
-        } catch (error) {
-          console.error('Error saving sequence to library:', error);
-          alert('Failed to save sequence to library');
-        }
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [workspaces, mutate, mutateWorkspaces]);
 
   // 워크스페이스 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
@@ -2012,7 +1918,7 @@ export default function Library() {
                   <span className="text-foreground/90">📁 {safeT('library.allJobs')}</span>
                 ) : selectedWorkspaceId ? (
                   (() => {
-                    const selectedWorkspace = workspaces.find(w => w.id === selectedWorkspaceId);
+                    const selectedWorkspace = workspaces.find((w: any) => w.id === selectedWorkspaceId);
                     return (
                       <span className="text-foreground/90">
                         {selectedWorkspace?.name}
@@ -2052,7 +1958,7 @@ export default function Library() {
                     </button>
 
                     {/* 워크스페이스 옵션들 */}
-                    {workspaces.map((workspace) => (
+                    {workspaces.map((workspace: any) => (
                       <button
                         key={workspace.id}
                         onClick={() => {
@@ -2106,7 +2012,7 @@ export default function Library() {
               {showFavoritesOnly ? safeT('library.noFavorites') : safeT('library.noResults')}
             </p>
           ) : (
-            filteredJobs.map((job) => (
+            filteredJobs.map((job: any) => (
               <LibraryItem 
                 key={job.id} 
                 item={job} 
@@ -2257,7 +2163,7 @@ export default function Library() {
                 <h4 className="font-medium mb-3 text-foreground/90">📂 {safeT('library.workspaceList')}</h4>
                 <div className="bg-background/20 rounded-xl border border-border/30 overflow-hidden">
                   <div className="max-h-60 overflow-y-auto custom-scrollbar">
-                    {workspaces.map((workspace, index) => (
+                    {workspaces.map((workspace: any, index: any) => (
                       <div
                         key={workspace.id}
                         className={`group flex items-center justify-between px-4 py-3 transition-all duration-200 hover:bg-background/30 ${
