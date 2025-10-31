@@ -1442,7 +1442,7 @@ export default function SpeechSequencerPage() {
             ) : (
               <>
                 {/* 시간축 (sticky 고정) */}
-                <div className="bg-secondary/50 border-b border-border h-8 flex-shrink-0 flex sticky top-0 z-20">
+                <div className="bg-secondary/50 border-b border-border h-8 flex-shrink-0 flex sticky top-0 z-20 relative">
                   {/* Speaker 레이블 공간 (고정) */}
                   <div className="w-24 flex-shrink-0 border-r border-border sticky left-0 z-20 bg-secondary" />
 
@@ -1453,32 +1453,31 @@ export default function SpeechSequencerPage() {
                   >
                     <div
                       className="h-full relative"
-                      style={{ width: `${timelineWidth}px` }}
-                    >
-                      {Array.from({ length: Math.ceil(totalDuration) + 1 }).map((_, i) => (
-                        <div
-                          key={i}
-                          className="absolute top-0 bottom-0"
-                          style={{
-                            left: `${i * PIXELS_PER_SECOND}px`,
-                            width: '1px',
-                            borderLeft: '1px solid',
-                            borderColor: 'rgb(var(--border-rgb) / 0.3)'
-                          }}
-                        >
-                          <span
-                            className="text-xs text-foreground/50 absolute pointer-events-none"
-                            style={{
-                              left: '2px',
-                              top: '4px',
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            {i}s
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                      style={{ width: `${timelineWidth}px`, minWidth: `${timelineWidth}px` }}
+                    />
+                  </div>
+
+                  {/* 타임스탬프 오버레이 */}
+                  <div
+                    className="absolute left-0 top-0 h-full pointer-events-none"
+                    style={{ width: `${timelineWidth}px`, marginLeft: '96px' }}
+                  >
+                    {Array.from({ length: Math.ceil(timelineWidth / PIXELS_PER_SECOND) + 2 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="absolute top-0 bottom-0 flex items-center text-xs text-foreground/50"
+                        style={{
+                          left: `${i * PIXELS_PER_SECOND}px`,
+                          width: `${PIXELS_PER_SECOND}px`,
+                          borderLeft: '1px solid',
+                          borderColor: 'rgb(var(--border-rgb) / 0.3)',
+                          paddingLeft: '5px',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        <span className="whitespace-nowrap">{i}s</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -1522,7 +1521,7 @@ export default function SpeechSequencerPage() {
                       >
                         {/* Grid Background */}
                         <div className="absolute inset-0 pointer-events-none">
-                          {Array.from({ length: Math.ceil(totalDuration) + 1 }).map((_, i) => (
+                          {Array.from({ length: Math.ceil(timelineWidth / PIXELS_PER_SECOND) + 2 }).map((_, i) => (
                             <div
                               key={i}
                               className="absolute top-0 bottom-0 border-r border-border/30"
@@ -1555,9 +1554,14 @@ export default function SpeechSequencerPage() {
                               }
 
                               // 드래그 시작 위치 계산
-                              // dragStartX = e.clientX 에서 segment 위치의 pixel 차이를 빼면
-                              // mousemove에서 newX = e.clientX - dragStartX 하면 segment.startTime * PIXELS_PER_SECOND 값이 나옴
-                              const dragStartXValue = e.clientX - segment.startTime * PIXELS_PER_SECOND;
+                              // scrollLeft를 고려하여 dragStartX를 설정
+                              // dragStartX = e.clientX - (segment.startTime * PIXELS_PER_SECOND - scrollLeft)
+                              // mousemove에서:
+                              // newXInTimeline = e.clientX - dragStartX
+                              // timeInContent = (scrollLeft + newXInTimeline) / PIXELS_PER_SECOND
+                              // 이렇게 하면 스크롤 상태를 무시하고 올바른 시간 위치를 계산할 수 있음
+                              const scrollLeft = timelineTracksRef.current?.scrollLeft || 0;
+                              const dragStartXValue = e.clientX - (segment.startTime * PIXELS_PER_SECOND - scrollLeft);
 
                               setDraggedSegment({ sequenceId: sequence.id, segmentId: segment.id });
                               setDragStartX(dragStartXValue);
