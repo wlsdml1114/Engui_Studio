@@ -767,7 +767,7 @@ export default function SettingsPage() {
                 </p>
               </div>
               <button
-                onClick={() => updateSetting('s3', 'useGlobalNetworking', !settings.s3?.useGlobalNetworking)}
+                onClick={() => updateSetting('s3', 'useGlobalNetworking', (!settings.s3?.useGlobalNetworking) ? 1 : 0)}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                   settings.s3?.useGlobalNetworking
                     ? 'bg-green-600 hover:bg-green-700 text-white'

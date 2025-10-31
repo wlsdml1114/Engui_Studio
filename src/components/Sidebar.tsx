@@ -21,6 +21,7 @@ export default function Sidebar() {
     { href: '/qwen-image-edit', label: t('menu.qwenImageEdit'), icon: PhotoIcon },
     { href: '/multitalk', label: t('menu.multitalk'), icon: ChatBubbleLeftRightIcon },
     { href: '/infinite-talk', label: t('menu.infiniteTalk'), icon: MicrophoneIcon },
+    { href: '/speech-sequencer', label: t('menu.speechSequencer'), icon: MicrophoneIcon },
     { href: '/s3-storage', label: t('menu.s3Storage'), icon: CloudIcon },
     { href: '/settings', label: t('menu.settings'), icon: CogIcon },
   ];

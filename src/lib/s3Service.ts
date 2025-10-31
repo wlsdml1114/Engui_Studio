@@ -358,7 +358,7 @@ class S3Service {
           }
           if (prefix && item.key.startsWith(prefix) && item.key !== prefix) {
             const relativePath = item.key.substring(prefix.length);
-            const pathParts = relativePath.split('/').filter(part => part.length > 0);
+            const pathParts = relativePath.split('/').filter((part: any) => part.length > 0);
             if (pathParts.length > 1) {
               logger.emoji.search('🚫 Filtering out nested item:', item.key);
               return false;

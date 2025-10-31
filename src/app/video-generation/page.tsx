@@ -467,7 +467,7 @@ export default function Wan22Page() {
       console.log('🎯 WAN 2.2에 드롭된 데이터:', dragData);
 
       // WAN 2.2는 이미지만 지원하므로 이미지 결과물만 처리
-      const isImageResult = dragData.jobType === 'flux-kontext' || dragData.jobType === 'flux-krea';
+      const isImageResult = dragData.jobType === 'flux-kontext' || dragData.jobType === 'flux-krea' || dragData.jobType === 'qwen-image-edit';
       
       if (isImageResult && (dragData.inputImagePath || dragData.imageUrl || dragData.thumbnailUrl)) {
         const imageUrl = dragData.inputImagePath || dragData.imageUrl || dragData.thumbnailUrl;
@@ -566,7 +566,7 @@ export default function Wan22Page() {
       console.log('🎯 End Frame에 드롭된 데이터:', dragData);
 
       // WAN 2.2는 이미지만 지원하므로 이미지 결과물만 처리
-      const isImageResult = dragData.jobType === 'flux-kontext' || dragData.jobType === 'flux-krea';
+      const isImageResult = dragData.jobType === 'flux-kontext' || dragData.jobType === 'flux-krea' || dragData.jobType === 'qwen-image-edit';
 
       if (isImageResult && (dragData.inputImagePath || dragData.imageUrl || dragData.thumbnailUrl)) {
         const imageUrl = dragData.inputImagePath || dragData.imageUrl || dragData.thumbnailUrl;

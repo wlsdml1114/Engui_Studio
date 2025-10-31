@@ -396,7 +396,7 @@ class RunPodService {
           throw error;
         }
 
-        console.log(`🔄 Retry attempt ${attempt}/${maxRetries} for network error:`, error.message);
+        console.log(`🔄 Retry attempt ${attempt}/${maxRetries} for network error:`, (error as any).message);
         await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // 지수 백오프: 1초, 2초, 3초
       }
     }

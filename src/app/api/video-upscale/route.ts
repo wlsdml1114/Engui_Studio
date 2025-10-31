@@ -325,11 +325,12 @@ async function processVideoUpscaleJob(jobId: string, runpodJobId: string, runpod
 
             // S3 경로에서 비디오 다운로드 (우선순위 높음)
             if (videoS3Path && typeof videoS3Path === 'string' && videoS3Path.length > 0) {
+                let s3Key = '';
                 try {
                     console.log(`📥 Downloading video from S3 path: ${videoS3Path}`);
-                    
+
                     // S3 경로를 S3 키로 변환 (/runpod-volume/ 제거)
-                    let s3Key = videoS3Path.replace('/runpod-volume/', '');
+                    s3Key = videoS3Path.replace('/runpod-volume/', '');
                     
                     // RunPod volume 경로가 절대 경로인 경우 처리
                     if (s3Key.startsWith('/')) {
