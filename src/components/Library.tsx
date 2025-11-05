@@ -507,8 +507,8 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
               </div>
               <div className="max-h-40 overflow-y-auto custom-scrollbar">
                 {availableWorkspaces
-                  .filter((ws: any) => ws.id !== item.workspaceId)
-                  .map((workspace: any) => (
+                  .filter((ws: Workspace) => ws.id !== item.workspaceId)
+                  .map((workspace: Workspace) => (
                     <button
                       key={workspace.id}
                       onClick={(e) => {
@@ -1458,10 +1458,10 @@ export default function Library() {
 
   // 데이터 변수들 선언
   const jobs: JobItem[] = data?.jobs || [];
-  const processingJobs = jobs.filter((job: any) => job.status === 'processing').length;
+  const processingJobs = jobs.filter((job: JobItem) => job.status === 'processing').length;
 
   // 즐겨찾기 필터링
-  const filteredJobs = showFavoritesOnly ? jobs.filter((job: any) => job.isFavorite) : jobs;
+  const filteredJobs = showFavoritesOnly ? jobs.filter((job: JobItem) => job.isFavorite) : jobs;
 
   // 페이지 가시성 감지
   useEffect(() => {
@@ -1918,7 +1918,7 @@ export default function Library() {
                   <span className="text-foreground/90">📁 {safeT('library.allJobs')}</span>
                 ) : selectedWorkspaceId ? (
                   (() => {
-                    const selectedWorkspace = workspaces.find((w: any) => w.id === selectedWorkspaceId);
+                    const selectedWorkspace = workspaces.find((w: Workspace) => w.id === selectedWorkspaceId);
                     return (
                       <span className="text-foreground/90">
                         {selectedWorkspace?.name}
@@ -2012,7 +2012,7 @@ export default function Library() {
               {showFavoritesOnly ? safeT('library.noFavorites') : safeT('library.noResults')}
             </p>
           ) : (
-            filteredJobs.map((job: any) => (
+            filteredJobs.map((job: JobItem) => (
               <LibraryItem 
                 key={job.id} 
                 item={job} 
@@ -2163,7 +2163,7 @@ export default function Library() {
                 <h4 className="font-medium mb-3 text-foreground/90">📂 {safeT('library.workspaceList')}</h4>
                 <div className="bg-background/20 rounded-xl border border-border/30 overflow-hidden">
                   <div className="max-h-60 overflow-y-auto custom-scrollbar">
-                    {workspaces.map((workspace: any, index: any) => (
+                    {workspaces.map((workspace: Workspace, index: number) => (
                       <div
                         key={workspace.id}
                         className={`group flex items-center justify-between px-4 py-3 transition-all duration-200 hover:bg-background/30 ${

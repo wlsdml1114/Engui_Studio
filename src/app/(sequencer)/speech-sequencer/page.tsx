@@ -60,6 +60,7 @@ export default function SpeechSequencerPage() {
   const [availableWorkspaces, setAvailableWorkspaces] = useState<Array<{ id: string; name: string; isDefault?: boolean }>>([]);
   const [currentProject, setCurrentProject] = useState<string>('');
   const [savedProjects, setSavedProjects] = useState<Array<{ id: string; name: string; savedAt: string }>>([]);
+  const [newProjectName, setNewProjectName] = useState<string>('');
 
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
   const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -1153,9 +1154,9 @@ export default function SpeechSequencerPage() {
       </div>
 
       {/* 메인 콘텐츠 */}
-      <div className="flex-1 overflow-hidden flex relative">
+      <div className="flex-1 overflow-hidden flex relative min-h-0">
         {/* 좌측: 제어판 */}
-        <div className="w-80 space-y-4 overflow-y-auto bg-secondary/20 border-r border-border p-4 flex-shrink-0">
+        <div className="w-80 space-y-4 overflow-y-auto bg-secondary/20 border-r border-border p-4 flex-shrink-0 min-h-0">
           {/* 파일 업로드 */}
           <div className="bg-card border border-border rounded-lg p-4">
             <h2 className="text-lg font-semibold mb-3">Upload Audio Files</h2>
@@ -1317,16 +1318,16 @@ export default function SpeechSequencerPage() {
               <div className="flex gap-2">
                 <input
                   type="text"
-                  id="projectNameInput"
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
                   placeholder="Project name"
                   className="flex-1 px-2 py-2 border border-border rounded-lg bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <button
                   onClick={async () => {
-                    const input = document.getElementById('projectNameInput') as HTMLInputElement;
-                    if (input) {
-                      await saveProject(input.value);
-                      input.value = '';
+                    if (newProjectName) {
+                      await saveProject(newProjectName);
+                      setNewProjectName('');
                     }
                   }}
                   className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm disabled:opacity-50"

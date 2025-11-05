@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
+import { join, basename } from 'path';
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,7 +28,8 @@ export async function POST(request: NextRequest) {
       console.error('Failed to create results directory:', err);
     }
 
-    const filePath = join(resultsDir, file.name);
+    const sanitizedFileName = basename(file.name);
+    const filePath = join(resultsDir, sanitizedFileName);
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
     console.log(`✅ File saved to: ${filePath}`);
 
     // 클라이언트에 반환할 경로 (web accessible path)
-    const webPath = `/results/${file.name}`;
+    const webPath = `/results/${sanitizedFileName}`;
 
     return NextResponse.json({
       success: true,
