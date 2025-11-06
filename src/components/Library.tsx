@@ -21,7 +21,7 @@ interface JobItem {
   userId: string;
   workspaceId?: string;
   status: 'processing' | 'completed' | 'failed';
-  type: 'video' | 'multitalk' | 'flux-kontext' | 'flux-krea' | 'wan22' | 'wan-animate' | 'infinitetalk'|'video-upscale'|'qwen-image-edit';
+  type: 'video' | 'multitalk' | 'flux-kontext' | 'flux-krea' | 'wan22' | 'wan-animate' | 'infinitetalk'|'video-upscale'|'qwen-image-edit'|'audio';
   prompt?: string;
   options?: string;
   resultUrl?: string;
@@ -70,6 +70,11 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
 
   // MultiTalk의 경우 options에서 입력 이미지 경로 추출
   const getThumbnailUrl = () => {
+    // Audio의 경우 생성된 썸네일 사용
+    if (item.type === 'audio' && item.thumbnailUrl) {
+      return item.thumbnailUrl;
+    }
+
     // MultiTalk의 경우 입력 이미지를 썸네일로 사용
     if (item.type === 'multitalk' && item.options) {
       try {
@@ -308,33 +313,37 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
       jobId: item.id,
       prompt: item.prompt || '',
       // 미디어 타입과 URL 정보
-      mediaType: item.type === 'flux-kontext' || item.type === 'flux-krea' || item.type === 'qwen-image-edit' ? 'image' : 'video',
+      mediaType: item.type === 'flux-kontext' || item.type === 'flux-krea' || item.type === 'qwen-image-edit' ? 'image' : item.type === 'audio' ? 'audio' : 'video',
       mediaUrl: item.resultUrl || thumbnailUrl,
       thumbnailUrl: thumbnailUrl,
       // 실제 결과 URL (비디오의 경우 실제 비디오 파일)
       resultUrl: item.resultUrl,
       // 각 타입별 추가 정보
-      ...(item.type === 'multitalk' && { 
+      ...(item.type === 'multitalk' && {
         inputImagePath: getThumbnailUrl(),
         videoUrl: item.resultUrl // 실제 비디오 URL 추가
       }),
       ...(item.type === 'flux-kontext' && { inputImagePath: getThumbnailUrl() }),
       ...(item.type === 'flux-krea' && { imageUrl: getThumbnailUrl() }),
       ...(item.type === 'qwen-image-edit' && { imageUrl: getThumbnailUrl() }),
-      ...(item.type === 'wan22' && { 
+      ...(item.type === 'wan22' && {
         inputImagePath: getThumbnailUrl(),
         videoUrl: item.resultUrl // 실제 비디오 URL 추가
       }),
-      ...(item.type === 'wan-animate' && { 
+      ...(item.type === 'wan-animate' && {
         imageUrl: getThumbnailUrl(),
         videoUrl: item.resultUrl // 실제 비디오 URL 추가
       }),
-      ...(item.type === 'infinitetalk' && { 
+      ...(item.type === 'infinitetalk' && {
         inputType: 'video',
         videoUrl: item.resultUrl // 실제 비디오 URL 사용
       }),
-      ...(item.type === 'video-upscale' && { 
+      ...(item.type === 'video-upscale' && {
         videoUrl: item.resultUrl // 실제 비디오 URL 사용
+      }),
+      ...(item.type === 'audio' && {
+        audioUrl: item.resultUrl, // 실제 오디오 URL 사용
+        audioName: item.prompt || 'Audio' // 오디오 이름
       })
     };
 
@@ -342,12 +351,18 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
     e.dataTransfer.setData('application/json', JSON.stringify(dragData));
     e.dataTransfer.setData('text/plain', JSON.stringify(dragData)); // 폴백용
     
-    // 썸네일을 드래그 이미지로 설정
+    // 썸네일을 드래그 이미지로 설정 (또는 오디오의 경우 아이콘)
     const img = itemRef.current?.querySelector('img');
     if (img) {
       e.dataTransfer.setDragImage(img, 50, 30); // 드래그 시 보여질 썸네일 위치
+    } else if (item.type === 'audio') {
+      // 오디오는 아이콘을 드래그 이미지로 사용
+      const svg = itemRef.current?.querySelector('svg');
+      if (svg) {
+        e.dataTransfer.setDragImage(svg, 24, 24);
+      }
     }
-    
+
     console.log('📦 드래그 데이터:', dragData);
   };
 
@@ -382,7 +397,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
         `}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
-        draggable={item.status === 'completed' && (thumbnailUrl || item.resultUrl)}
+        draggable={item.status === 'completed' && (thumbnailUrl || item.resultUrl || item.type === 'audio')}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
@@ -446,6 +461,8 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
           <span className={`text-xs px-2 py-1 rounded-full capitalize font-medium ${
             item.type === 'flux-kontext' || item.type === 'flux-krea' || item.type === 'qwen-image-edit'
               ? 'bg-purple-500/20 text-purple-300' // 이미지 타입 - 보라색
+              : item.type === 'audio'
+              ? 'bg-amber-500/20 text-amber-300'   // 오디오 타입 - 황금색
               : 'bg-blue-500/20 text-blue-300'     // 비디오 타입 - 파란색
           }`}>
             {item.type}
@@ -490,8 +507,8 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
               </div>
               <div className="max-h-40 overflow-y-auto custom-scrollbar">
                 {availableWorkspaces
-                  .filter(ws => ws.id !== item.workspaceId)
-                  .map((workspace) => (
+                  .filter((ws: Workspace) => ws.id !== item.workspaceId)
+                  .map((workspace: Workspace) => (
                     <button
                       key={workspace.id}
                       onClick={(e) => {
@@ -1441,10 +1458,10 @@ export default function Library() {
 
   // 데이터 변수들 선언
   const jobs: JobItem[] = data?.jobs || [];
-  const processingJobs = jobs.filter(job => job.status === 'processing').length;
-  
+  const processingJobs = jobs.filter((job: JobItem) => job.status === 'processing').length;
+
   // 즐겨찾기 필터링
-  const filteredJobs = showFavoritesOnly ? jobs.filter(job => job.isFavorite) : jobs;
+  const filteredJobs = showFavoritesOnly ? jobs.filter((job: JobItem) => job.isFavorite) : jobs;
 
   // 페이지 가시성 감지
   useEffect(() => {
@@ -1455,6 +1472,7 @@ export default function Library() {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
+
 
   // 워크스페이스 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
@@ -1900,7 +1918,7 @@ export default function Library() {
                   <span className="text-foreground/90">📁 {safeT('library.allJobs')}</span>
                 ) : selectedWorkspaceId ? (
                   (() => {
-                    const selectedWorkspace = workspaces.find(w => w.id === selectedWorkspaceId);
+                    const selectedWorkspace = workspaces.find((w: Workspace) => w.id === selectedWorkspaceId);
                     return (
                       <span className="text-foreground/90">
                         {selectedWorkspace?.name}
@@ -1940,7 +1958,7 @@ export default function Library() {
                     </button>
 
                     {/* 워크스페이스 옵션들 */}
-                    {workspaces.map((workspace) => (
+                    {workspaces.map((workspace: any) => (
                       <button
                         key={workspace.id}
                         onClick={() => {
@@ -1994,7 +2012,7 @@ export default function Library() {
               {showFavoritesOnly ? safeT('library.noFavorites') : safeT('library.noResults')}
             </p>
           ) : (
-            filteredJobs.map((job) => (
+            filteredJobs.map((job: JobItem) => (
               <LibraryItem 
                 key={job.id} 
                 item={job} 
@@ -2145,7 +2163,7 @@ export default function Library() {
                 <h4 className="font-medium mb-3 text-foreground/90">📂 {safeT('library.workspaceList')}</h4>
                 <div className="bg-background/20 rounded-xl border border-border/30 overflow-hidden">
                   <div className="max-h-60 overflow-y-auto custom-scrollbar">
-                    {workspaces.map((workspace, index) => (
+                    {workspaces.map((workspace: Workspace, index: number) => (
                       <div
                         key={workspace.id}
                         className={`group flex items-center justify-between px-4 py-3 transition-all duration-200 hover:bg-background/30 ${

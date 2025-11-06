@@ -21,12 +21,13 @@ export default function Sidebar() {
     { href: '/qwen-image-edit', label: t('menu.qwenImageEdit'), icon: PhotoIcon },
     { href: '/multitalk', label: t('menu.multitalk'), icon: ChatBubbleLeftRightIcon },
     { href: '/infinite-talk', label: t('menu.infiniteTalk'), icon: MicrophoneIcon },
+    { href: '/speech-sequencer', label: t('menu.speechSequencer'), icon: MicrophoneIcon },
     { href: '/s3-storage', label: t('menu.s3Storage'), icon: CloudIcon },
     { href: '/settings', label: t('menu.settings'), icon: CogIcon },
   ];
 
   return (
-    <aside className="w-72 bg-secondary p-6 flex flex-col flex-shrink-0 border-r border-border">
+    <aside className="w-72 bg-secondary p-6 flex flex-col flex-shrink-0 border-r border-border overflow-y-auto">
       <div className="flex items-center gap-3 mb-6">
         <div className="w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center">
           <Image 

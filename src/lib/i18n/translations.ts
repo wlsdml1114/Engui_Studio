@@ -99,6 +99,7 @@ export const translations = {
       qwenImageEdit: 'Qwen Image Edit',
       multitalk: 'MultiTalk',
       infiniteTalk: 'Infinite Talk',
+      speechSequencer: 'Speech Sequencer',
       s3Storage: 'S3 Storage',
       settings: '설정'
     },
@@ -825,6 +826,7 @@ export const translations = {
       qwenImageEdit: 'Qwen Image Edit',
       multitalk: 'MultiTalk',
       infiniteTalk: 'Infinite Talk',
+      speechSequencer: 'Speech Sequencer',
       s3Storage: 'S3 Storage',
       settings: 'Settings'
     },
