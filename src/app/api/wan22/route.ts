@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
         const userId = formData.get('userId') as string;
         const language = formData.get('language') as 'ko' | 'en' || 'ko';
         const prompt = formData.get('prompt') as string;
+        const negativePrompt = formData.get('negativePrompt') as string | null;
         const width = parseInt(formData.get('width') as string);
         const height = parseInt(formData.get('height') as string);
         const seed = parseInt(formData.get('seed') as string);
@@ -216,7 +217,8 @@ export async function POST(request: NextRequest) {
                 prompt,
                 options: JSON.stringify({
                     width, height, seed, cfg, length, step, contextOverlap,
-                    loraCount, loraPairs
+                    loraCount, loraPairs,
+                    ...(negativePrompt && negativePrompt.trim() && { negativePrompt: negativePrompt.trim() })
                 }),
                 createdAt: new Date(),
             },
@@ -311,6 +313,12 @@ export async function POST(request: NextRequest) {
             lora_pairs: loraPairs
         };
 
+        // Negative prompt가 있는 경우 추가
+        if (negativePrompt && negativePrompt.trim()) {
+            runpodInput.negative_prompt = negativePrompt.trim();
+            console.log('🔍 Negative prompt added to payload:', negativePrompt.trim());
+        }
+
         // End frame이 있는 경우 runpodInput에 추가
         console.log('🔍 Checking endImagePath before adding to payload:', endImagePath);
         if (endImagePath) {
@@ -334,6 +342,9 @@ export async function POST(request: NextRequest) {
         console.log('  - steps:', runpodInput.steps);
         console.log('  - context_overlap:', runpodInput.context_overlap);
         console.log('  - lora_pairs:', runpodInput.lora_pairs);
+        if (runpodInput.negative_prompt) {
+            console.log('  - negative_prompt:', runpodInput.negative_prompt);
+        }
         if (runpodInput.end_image_path) {
             console.log('  - end_image_path:', runpodInput.end_image_path);
         }

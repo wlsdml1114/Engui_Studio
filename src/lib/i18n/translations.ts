@@ -178,6 +178,8 @@ export const translations = {
     videoGeneration: {
       title: 'WAN 2.2',
       prompt: '프롬프트 *',
+      negativePrompt: 'Negative Prompt',
+      negativePromptPlaceholder: '예: blurry, low quality, distorted...',
       imageFile: '이미지 파일 *',
       endFrame: '엔드 프레임 파일',
       endFrameOptional: '(선택사항)',
@@ -907,6 +909,8 @@ export const translations = {
     videoGeneration: {
       title: 'WAN 2.2',
       prompt: 'Prompt *',
+      negativePrompt: 'Negative Prompt',
+      negativePromptPlaceholder: 'e.g., blurry, low quality, distorted...',
       imageFile: 'Image File *',
       endFrame: 'End Frame File',
       endFrameOptional: '(Optional)',

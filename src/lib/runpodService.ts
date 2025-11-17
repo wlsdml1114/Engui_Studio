@@ -40,6 +40,7 @@ interface Wan22Input {
   prompt: string;
   image_path: string; // base64 인코딩된 이미지 데이터 (키는 image_path)
   end_image_path?: string; // optional end frame image
+  negative_prompt?: string; // optional negative prompt
   width: number;
   height: number;
   seed: number;
@@ -248,6 +249,7 @@ class RunPodService {
           steps: input.steps, // steps로 변경
           context_overlap: input.context_overlap, // context overlap 추가
           ...(input.end_image_path && { end_image_path: input.end_image_path }), // end_image_path 추가
+          ...(input.negative_prompt && { negative_prompt: input.negative_prompt }), // negative_prompt 추가
           ...(input.lora_pairs && { lora_pairs: input.lora_pairs }) // LoRA pairs 추가
         }
       };
@@ -256,6 +258,7 @@ class RunPodService {
       console.log('  - prompt:', payload.input.prompt);
       console.log('  - image_path:', `[base64 data] (${payload.input.image_path.length} characters)`);
       console.log('  - end_image_path:', payload.input.end_image_path || 'not set');
+      console.log('  - negative_prompt:', payload.input.negative_prompt || 'not set');
       console.log('  - width:', payload.input.width);
       console.log('  - height:', payload.input.height);
       console.log('  - seed:', payload.input.seed);

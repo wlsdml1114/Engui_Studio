@@ -23,6 +23,7 @@ interface LoRAPair {
 export default function Wan22Page() {
   const { t, language } = useI18n();
   const [prompt, setPrompt] = useState('');
+  const [negativePrompt, setNegativePrompt] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
   const [endImageFile, setEndImageFile] = useState<File | null>(null);
@@ -89,6 +90,12 @@ export default function Wan22Page() {
             if (data.prompt) {
               setPrompt(data.prompt);
               console.log('📝 프롬프트 로드됨:', data.prompt);
+            }
+
+            // Negative prompt 로드
+            if (data.negativePrompt) {
+              setNegativePrompt(data.negativePrompt);
+              console.log('📝 Negative prompt 로드됨:', data.negativePrompt);
             }
 
             // 이미지 로드 및 File 객체 생성 (헬퍼 함수 사용)
@@ -339,6 +346,9 @@ export default function Wan22Page() {
       formData.append('language', language);
       formData.append('image', imageFile);
       formData.append('prompt', prompt);
+      if (negativePrompt.trim()) {
+        formData.append('negativePrompt', negativePrompt);
+      }
       formData.append('width', width.toString());
       formData.append('height', height.toString());
       formData.append('seed', seed === -1 ? '42' : seed.toString());
@@ -400,6 +410,7 @@ export default function Wan22Page() {
 
   const handleReset = () => {
     setPrompt('');
+    setNegativePrompt('');
     setImageFile(null);
     setPreviewUrl('');
     setEndImageFile(null);
@@ -649,6 +660,23 @@ export default function Wan22Page() {
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder={t('common.placeholder.prompt')}
                 className="w-full h-32 px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                disabled={isGenerating}
+              />
+            </div>
+
+            {/* Negative Prompt Input */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                {t('videoGeneration.negativePrompt')}
+                <span className="text-xs text-muted-foreground ml-2">
+                  {t('videoGeneration.endFrameOptional')}
+                </span>
+              </label>
+              <textarea
+                value={negativePrompt}
+                onChange={(e) => setNegativePrompt(e.target.value)}
+                placeholder={t('videoGeneration.negativePromptPlaceholder')}
+                className="w-full h-24 px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                 disabled={isGenerating}
               />
             </div>
