@@ -86,7 +86,8 @@ export const translations = {
     // Sidebar
     sidebar: {
       github: 'Engui Studio GitHub',
-      discord: 'Discord 커뮤니티'
+      discord: 'Discord 커뮤니티',
+      youtube: '공식 유튜브 채널'
     },
 
     // Menu Items
@@ -813,7 +814,8 @@ export const translations = {
     // Sidebar
     sidebar: {
       github: 'Engui Studio GitHub',
-      discord: 'Discord Community'
+      discord: 'Discord Community',
+      youtube: 'Official YouTube Channel'
     },
 
     // Menu Items
