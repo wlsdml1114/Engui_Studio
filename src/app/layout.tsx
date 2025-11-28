@@ -32,13 +32,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased custom-scrollbar`}
       >
         <I18nProvider>
-          <LayoutWrapper>
-            <Sidebar />
-            <main className="flex-1 flex flex-col overflow-hidden custom-scrollbar">
-              {children}
-            </main>
-            <Library />
-          </LayoutWrapper>
+          {children}
         </I18nProvider>
       </body>
     </html>

@@ -23,6 +23,10 @@ model Job {
   thumbnailUrl  String?    // 썸네일 URL 추가
   isFavorite    Boolean   @default(false) // 즐겨찾기 상태
   createdAt     DateTime  @default(now())
+  modelId       String    @default("unknown") // 모델 ID 추가
+  endpointId    String?   // RunPod Endpoint ID 추가
+  error         String?   // 에러 메시지 추가
+  cost          Float?    // 비용 추가
   completedAt   DateTime?
 
   // 관계 설정
@@ -110,7 +114,7 @@ model Workspace {
   color       String?   // 워크스페이스 색상 테마
   isDefault   Boolean   @default(false) // 기본 워크스페이스 여부
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @ updatedAt
+  updatedAt   DateTime  @updatedAt
 
   // 관계 설정
   jobs        Job[]     @relation("WorkspaceJobs")
