@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { VideoCameraIcon, ChatBubbleLeftRightIcon, CogIcon, SparklesIcon, MicrophoneIcon, CloudIcon, PhotoIcon, ArrowUpIcon, PlayIcon } from '@heroicons/react/24/outline';
+import { VideoCameraIcon, ChatBubbleLeftRightIcon, CogIcon, SparklesIcon, MicrophoneIcon, CloudIcon, PhotoIcon, ArrowUpIcon, PlayIcon, FilmIcon } from '@heroicons/react/24/outline';
 import { ChatBubbleLeftRightIcon as DiscordIcon } from '@heroicons/react/24/solid';
 
 const menuItems = [
@@ -15,6 +15,7 @@ const menuItems = [
   { href: '/flux-krea', label: 'FLUX KREA', icon: PhotoIcon },
   { href: '/multitalk', label: 'MultiTalk', icon: ChatBubbleLeftRightIcon },
   { href: '/infinite-talk', label: 'Infinite Talk', icon: MicrophoneIcon },
+  { href: '/studio', label: 'Studio', icon: FilmIcon },
   { href: '/s3-storage', label: 'S3 Storage', icon: CloudIcon },
   { href: '/settings', label: 'Settings', icon: CogIcon },
 ];
