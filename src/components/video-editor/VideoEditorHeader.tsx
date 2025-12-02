@@ -177,8 +177,19 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
 
       for (const file of files) {
         try {
-          // Create object URL for the file
-          const url = URL.createObjectURL(file);
+          // Upload file to server first
+          const formData = new FormData();
+          formData.append('file', file);
+          
+          const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          
+          const uploadData = await uploadResponse.json();
+          
+          // Use server URL if upload succeeded, otherwise fall back to blob URL
+          const url = uploadData.success ? uploadData.url : URL.createObjectURL(file);
           
           // Determine media type
           let mediaType: 'image' | 'video' | 'music' | 'voiceover';
@@ -199,21 +210,26 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
           }
 
           // Get actual media duration for audio and video files
+          // Use blob URL for duration detection (faster than server URL)
+          const blobUrl = URL.createObjectURL(file);
           let duration: number;
           let originalDuration: number;
           
           if (file.type.startsWith('video/')) {
-            duration = await getMediaDuration(url, 'video');
+            duration = await getMediaDuration(blobUrl, 'video');
             originalDuration = duration;
           } else if (file.type.startsWith('audio/')) {
             // Both music and voiceover are audio types
-            duration = await getMediaDuration(url, 'audio');
+            duration = await getMediaDuration(blobUrl, 'audio');
             originalDuration = duration;
           } else {
             // Default 5 seconds for images
             duration = 5000;
             originalDuration = duration;
           }
+          
+          // Clean up blob URL after getting duration
+          URL.revokeObjectURL(blobUrl);
 
           // Find or create appropriate track
           let track = tracks.find(t => t.type === trackType);

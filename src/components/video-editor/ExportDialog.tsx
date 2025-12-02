@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useStudio, VideoProject } from '@/lib/context/StudioContext';
+import { useStudio, VideoProject, VideoTrack, VideoKeyFrame } from '@/lib/context/StudioContext';
 import {
   Dialog,
   DialogContent,
@@ -32,7 +32,7 @@ interface ExportOptions {
 type ExportState = 'idle' | 'rendering' | 'completed' | 'error';
 
 export function ExportDialog({ project }: ExportDialogProps) {
-  const { exportDialogOpen, setExportDialogOpen } = useStudio();
+  const { exportDialogOpen, setExportDialogOpen, tracks, keyframes } = useStudio();
   
   const [exportOptions, setExportOptions] = useState<ExportOptions>({
     format: 'mp4',
@@ -64,12 +64,22 @@ export function ExportDialog({ project }: ExportDialogProps) {
         });
       }, 200);
 
-      // Simulate API call
+      // Send project data directly to API
       const response = await fetch('/api/video-export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          projectId: project.id,
+          project: {
+            id: project.id,
+            title: project.title,
+            description: project.description,
+            aspectRatio: project.aspectRatio,
+            duration: project.duration,
+            createdAt: project.createdAt,
+            updatedAt: project.updatedAt,
+          },
+          tracks: tracks,
+          keyframes: keyframes,
           options: exportOptions,
         }),
       });
@@ -84,10 +94,31 @@ export function ExportDialog({ project }: ExportDialogProps) {
       
       if (data.success) {
         setProgress(100);
-        setDownloadUrl(data.downloadUrl);
         setExportState('completed');
+        
+        // Check if there's content to download
+        if (data.downloadUrl) {
+          setDownloadUrl(data.downloadUrl);
+          // Trigger automatic download
+          const link = document.createElement('a');
+          link.href = data.downloadUrl;
+          link.download = `${project.title}.${exportOptions.format}`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          // Auto close dialog after download starts
+          setTimeout(() => {
+            handleClose();
+          }, 1500);
+        } else if (data.note) {
+          // Show note (e.g., "Add media to timeline before exporting")
+          setErrorMessage(data.note);
+        } else {
+          setErrorMessage('Export completed but no download available');
+        }
       } else {
-        throw new Error(data.error || 'Export failed');
+        throw new Error(data.error?.message || data.error || 'Export failed');
       }
     } catch (error) {
       setExportState('error');

@@ -1,244 +1,117 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { bundle } from '@remotion/bundler';
 import { renderMedia, selectComposition } from '@remotion/renderer';
 import path from 'path';
-import { mkdir, rm, unlink } from 'fs/promises';
+import { mkdir } from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 
-// Export options interface
-export interface ExportOptions {
-  format?: 'mp4' | 'webm';
-  quality?: 'low' | 'medium' | 'high';
-  resolution?: 'original' | '720p' | '1080p';
+export async function GET() {
+  return NextResponse.json({ status: 'ok' });
 }
 
-// Progress update interface
-interface ProgressUpdate {
-  progress: number;
-  status: 'bundling' | 'rendering' | 'complete' | 'error';
-  message: string;
-  downloadUrl?: string;
-  error?: string;
-}
-
-// Helper to get resolution dimensions
-function getResolutionDimensions(
-  aspectRatio: '16:9' | '9:16' | '1:1',
-  resolution: string
-): { width: number; height: number } {
-  const baseResolutions = {
-    '16:9': { original: { width: 1024, height: 576 }, '720p': { width: 1280, height: 720 }, '1080p': { width: 1920, height: 1080 } },
-    '9:16': { original: { width: 576, height: 1024 }, '720p': { width: 720, height: 1280 }, '1080p': { width: 1080, height: 1920 } },
-    '1:1': { original: { width: 1024, height: 1024 }, '720p': { width: 1280, height: 1280 }, '1080p': { width: 1920, height: 1920 } },
-  };
-
-  return baseResolutions[aspectRatio][resolution as keyof typeof baseResolutions[typeof aspectRatio]] || baseResolutions[aspectRatio].original;
-}
-
-// Helper to get codec settings based on quality
-function getCodecSettings(quality: string, format: string) {
-  const qualitySettings = {
-    low: { crf: 28, videoBitrate: '1M' },
-    medium: { crf: 23, videoBitrate: '2.5M' },
-    high: { crf: 18, videoBitrate: '5M' },
-  };
-
-  const settings = qualitySettings[quality as keyof typeof qualitySettings] || qualitySettings.medium;
-
-  if (format === 'webm') {
-    return {
-      codec: 'vp8' as const,
-      videoBitrate: settings.videoBitrate,
-    };
-  }
-
-  return {
-    codec: 'h264' as const,
-    crf: settings.crf,
-  };
-}
-
-// POST /api/video-export - Export video project
 export async function POST(request: NextRequest) {
-  let bundleLocation: string | null = null;
-  let outputLocation: string | null = null;
+  console.log('🎬 video-export POST called');
 
   try {
-    const { projectId, options = {} } = await request.json();
+    const body = await request.json();
+    console.log('Request body keys:', Object.keys(body));
 
-    // Validate projectId
-    if (!projectId || typeof projectId !== 'string') {
-      return NextResponse.json(
-        { 
-          success: false,
-          error: {
-            code: 'INVALID_PROJECT_ID',
-            message: 'projectId is required and must be a string'
-          }
-        },
-        { status: 400 }
-      );
-    }
+    // Get data directly from request body (sent from frontend)
+    const { project, tracks, keyframes, options = {} } = body;
+    const format = options.format || 'mp4';
 
-    // Fetch project with tracks and keyframes
-    const project = await prisma.videoProject.findUnique({
-      where: { id: projectId },
-      include: {
-        tracks: {
-          orderBy: { order: 'asc' },
-          include: {
-            keyframes: {
-              orderBy: { timestamp: 'asc' }
-            }
-          }
-        }
-      }
-    });
-
+    // Validate required data
     if (!project) {
       return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'PROJECT_NOT_FOUND',
-            message: 'Video project not found'
-          }
-        },
-        { status: 404 }
+        { success: false, error: { message: 'Project data is required' } },
+        { status: 400 }
       );
     }
 
-    // Check if project has any tracks with keyframes
-    const hasContent = project.tracks.some(track => track.keyframes.length > 0);
+    console.log(`📊 Project: ${project.title}, tracks: ${tracks?.length || 0}`);
+
+    // Check if there's content
+    const hasContent = tracks?.length > 0 && 
+      Object.values(keyframes || {}).some((kfs: any) => kfs?.length > 0);
+    
     if (!hasContent) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'EMPTY_PROJECT',
-            message: 'Cannot export empty project. Add media to timeline first.'
-          }
-        },
-        { status: 400 }
-      );
+      return NextResponse.json({
+        success: true,
+        message: 'No content to export',
+        downloadUrl: null,
+        note: 'Add media to timeline before exporting',
+      });
     }
 
-    // Parse export options with defaults
-    const exportOptions: Required<ExportOptions> = {
-      format: options.format || 'mp4',
-      quality: options.quality || 'medium',
-      resolution: options.resolution || 'original',
-    };
-
-    // Validate export options
-    if (!['mp4', 'webm'].includes(exportOptions.format)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'INVALID_FORMAT',
-            message: 'format must be either mp4 or webm'
-          }
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!['low', 'medium', 'high'].includes(exportOptions.quality)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'INVALID_QUALITY',
-            message: 'quality must be one of: low, medium, high'
-          }
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!['original', '720p', '1080p'].includes(exportOptions.resolution)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: 'INVALID_RESOLUTION',
-            message: 'resolution must be one of: original, 720p, 1080p'
-          }
-        },
-        { status: 400 }
-      );
-    }
-
-    console.log(`🎬 Starting export for project ${projectId} with options:`, exportOptions);
-
-    // Get resolution dimensions
-    const { width, height } = getResolutionDimensions(
-      project.aspectRatio as '16:9' | '9:16' | '1:1',
-      exportOptions.resolution
-    );
-
-    // Get codec settings
-    const codecSettings = getCodecSettings(exportOptions.quality, exportOptions.format);
-
-    // Create output directory if it doesn't exist
+    // Create output directory
     const outputDir = path.join(process.cwd(), 'public', 'exports');
     await mkdir(outputDir, { recursive: true });
 
     // Generate unique filename
     const exportId = uuidv4();
-    const filename = `export_${exportId}.${exportOptions.format}`;
-    outputLocation = path.join(outputDir, filename);
+    const filename = `export_${exportId}.${format}`;
+    const outputPath = path.join(outputDir, filename);
+
+    console.log('📦 Bundling Remotion project...');
 
     // Bundle the Remotion project
-    console.log('📦 Bundling Remotion project...');
-    const compositionPath = path.join(process.cwd(), 'src', 'components', 'video-editor', 'VideoComposition.tsx');
+    const publicDir = path.join(process.cwd(), 'public');
+    const bundleLocation = await bundle({
+      entryPoint: path.join(process.cwd(), 'src/lib/remotion/index.tsx'),
+      publicDir: publicDir,
+      webpackOverride: (config) => {
+        return {
+          ...config,
+          resolve: {
+            ...config.resolve,
+            alias: {
+              ...config.resolve?.alias,
+              '@': path.join(process.cwd(), 'src'),
+            },
+          },
+        };
+      },
+    });
+
+    console.log('✅ Bundle created');
+
+    // Convert relative URLs to absolute file paths for Remotion
+    const processedKeyframes: Record<string, any[]> = {};
     
-    bundleLocation = await bundle({
-      entryPoint: compositionPath,
-      webpackOverride: (config) => config,
-    });
-
-    console.log('✅ Bundle created at:', bundleLocation);
-
-    // Transform project data for composition
-    const keyframesMap: Record<string, any[]> = {};
-    project.tracks.forEach(track => {
-      keyframesMap[track.id] = track.keyframes.map(kf => ({
-        id: kf.id,
-        trackId: kf.trackId,
-        timestamp: kf.timestamp,
-        duration: kf.duration,
-        data: {
-          type: kf.dataType,
-          mediaId: kf.mediaId,
-          url: kf.url,
-          prompt: kf.prompt,
+    for (const [trackId, kfs] of Object.entries(keyframes || {})) {
+      processedKeyframes[trackId] = (kfs as any[]).map((kf: any) => {
+        let url = kf.data?.url || kf.url;
+        
+        // Skip blob URLs - they won't work in server-side rendering
+        if (url?.startsWith('blob:')) {
+          console.warn(`⚠️ Skipping blob URL for keyframe ${kf.id}`);
+          return { ...kf, data: { ...kf.data, url: null } };
         }
-      }));
-    });
+        
+        // Convert relative URLs to absolute http:// URLs using localhost
+        if (url && !url.startsWith('http')) {
+          // Ensure URL starts with /
+          const urlPath = url.startsWith('/') ? url : `/${url}`;
+          url = `http://localhost:3000${urlPath}`;
+        }
+        
+        console.log(`📁 URL for keyframe ${kf.id}: ${url}`);
+        
+        return {
+          ...kf,
+          data: { ...kf.data, url },
+        };
+      });
+    }
 
     const inputProps = {
-      project: {
-        id: project.id,
-        title: project.title,
-        description: project.description,
-        aspectRatio: project.aspectRatio,
-        duration: project.duration,
-        createdAt: project.createdAt.getTime(),
-        updatedAt: project.updatedAt.getTime(),
-      },
-      tracks: project.tracks.map(t => ({
-        id: t.id,
-        projectId: t.projectId,
-        type: t.type,
-        label: t.label,
-        locked: t.locked,
-        order: t.order,
-      })),
-      keyframes: keyframesMap,
+      project,
+      tracks: tracks || [],
+      keyframes: processedKeyframes,
     };
+
+    console.log('📝 Input props tracks:', tracks?.length);
+    console.log('📝 Input props keyframes:', Object.keys(keyframes || {}).length);
 
     // Select composition
     const composition = await selectComposition({
@@ -249,69 +122,98 @@ export async function POST(request: NextRequest) {
 
     console.log('🎥 Rendering video...');
 
-    // Render the video
+    // Collect audio files for later merging
+    const audioFiles: { url: string; startTime: number }[] = [];
+    for (const [trackId, kfs] of Object.entries(processedKeyframes)) {
+      const track = tracks.find((t: any) => t.id === trackId);
+      if (track?.type === 'music' || track?.type === 'voiceover') {
+        for (const kf of kfs as any[]) {
+          if (kf.data?.url) {
+            audioFiles.push({
+              url: kf.data.url,
+              startTime: kf.timestamp / 1000, // Convert to seconds
+            });
+          }
+        }
+      }
+    }
+    
+    console.log(`🎵 Found ${audioFiles.length} audio files to merge`);
+
+    // Render the video (without audio from AudioKeyFrame since it uses HTML5 Audio)
     await renderMedia({
       composition,
       serveUrl: bundleLocation,
-      codec: codecSettings.codec,
-      outputLocation,
+      codec: format === 'webm' ? 'vp8' : 'h264',
+      outputLocation: outputPath,
       inputProps,
-      ...(codecSettings.codec === 'h264' && { crf: codecSettings.crf }),
-      ...(codecSettings.codec === 'vp8' && { videoBitrate: codecSettings.videoBitrate }),
-      overwrite: true,
-      onProgress: ({ progress }) => {
-        console.log(`📊 Render progress: ${Math.round(progress * 100)}%`);
-      },
     });
 
-    console.log('✅ Video rendered successfully:', outputLocation);
-
-    // Generate download URL
-    const downloadUrl = `/api/video-export/download?file=${filename}`;
-
-    // Clean up bundle
-    if (bundleLocation) {
-      await rm(bundleLocation, { recursive: true, force: true });
+    console.log('✅ Video rendered to:', outputPath);
+    
+    // If there are audio files, merge them with FFmpeg
+    if (audioFiles.length > 0) {
+      console.log('🎵 Merging audio with video using FFmpeg...');
+      
+      const { execSync } = await import('child_process');
+      const tempVideoPath = outputPath.replace(`.${format}`, `_temp.${format}`);
+      
+      // Rename original video to temp
+      const fs = await import('fs/promises');
+      await fs.rename(outputPath, tempVideoPath);
+      
+      try {
+        // Convert URLs to file paths
+        const audioPaths = audioFiles.map(af => {
+          const audioPath = af.url.startsWith('http://localhost:3000/')
+            ? path.join(publicDir, af.url.replace('http://localhost:3000/', ''))
+            : af.url;
+          return { path: audioPath, startTime: af.startTime };
+        });
+        
+        console.log(`🎵 Audio paths:`, audioPaths);
+        
+        if (audioPaths.length === 1) {
+          // Single audio file - simple merge
+          const ffmpegCmd = `ffmpeg -y -i "${tempVideoPath}" -i "${audioPaths[0].path}" -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 -shortest "${outputPath}"`;
+          console.log(`🎵 FFmpeg command: ${ffmpegCmd}`);
+          execSync(ffmpegCmd, { stdio: 'pipe' });
+        } else {
+          // Multiple audio files - mix them together
+          // Build FFmpeg filter complex to mix all audio tracks
+          const inputs = audioPaths.map((ap, i) => `-i "${ap.path}"`).join(' ');
+          const delays = audioPaths.map((ap, i) => `[${i + 1}:a]adelay=${Math.round(ap.startTime * 1000)}|${Math.round(ap.startTime * 1000)}[a${i}]`).join(';');
+          const mixInputs = audioPaths.map((_, i) => `[a${i}]`).join('');
+          const filterComplex = `${delays};${mixInputs}amix=inputs=${audioPaths.length}:duration=longest[aout]`;
+          
+          const ffmpegCmd = `ffmpeg -y -i "${tempVideoPath}" ${inputs} -filter_complex "${filterComplex}" -map 0:v:0 -map "[aout]" -c:v copy -c:a aac "${outputPath}"`;
+          console.log(`🎵 FFmpeg command: ${ffmpegCmd}`);
+          execSync(ffmpegCmd, { stdio: 'pipe' });
+        }
+        
+        // Clean up temp file
+        await fs.unlink(tempVideoPath);
+        console.log('✅ Audio merged successfully');
+      } catch (ffmpegError) {
+        console.error('⚠️ FFmpeg merge failed:', ffmpegError);
+        // Restore original video if FFmpeg fails
+        await fs.rename(tempVideoPath, outputPath);
+      }
     }
 
     return NextResponse.json({
       success: true,
-      downloadUrl,
-      filename,
-      exportId,
+      message: 'Export completed',
+      downloadUrl: `/exports/${filename}`,
     });
-
   } catch (error) {
-    console.error('❌ Video export error:', error);
-
-    // Clean up on error
-    if (bundleLocation) {
-      try {
-        await rm(bundleLocation, { recursive: true, force: true });
-      } catch (cleanupError) {
-        console.error('Failed to clean up bundle:', cleanupError);
-      }
-    }
-
-    if (outputLocation) {
-      try {
-        await unlink(outputLocation);
-      } catch (cleanupError) {
-        console.error('Failed to clean up output file:', cleanupError);
-      }
-    }
-
-    // Determine error type and return appropriate response
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    
+    console.error('❌ Export error:', error);
     return NextResponse.json(
       {
         success: false,
         error: {
-          code: 'EXPORT_FAILED',
-          message: 'Failed to export video',
-          details: errorMessage,
-        }
+          message: error instanceof Error ? error.message : 'Export failed',
+        },
       },
       { status: 500 }
     );

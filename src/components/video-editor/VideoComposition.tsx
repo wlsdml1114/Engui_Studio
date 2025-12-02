@@ -6,6 +6,7 @@ import {
   OffthreadVideo,
   useCurrentFrame,
   useVideoConfig,
+  staticFile,
 } from 'remotion';
 import { VideoProject, VideoTrack, VideoKeyFrame } from '@/lib/context/StudioContext';
 
@@ -245,7 +246,18 @@ function AudioTrackSequence({ track, keyframes }: TrackSequenceProps) {
     <>
       {sortedKeyframes.map((keyframe) => {
         const startFrame = msToFrames(keyframe.timestamp);
-        const durationFrames = msToFrames(keyframe.duration);
+        // For audio, use originalDuration if available (actual audio length)
+        // This ensures the Sequence doesn't end before the audio finishes
+        const audioDuration = keyframe.data.originalDuration || keyframe.duration;
+        const durationFrames = msToFrames(audioDuration);
+        
+        console.log(`AudioTrackSequence: keyframe ${keyframe.id}, duration=${keyframe.duration}ms, originalDuration=${keyframe.data.originalDuration}ms, using=${audioDuration}ms, frames=${durationFrames}`);
+        
+        // Skip if no valid URL
+        if (!keyframe.data.url) {
+          console.warn(`Skipping audio keyframe ${keyframe.id} - no URL`);
+          return null;
+        }
         
         return (
           <Sequence
@@ -253,6 +265,7 @@ function AudioTrackSequence({ track, keyframes }: TrackSequenceProps) {
             from={startFrame}
             durationInFrames={durationFrames}
           >
+            {/* HTML5 audio for preview playback */}
             <AudioKeyFrame keyframe={keyframe} />
           </Sequence>
         );
