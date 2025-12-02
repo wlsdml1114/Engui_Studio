@@ -129,7 +129,8 @@ export async function POST(request: NextRequest) {
                 userId,
                 workspaceId: currentWorkspaceId, // 워크스페이스 ID 추가
                 status: 'processing',
-                type: 'wan-animate',
+                type: 'video',
+                modelId: 'wan-animate',
                 prompt,
                 options: JSON.stringify({
                     prompt,

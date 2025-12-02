@@ -2,9 +2,26 @@
 
 import React from 'react';
 import { useStudio } from '@/lib/context/StudioContext';
+import { VideoEditorView } from '@/components/video-editor/VideoEditorView';
 
 export default function CenterPanel() {
-    const { activeArtifactId } = useStudio();
+    const { activeArtifactId, activeTool } = useStudio();
+
+    console.log('CenterPanel render - activeTool:', activeTool, 'activeArtifactId:', activeArtifactId);
+
+    // Check if we're in video editor mode
+    const isVideoEditorMode = activeTool === 'speech-sequencer';
+
+    console.log('isVideoEditorMode:', isVideoEditorMode);
+
+    // If in video editor mode, render the VideoEditorView
+    if (isVideoEditorMode) {
+        return (
+            <div className="flex-1 flex flex-col h-full overflow-hidden">
+                <VideoEditorView projectId={activeArtifactId || 'default-project'} />
+            </div>
+        );
+    }
 
     // Mock data for demonstration - in a real app, this would come from a store or API based on activeArtifactId
     const activeArtifact = activeArtifactId ? {

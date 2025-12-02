@@ -102,7 +102,7 @@ export default function ImageGenerationForm() {
 
             if (response && response.ok && data.success) {
                 console.log('Generation started successfully', data);
-                setMessage({ type: 'success', text: `Generation started! Job ID: ${data.jobId}` });
+                // Success - job added to queue, no need to show message
 
                 // Add job to context
                 addJob({

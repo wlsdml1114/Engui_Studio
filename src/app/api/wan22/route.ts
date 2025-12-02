@@ -162,8 +162,13 @@ export async function POST(request: NextRequest) {
             console.warn('⚠️ RunPod health preflight failed:', preErr);
         }
 
-        // 현재 워크스페이스 ID 가져오기
-        let currentWorkspaceId = await settingsService.getCurrentWorkspaceId(userId);
+        // 워크스페이스 ID 가져오기 (클라이언트에서 전달받거나, 설정에서 가져오거나, 기본 워크스페이스 찾기)
+        let currentWorkspaceId = formData.get('workspaceId') as string | null;
+        
+        if (!currentWorkspaceId) {
+            currentWorkspaceId = await settingsService.getCurrentWorkspaceId(userId);
+        }
+        
         console.log('🏗️ Current workspace ID for job:', currentWorkspaceId);
 
         // currentWorkspaceId가 없다면 기본 워크스페이스 찾기
@@ -215,7 +220,8 @@ export async function POST(request: NextRequest) {
                 userId,
                 workspaceId: currentWorkspaceId, // 워크스페이스 ID 추가
                 status: 'processing',
-                type: 'wan22',
+                type: 'video',
+                modelId: 'wan22',
                 prompt,
                 options: JSON.stringify({
                     width, height, seed, cfg, length, step, contextOverlap,

@@ -55,6 +55,43 @@ export interface Job {
     workspaceId?: string;
 }
 
+// Video Editor Types
+export interface VideoProject {
+    id: string;
+    title: string;
+    description: string;
+    aspectRatio: '16:9' | '9:16' | '1:1';
+    duration: number; // milliseconds
+    createdAt: number;
+    updatedAt: number;
+}
+
+export interface VideoTrack {
+    id: string;
+    projectId: string;
+    type: 'video' | 'music' | 'voiceover';
+    label: string;
+    locked: boolean;
+    order: number;
+}
+
+export interface VideoKeyFrame {
+    id: string;
+    trackId: string;
+    timestamp: number; // milliseconds
+    duration: number; // milliseconds
+    data: {
+        type: 'image' | 'video' | 'music' | 'voiceover';
+        mediaId: string;
+        url: string;
+        prompt?: string;
+        originalDuration?: number; // Original media duration in ms (for waveform scaling)
+    };
+}
+
+// PlayerRef type for Remotion Player
+export type PlayerRef = any; // Will be properly typed when Remotion is installed
+
 const defaultSettings: StudioSettings = {
     apiKeys: {},
     runpod: { endpoints: {} },
@@ -83,18 +120,61 @@ interface StudioContextType {
     createWorkspace: (name: string) => Promise<void>;
     selectWorkspace: (id: string) => void;
     deleteWorkspace: (id: string) => Promise<void>;
+
+    // Video Editor State
+    currentProject: VideoProject | null;
+    projects: VideoProject[];
+    tracks: VideoTrack[];
+    keyframes: Record<string, VideoKeyFrame[]>; // trackId -> keyframes
+    player: PlayerRef | null;
+    playerState: 'playing' | 'paused';
+    currentTimestamp: number; // seconds
+    zoom: number;
+    selectedKeyframeIds: string[];
+    exportDialogOpen: boolean;
+
+    // Video Editor Actions
+    createProject: (project: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
+    loadProject: (projectId: string) => Promise<void>;
+    updateProject: (projectId: string, updates: Partial<VideoProject>) => Promise<void>;
+    deleteProject: (projectId: string) => Promise<void>;
+    addTrack: (track: Omit<VideoTrack, 'id'>) => Promise<string>;
+    removeTrack: (trackId: string) => Promise<void>;
+    addKeyframe: (keyframe: Omit<VideoKeyFrame, 'id'>) => Promise<string>;
+    updateKeyframe: (keyframeId: string, updates: Partial<VideoKeyFrame>) => Promise<void>;
+    removeKeyframe: (keyframeId: string) => Promise<void>;
+    setPlayer: (player: PlayerRef | null) => void;
+    setPlayerState: (state: 'playing' | 'paused') => void;
+    setCurrentTimestamp: (timestamp: number) => void;
+    setZoom: (zoom: number) => void;
+    selectKeyframe: (keyframeId: string) => void;
+    deselectKeyframe: (keyframeId: string) => void;
+    clearSelection: () => void;
+    setExportDialogOpen: (open: boolean) => void;
 }
 
 const StudioContext = createContext<StudioContextType | undefined>(undefined);
 
 export function StudioProvider({ children }: { children: ReactNode }) {
-    const [activeTool, setActiveTool] = useState<StudioTool>('video-generation');
+    const [activeTool, setActiveTool] = useState<StudioTool>('speech-sequencer');
     const [selectedModel, setSelectedModel] = useState<string | null>(null);
     const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
 
     // Workspace State
     const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
     const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
+
+    // Video Editor State
+    const [currentProject, setCurrentProject] = useState<VideoProject | null>(null);
+    const [projects, setProjects] = useState<VideoProject[]>([]);
+    const [tracks, setTracks] = useState<VideoTrack[]>([]);
+    const [keyframes, setKeyframes] = useState<Record<string, VideoKeyFrame[]>>({});
+    const [player, setPlayer] = useState<PlayerRef | null>(null);
+    const [playerState, setPlayerState] = useState<'playing' | 'paused'>('paused');
+    const [currentTimestamp, setCurrentTimestamp] = useState<number>(0);
+    const [zoom, setZoom] = useState<number>(1);
+    const [selectedKeyframeIds, setSelectedKeyframeIds] = useState<string[]>([]);
+    const [exportDialogOpen, setExportDialogOpen] = useState<boolean>(false);
 
     const [jobs, setJobs] = useState<Job[]>(() => {
         if (typeof window !== 'undefined') {
@@ -130,7 +210,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             // Map 'storage' to 's3' for the API
             const apiSettings: any = { ...updated };
             if (updated.storage) {
-                apiSettings.s3 = updated.storage;
+                apiSettings.s3 = {
+                    endpointUrl: updated.storage.endpointUrl,
+                    bucketName: updated.storage.bucket,
+                    region: updated.storage.region,
+                    accessKeyId: updated.storage.accessKey,
+                    secretAccessKey: updated.storage.secretKey
+                };
                 delete apiSettings.storage;
             }
 
@@ -163,7 +249,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
                         // Map 's3' from API to 'storage' in state
                         if (data.settings.s3) {
-                            merged.storage = { ...prev.storage, ...data.settings.s3 };
+                            merged.storage = {
+                                ...prev.storage,
+                                endpointUrl: data.settings.s3.endpointUrl,
+                                bucket: data.settings.s3.bucketName,
+                                region: data.settings.s3.region,
+                                accessKey: data.settings.s3.accessKeyId,
+                                secretKey: data.settings.s3.secretAccessKey
+                            };
                             delete (merged as any).s3;
                         }
 
@@ -199,15 +292,38 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
     const fetchWorkspaces = async () => {
         try {
-            const response = await fetch('/api/workspaces?userId=default-user');
+            console.log('📂 Fetching workspaces for user: user-with-settings');
+            const response = await fetch('/api/workspaces?userId=user-with-settings');
             const data = await response.json();
+            console.log('📂 Workspaces response:', data);
             if (data.workspaces) {
                 setWorkspaces(data.workspaces);
+                console.log('📂 Found workspaces:', data.workspaces.length);
+                
                 // Set default workspace if none active
                 if (!activeWorkspaceId && data.workspaces.length > 0) {
-                    // Prefer default workspace, otherwise first one
-                    const defaultWs = data.workspaces.find((w: Workspace) => w.isDefault) || data.workspaces[0];
-                    setActiveWorkspaceId(defaultWs.id);
+                    // Try to restore last selected workspace from localStorage
+                    const savedWorkspaceId = typeof window !== 'undefined' 
+                        ? localStorage.getItem('activeWorkspaceId') 
+                        : null;
+                    
+                    let workspaceToSelect: Workspace | undefined;
+                    
+                    if (savedWorkspaceId && data.workspaces.find((w: Workspace) => w.id === savedWorkspaceId)) {
+                        // Use saved workspace if it still exists
+                        workspaceToSelect = data.workspaces.find((w: Workspace) => w.id === savedWorkspaceId);
+                        console.log('✅ Restoring saved workspace:', workspaceToSelect?.id, workspaceToSelect?.name);
+                    } else {
+                        // Prefer default workspace, otherwise first one
+                        workspaceToSelect = data.workspaces.find((w: Workspace) => w.isDefault) || data.workspaces[0];
+                        console.log('✅ Setting default workspace:', workspaceToSelect.id, workspaceToSelect.name);
+                    }
+                    
+                    setActiveWorkspaceId(workspaceToSelect!.id);
+                } else if (data.workspaces.length === 0) {
+                    console.warn('⚠️ No workspaces found! Creating default workspace...');
+                    // Create default workspace
+                    await createWorkspace('Default');
                 }
             }
         } catch (error) {
@@ -220,7 +336,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             const response = await fetch('/api/workspaces', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, userId: 'default-user' })
+                body: JSON.stringify({ name, userId: 'user-with-settings' })
             });
             const data = await response.json();
             if (data.workspace) {
@@ -241,17 +357,27 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
     const selectWorkspace = (id: string) => {
         setActiveWorkspaceId(id);
+        // Save to localStorage
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('activeWorkspaceId', id);
+        }
     };
 
     // --- Job Actions ---
 
     const fetchJobs = async () => {
-        if (!activeWorkspaceId) return;
+        if (!activeWorkspaceId) {
+            console.log('⚠️ fetchJobs: No active workspace ID');
+            return;
+        }
 
         try {
+            console.log('🔄 Fetching jobs for workspace:', activeWorkspaceId);
             const response = await fetch(`/api/jobs?workspaceId=${activeWorkspaceId}&limit=50`);
             const data = await response.json();
             if (data.success) {
+                console.log('✅ Fetched jobs:', data.jobs.length, 'jobs');
+                console.log('📊 Job statuses:', data.jobs.map((j: Job) => ({ id: j.id.substring(0, 8), status: j.status, workspaceId: j.workspaceId })));
                 setJobs(data.jobs);
             }
         } catch (error) {
@@ -262,15 +388,23 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     const addJob = async (job: Job) => {
         const jobWithWorkspace = { ...job, workspaceId: activeWorkspaceId || undefined };
 
+        console.log('➕ Adding job:', {
+            jobId: job.id,
+            workspaceId: activeWorkspaceId,
+            status: job.status
+        });
+
         // Optimistic update
         setJobs(prev => [jobWithWorkspace, ...prev]);
 
         try {
-            await fetch('/api/jobs', {
+            const response = await fetch('/api/jobs', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(jobWithWorkspace)
             });
+            const data = await response.json();
+            console.log('✅ Job saved to DB:', data);
         } catch (error) {
             console.error('Failed to save job:', error);
         }
@@ -308,13 +442,21 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
     // Initial Load
     useEffect(() => {
+        console.log('🚀 StudioContext: Initial load, fetching workspaces...');
         fetchWorkspaces();
     }, []);
 
     // Fetch jobs when workspace changes
     useEffect(() => {
+        console.log('🔄 Workspace changed:', activeWorkspaceId);
         if (activeWorkspaceId) {
+            // Save to localStorage
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('activeWorkspaceId', activeWorkspaceId);
+            }
             fetchJobs();
+        } else {
+            console.warn('⚠️ No active workspace ID set');
         }
     }, [activeWorkspaceId]);
 
@@ -325,8 +467,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
             if (activeJobs.length === 0) return;
 
+            // Refresh jobs from DB to get updated status
+            await fetchJobs();
+
             for (const job of activeJobs) {
                 try {
+                    // Skip WAN 2.2 jobs - they handle their own status updates in the background
+                    if (job.modelId === 'wan22') {
+                        continue;
+                    }
+
                     // Use stored endpointId or fallback
                     const endpointId = job.endpointId || settings.runpod.endpoints[job.modelId];
 
@@ -423,7 +573,288 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         }, 5000); // Poll every 5 seconds
 
         return () => clearInterval(interval);
-    }, [jobs, settings]);
+    }, [jobs, settings, activeWorkspaceId]);
+
+    // --- Video Editor Actions ---
+
+    const createProject = async (project: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+        const newProject: VideoProject = {
+            ...project,
+            id: `project-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+        };
+
+        setProjects(prev => [...prev, newProject]);
+        setCurrentProject(newProject);
+
+        try {
+            const response = await fetch('/api/video-projects', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newProject),
+            });
+            const data = await response.json();
+            if (data.success && data.project) {
+                // Update with server-generated ID if different
+                setProjects(prev => prev.map(p => p.id === newProject.id ? data.project : p));
+                setCurrentProject(data.project);
+                return data.project.id;
+            }
+        } catch (error) {
+            console.error('Failed to create project:', error);
+        }
+
+        return newProject.id;
+    };
+
+    const loadProject = async (projectId: string): Promise<void> => {
+        try {
+            const response = await fetch(`/api/video-projects/${projectId}`);
+            
+            // If project doesn't exist (404), create a new default project locally
+            if (response.status === 404) {
+                console.log('Project not found, creating new default project locally...');
+                
+                // Create a default project directly in state without API call
+                const defaultProject: VideoProject = {
+                    id: `project-${Date.now()}`,
+                    title: 'My Video Project',
+                    description: 'A new video project',
+                    aspectRatio: '16:9',
+                    duration: 30000, // 30 seconds
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                };
+                
+                setCurrentProject(defaultProject);
+                setProjects(prev => [...prev, defaultProject]);
+                setTracks([]);
+                setKeyframes({});
+                
+                console.log('✅ Default project created locally:', defaultProject.id);
+                return;
+            }
+            
+            const data = await response.json();
+            if (data.success && data.project) {
+                setCurrentProject(data.project);
+                setTracks(data.tracks || []);
+                
+                // Organize keyframes by trackId
+                const keyframesByTrack: Record<string, VideoKeyFrame[]> = {};
+                if (data.keyframes) {
+                    data.keyframes.forEach((kf: VideoKeyFrame) => {
+                        if (!keyframesByTrack[kf.trackId]) {
+                            keyframesByTrack[kf.trackId] = [];
+                        }
+                        keyframesByTrack[kf.trackId].push(kf);
+                    });
+                }
+                setKeyframes(keyframesByTrack);
+            } else {
+                // If the API returns success: false, create default project
+                console.log('API returned error, creating default project locally...');
+                const defaultProject: VideoProject = {
+                    id: `project-${Date.now()}`,
+                    title: 'My Video Project',
+                    description: 'A new video project',
+                    aspectRatio: '16:9',
+                    duration: 30000,
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                };
+                
+                setCurrentProject(defaultProject);
+                setProjects(prev => [...prev, defaultProject]);
+                setTracks([]);
+                setKeyframes({});
+            }
+        } catch (error) {
+            // For any error, create a default project locally
+            console.log('Error loading project, creating default project locally...', error);
+            const defaultProject: VideoProject = {
+                id: `project-${Date.now()}`,
+                title: 'My Video Project',
+                description: 'A new video project',
+                aspectRatio: '16:9',
+                duration: 30000,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            };
+            
+            setCurrentProject(defaultProject);
+            setProjects(prev => [...prev, defaultProject]);
+            setTracks([]);
+            setKeyframes({});
+        }
+    };
+
+    const updateProject = async (projectId: string, updates: Partial<VideoProject>): Promise<void> => {
+        const updatedProject = { ...updates, updatedAt: Date.now() };
+        
+        setProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updatedProject } : p));
+        if (currentProject?.id === projectId) {
+            setCurrentProject(prev => prev ? { ...prev, ...updatedProject } : null);
+        }
+
+        try {
+            await fetch(`/api/video-projects/${projectId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedProject),
+            });
+        } catch (error) {
+            console.error('Failed to update project:', error);
+        }
+    };
+
+    const deleteProject = async (projectId: string): Promise<void> => {
+        setProjects(prev => prev.filter(p => p.id !== projectId));
+        if (currentProject?.id === projectId) {
+            setCurrentProject(null);
+            setTracks([]);
+            setKeyframes({});
+        }
+
+        try {
+            await fetch(`/api/video-projects/${projectId}`, {
+                method: 'DELETE',
+            });
+        } catch (error) {
+            console.error('Failed to delete project:', error);
+        }
+    };
+
+    const addTrack = async (track: Omit<VideoTrack, 'id'>): Promise<string> => {
+        const newTrack: VideoTrack = {
+            ...track,
+            id: `track-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        };
+
+        setTracks(prev => [...prev, newTrack]);
+        setKeyframes(prev => ({ ...prev, [newTrack.id]: [] }));
+
+        try {
+            const response = await fetch('/api/video-tracks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newTrack),
+            });
+            const data = await response.json();
+            if (data.success && data.track) {
+                setTracks(prev => prev.map(t => t.id === newTrack.id ? data.track : t));
+                return data.track.id;
+            }
+        } catch (error) {
+            console.error('Failed to add track:', error);
+        }
+
+        return newTrack.id;
+    };
+
+    const removeTrack = async (trackId: string): Promise<void> => {
+        setTracks(prev => prev.filter(t => t.id !== trackId));
+        setKeyframes(prev => {
+            const updated = { ...prev };
+            delete updated[trackId];
+            return updated;
+        });
+
+        try {
+            await fetch(`/api/video-tracks/${trackId}`, {
+                method: 'DELETE',
+            });
+        } catch (error) {
+            console.error('Failed to remove track:', error);
+        }
+    };
+
+    const addKeyframe = async (keyframe: Omit<VideoKeyFrame, 'id'>): Promise<string> => {
+        const newKeyframe: VideoKeyFrame = {
+            ...keyframe,
+            id: `keyframe-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        };
+
+        setKeyframes(prev => ({
+            ...prev,
+            [keyframe.trackId]: [...(prev[keyframe.trackId] || []), newKeyframe],
+        }));
+
+        try {
+            const response = await fetch('/api/video-keyframes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newKeyframe),
+            });
+            const data = await response.json();
+            if (data.success && data.keyframe) {
+                setKeyframes(prev => ({
+                    ...prev,
+                    [keyframe.trackId]: prev[keyframe.trackId].map(kf => 
+                        kf.id === newKeyframe.id ? data.keyframe : kf
+                    ),
+                }));
+                return data.keyframe.id;
+            }
+        } catch (error) {
+            console.error('Failed to add keyframe:', error);
+        }
+
+        return newKeyframe.id;
+    };
+
+    const updateKeyframe = async (keyframeId: string, updates: Partial<VideoKeyFrame>): Promise<void> => {
+        setKeyframes(prev => {
+            const updated = { ...prev };
+            Object.keys(updated).forEach(trackId => {
+                updated[trackId] = updated[trackId].map(kf =>
+                    kf.id === keyframeId ? { ...kf, ...updates } : kf
+                );
+            });
+            return updated;
+        });
+
+        try {
+            await fetch(`/api/video-keyframes/${keyframeId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updates),
+            });
+        } catch (error) {
+            console.error('Failed to update keyframe:', error);
+        }
+    };
+
+    const removeKeyframe = async (keyframeId: string): Promise<void> => {
+        setKeyframes(prev => {
+            const updated = { ...prev };
+            Object.keys(updated).forEach(trackId => {
+                updated[trackId] = updated[trackId].filter(kf => kf.id !== keyframeId);
+            });
+            return updated;
+        });
+
+        try {
+            await fetch(`/api/video-keyframes/${keyframeId}`, {
+                method: 'DELETE',
+            });
+        } catch (error) {
+            console.error('Failed to remove keyframe:', error);
+        }
+    };
+
+    const selectKeyframe = (keyframeId: string) => {
+        setSelectedKeyframeIds(prev => [...prev, keyframeId]);
+    };
+
+    const deselectKeyframe = (keyframeId: string) => {
+        setSelectedKeyframeIds(prev => prev.filter(id => id !== keyframeId));
+    };
+
+    const clearSelection = () => {
+        setSelectedKeyframeIds([]);
+    };
 
     return (
         <StudioContext.Provider value={{
@@ -447,7 +878,38 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             activeWorkspaceId,
             createWorkspace,
             selectWorkspace,
-            deleteWorkspace
+            deleteWorkspace,
+
+            // Video Editor State
+            currentProject,
+            projects,
+            tracks,
+            keyframes,
+            player,
+            playerState,
+            currentTimestamp,
+            zoom,
+            selectedKeyframeIds,
+            exportDialogOpen,
+
+            // Video Editor Actions
+            createProject,
+            loadProject,
+            updateProject,
+            deleteProject,
+            addTrack,
+            removeTrack,
+            addKeyframe,
+            updateKeyframe,
+            removeKeyframe,
+            setPlayer,
+            setPlayerState,
+            setCurrentTimestamp,
+            setZoom,
+            selectKeyframe,
+            deselectKeyframe,
+            clearSelection,
+            setExportDialogOpen,
         }}>
             {children}
         </StudioContext.Provider>

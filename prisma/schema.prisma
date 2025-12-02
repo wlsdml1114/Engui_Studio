@@ -123,3 +123,48 @@ model Workspace {
   @@index([userId])
   @@map("workspaces")
 }
+
+model VideoProject {
+  id          String   @id @default(uuid())
+  title       String
+  description String   @default("")
+  aspectRatio String   @default("16:9")
+  duration    Int      @default(30000)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  tracks      VideoTrack[]
+  
+  @@map("video_projects")
+}
+
+model VideoTrack {
+  id        String   @id @default(uuid())
+  projectId String
+  type      String   // 'video' | 'music' | 'voiceover'
+  label     String
+  locked    Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  
+  project   VideoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  keyframes VideoKeyFrame[]
+  
+  @@map("video_tracks")
+}
+
+model VideoKeyFrame {
+  id        String   @id @default(uuid())
+  trackId   String
+  timestamp Int      // milliseconds
+  duration  Int      // milliseconds
+  dataType  String   // 'image' | 'video' | 'music' | 'voiceover'
+  mediaId   String
+  url       String
+  prompt    String?
+  createdAt DateTime @default(now())
+  
+  track     VideoTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  
+  @@map("video_keyframes")
+}

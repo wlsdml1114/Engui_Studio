@@ -89,7 +89,8 @@ export async function POST(request: NextRequest) {
                 userId,
                 workspaceId: currentWorkspaceId, // 워크스페이스 ID 추가
                 status: 'processing',
-                type: 'flux-krea',
+                type: 'image',
+                modelId: 'flux-krea',
                 prompt,
                 options: JSON.stringify({
                     width, height, seed, guidance, model,

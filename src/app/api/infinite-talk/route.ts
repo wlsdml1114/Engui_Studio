@@ -313,7 +313,8 @@ export async function POST(request: NextRequest) {
       data: {
         userId,
         workspaceId: currentWorkspaceId,
-        type: 'infinitetalk',
+        type: 'video',
+        modelId: 'infinite-talk',
         status: 'processing',
         prompt,
         options: JSON.stringify({

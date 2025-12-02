@@ -9,11 +9,12 @@ import { Label } from '@/components/ui/label';
 import { PhotoIcon } from '@heroicons/react/24/outline';
 
 export default function VideoGenerationForm() {
-    const { selectedModel, setSelectedModel, settings, addJob } = useStudio();
+    const { selectedModel, setSelectedModel, settings, addJob, activeWorkspaceId } = useStudio();
     const [prompt, setPrompt] = useState('');
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string>('');
     const [showAdvanced, setShowAdvanced] = useState(false);
+    const [isDragOver, setIsDragOver] = useState(false);
 
     const videoModels = getModelsByType('video');
 
@@ -42,6 +43,46 @@ export default function VideoGenerationForm() {
         setPreviewUrl('');
     };
 
+    const handleDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragOver(false);
+
+        try {
+            // Try to get media data from workspace
+            const mediaDataStr = e.dataTransfer.getData('application/json');
+            if (mediaDataStr) {
+                const mediaData = JSON.parse(mediaDataStr);
+                // Only accept images for video generation
+                if (mediaData.type === 'image') {
+                    setPreviewUrl(mediaData.url);
+                    // Note: We're using the URL directly, not converting to File
+                    // The form submission will need to handle this case
+                }
+                return;
+            }
+
+            // Handle file drops
+            const files = Array.from(e.dataTransfer.files);
+            const imageFile = files.find(f => f.type.startsWith('image/'));
+            if (imageFile) {
+                setImageFile(imageFile);
+                setPreviewUrl(URL.createObjectURL(imageFile));
+            }
+        } catch (error) {
+            console.error('Failed to handle drop:', error);
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragOver(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragOver(false);
+    };
+
     const [isGenerating, setIsGenerating] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -58,6 +99,11 @@ export default function VideoGenerationForm() {
             formData.append('userId', 'user-with-settings'); // TODO: Get actual user ID
             formData.append('modelId', currentModel.id);
             if (prompt) formData.append('prompt', prompt);
+            
+            // Add workspace ID from context
+            if (activeWorkspaceId) {
+                formData.append('workspaceId', activeWorkspaceId);
+            }
 
             if (imageFile) {
                 formData.append('image', imageFile);
@@ -102,6 +148,13 @@ export default function VideoGenerationForm() {
             // Add RunPod Endpoint ID if applicable
             if (currentModel.api.type === 'runpod') {
                 const endpointId = settings.runpod.endpoints[currentModel.id] || currentModel.api.endpoint;
+                console.log('🔍 RunPod Endpoint Debug:', {
+                    modelId: currentModel.id,
+                    endpointFromSettings: settings.runpod.endpoints[currentModel.id],
+                    endpointFromModel: currentModel.api.endpoint,
+                    finalEndpoint: endpointId,
+                    allEndpoints: settings.runpod.endpoints
+                });
                 headers['X-RunPod-Endpoint-Id'] = endpointId;
             }
 
@@ -130,7 +183,7 @@ export default function VideoGenerationForm() {
 
             if (response && response.ok && data.success) {
                 console.log('Generation started successfully', data);
-                setMessage({ type: 'success', text: `Generation started! Job ID: ${data.jobId}` });
+                // Success - job added to queue, no need to show message
 
                 // Add job to context
                 addJob({
@@ -201,7 +254,14 @@ export default function VideoGenerationForm() {
                                 </button>
                             </div>
                         ) : (
-                            <div className="border border-dashed border-border rounded-lg p-8 text-center hover:bg-muted/20 transition-colors cursor-pointer relative">
+                            <div 
+                                className={`border border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer relative ${
+                                    isDragOver ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted/20'
+                                }`}
+                                onDrop={handleDrop}
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                            >
                                 <input
                                     type="file"
                                     accept="image/*"
@@ -209,7 +269,9 @@ export default function VideoGenerationForm() {
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                 />
                                 <PhotoIcon className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                                <span className="text-xs text-muted-foreground">Click or drop image</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {isDragOver ? 'Drop image here' : 'Click or drop image'}
+                                </span>
                             </div>
                         )}
                     </div>

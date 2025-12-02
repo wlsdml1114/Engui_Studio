@@ -65,7 +65,8 @@ export async function POST(request: NextRequest) {
                 userId,
                 workspaceId: currentWorkspaceId, // 워크스페이드 ID 추가
                 status: 'processing',
-                type: 'flux-kontext',
+                type: 'image',
+                modelId: 'flux-kontext',
                 prompt,
                 runpodJobId: '', // 초기값으로 빈 문자열 설정
                 options: JSON.stringify({ width, height, seed, cfg }),

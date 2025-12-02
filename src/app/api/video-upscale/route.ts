@@ -99,7 +99,8 @@ export async function POST(request: NextRequest) {
                 userId,
                 workspaceId: currentWorkspaceId, // 워크스페이스 ID 추가
                 status: 'processing',
-                type: 'video-upscale',
+                type: 'video',
+                modelId: 'video-upscale',
                 prompt: `Video upscale task: ${taskType}`,
                 options: JSON.stringify({
                     taskType,

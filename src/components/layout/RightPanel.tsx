@@ -21,6 +21,7 @@ export default function RightPanel() {
     const [selectedJob, setSelectedJob] = useState<Job | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [filter, setFilter] = useState<'all' | 'image' | 'video'>('all');
+    const [isMounted, setIsMounted] = useState(false);
 
     // Workspace Creation State
     const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
@@ -28,6 +29,10 @@ export default function RightPanel() {
     const inputRef = useRef<HTMLInputElement>(null);
 
     const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     useEffect(() => {
         if (isCreatingWorkspace && inputRef.current) {
@@ -159,7 +164,14 @@ export default function RightPanel() {
 
             {/* Job List */}
             <div className="flex-1 overflow-y-auto">
-                {filteredJobs.length === 0 ? (
+                {!isMounted ? (
+                    <div className="flex flex-col items-center justify-center h-40 text-muted-foreground gap-2">
+                        <div className="w-10 h-10 rounded-full bg-muted/20 flex items-center justify-center">
+                            <FolderPlus className="w-5 h-5 opacity-50" />
+                        </div>
+                        <div className="text-xs">Loading...</div>
+                    </div>
+                ) : filteredJobs.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-40 text-muted-foreground gap-2">
                         <div className="w-10 h-10 rounded-full bg-muted/20 flex items-center justify-center">
                             <FolderPlus className="w-5 h-5 opacity-50" />
@@ -174,6 +186,20 @@ export default function RightPanel() {
                                 key={job.id}
                                 onClick={() => handleJobClick(job)}
                                 className="group flex gap-3 p-3 cursor-pointer transition-all hover:bg-muted/5 border-b border-white/5 last:border-0 relative"
+                                draggable={job.status === 'completed' && !!job.resultUrl}
+                                onDragStart={(e) => {
+                                    if (job.status === 'completed' && job.resultUrl) {
+                                        const mediaData = {
+                                            id: job.id,
+                                            type: job.type,
+                                            url: job.resultUrl,
+                                            prompt: job.prompt,
+                                            duration: 5000, // Default 5 seconds
+                                        };
+                                        e.dataTransfer.setData('application/json', JSON.stringify(mediaData));
+                                        e.dataTransfer.effectAllowed = 'copy';
+                                    }
+                                }}
                             >
                                 {/* Thumbnail */}
                                 <div className="w-14 h-14 bg-black/20 rounded-md overflow-hidden flex-shrink-0 relative shadow-sm group-hover:shadow-md transition-shadow">

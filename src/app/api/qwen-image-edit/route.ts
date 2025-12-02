@@ -116,7 +116,8 @@ export async function POST(request: NextRequest) {
                 userId,
                 workspaceId: currentWorkspaceId,
                 status: 'processing',
-                type: 'qwen-image-edit',
+                type: 'image',
+                modelId: 'qwen-image-edit',
                 prompt,
                 runpodJobId: '',
                 options: JSON.stringify({

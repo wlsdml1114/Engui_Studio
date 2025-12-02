@@ -33,9 +33,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Job 생성
-    const job = await prisma.job.create({
-      data: {
+    // Job 생성 또는 업데이트 (upsert)
+    const job = await prisma.job.upsert({
+      where: { id: id || 'new-job-' + Date.now() },
+      update: {
+        status,
+        resultUrl,
+        thumbnailUrl: thumbnailUrl || null,
+        error,
+        cost,
+        completedAt: status === 'completed' ? new Date() : null
+      },
+      create: {
         id: id || undefined, // Use provided ID if available
         userId,
         workspaceId: workspaceId || null,
@@ -54,10 +63,11 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // 캐시 무효화 (해당 사용자의 모든 캐시 제거)
+    // 캐시 무효화 (해당 사용자 및 워크스페이스의 모든 캐시 제거)
     for (const [key, _] of cache.entries()) {
-      if (key.includes(userId)) {
+      if (key.includes(userId) || (workspaceId && key.includes(workspaceId))) {
         cache.delete(key);
+        console.log('🗑️ Cache invalidated:', key);
       }
     }
 
@@ -75,7 +85,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const jobId = searchParams.get('jobId');
-    const userId = searchParams.get('userId') || 'default-user';
+    const userId = searchParams.get('userId') || 'user-with-settings';
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
     const skip = (page - 1) * limit;
