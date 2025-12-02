@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { XMarkIcon } from '@heroicons/react/24/outline';
+import { MODELS } from '@/lib/models/modelConfig';
 
 interface SettingsDialogProps {
     isOpen: boolean;
@@ -19,6 +20,9 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
     const [activeTab, setActiveTab] = useState<SettingsTab>('general');
     const [formData, setFormData] = useState<StudioSettings>(settings);
     const [isSaving, setIsSaving] = useState(false);
+    
+    // modelConfig에서 RunPod 모델들을 가져오기
+    const runpodModels = MODELS.filter(model => model.api.type === 'runpod');
 
 
     // Sync form data when settings change or dialog opens
@@ -89,7 +93,7 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
             <div className="bg-card w-full max-w-2xl h-[600px] rounded-xl border border-border shadow-2xl overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-border bg-muted/30">
@@ -178,35 +182,16 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                                         <p className="text-xs text-muted-foreground">Map internal model IDs to your specific RunPod Endpoint IDs.</p>
 
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <Label className="text-xs">Wan 2.2 Endpoint ID</Label>
-                                                <Input
-                                                    value={formData.runpod.endpoints['wan22'] || ''}
-                                                    onChange={(e) => updateRunPodEndpoint('wan22', e.target.value)}
-                                                    placeholder="vllm-..."
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label className="text-xs">Wan Animate Endpoint ID</Label>
-                                                <Input
-                                                    value={formData.runpod.endpoints['wan-animate'] || ''}
-                                                    onChange={(e) => updateRunPodEndpoint('wan-animate', e.target.value)}
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label className="text-xs">Flux Krea Endpoint ID</Label>
-                                                <Input
-                                                    value={formData.runpod.endpoints['flux-krea'] || ''}
-                                                    onChange={(e) => updateRunPodEndpoint('flux-krea', e.target.value)}
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label className="text-xs">Infinite Talk Endpoint ID</Label>
-                                                <Input
-                                                    value={formData.runpod.endpoints['infinite-talk'] || ''}
-                                                    onChange={(e) => updateRunPodEndpoint('infinite-talk', e.target.value)}
-                                                />
-                                            </div>
+                                            {runpodModels.map((model) => (
+                                                <div key={model.id} className="space-y-2">
+                                                    <Label className="text-xs">{model.name} Endpoint ID</Label>
+                                                    <Input
+                                                        value={formData.runpod.endpoints[model.id] || ''}
+                                                        onChange={(e) => updateRunPodEndpoint(model.id, e.target.value)}
+                                                        placeholder={`Enter ${model.name} endpoint ID`}
+                                                    />
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                 </div>

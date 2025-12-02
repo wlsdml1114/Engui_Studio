@@ -1,16 +1,20 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStudio } from '@/lib/context/StudioContext';
 import { getModelsByType, getModelById } from '@/lib/models/modelConfig';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PhotoIcon } from '@heroicons/react/24/outline';
 
 export default function ImageGenerationForm() {
-    const { selectedModel, setSelectedModel, settings, addJob } = useStudio();
+    const { selectedModel, setSelectedModel, settings, addJob, activeWorkspaceId } = useStudio();
     const [prompt, setPrompt] = useState('');
     const [showAdvanced, setShowAdvanced] = useState(false);
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string>('');
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const imageModels = getModelsByType('image');
 
@@ -24,15 +28,92 @@ export default function ImageGenerationForm() {
         }
     }, [selectedModel, setSelectedModel, imageModels]);
 
+    // 모델이 변경될 때 이미지 파일 초기화
+    useEffect(() => {
+        setImageFile(null);
+        setPreviewUrl('');
+    }, [selectedModel]);
+
     const currentModel = getModelById(selectedModel || '') || imageModels[0];
 
     const [isGenerating, setIsGenerating] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
+    const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            setImageFile(file);
+            const url = URL.createObjectURL(file);
+            setPreviewUrl(url);
+            
+            // 이미지 로드 후 width와 height 자동 설정
+            const img = new Image();
+            img.onload = () => {
+                // width와 height 입력 필드를 찾아서 값 설정
+                const form = document.querySelector('form');
+                if (form) {
+                    const widthInput = form.elements.namedItem('width') as HTMLInputElement;
+                    const heightInput = form.elements.namedItem('height') as HTMLInputElement;
+                    if (widthInput) widthInput.value = img.width.toString();
+                    if (heightInput) heightInput.value = img.height.toString();
+                }
+                console.log('✅ 이미지 크기 자동 설정:', img.width, 'x', img.height);
+            };
+            img.src = url;
+        }
+    };
+
+    const handleDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        try {
+            const data = e.dataTransfer.getData('application/json');
+            if (data) {
+                const mediaData = JSON.parse(data);
+                if (mediaData.type === 'image' && mediaData.url) {
+                    // Fetch the image from workspace and convert to File
+                    const response = await fetch(mediaData.url);
+                    const blob = await response.blob();
+                    const file = new File([blob], `workspace-${mediaData.id}.png`, { type: 'image/png' });
+                    
+                    setImageFile(file);
+                    setPreviewUrl(mediaData.url);
+                    
+                    // Auto-set dimensions
+                    const img = new Image();
+                    img.onload = () => {
+                        const form = document.querySelector('form');
+                        if (form) {
+                            const widthInput = form.elements.namedItem('width') as HTMLInputElement;
+                            const heightInput = form.elements.namedItem('height') as HTMLInputElement;
+                            if (widthInput) widthInput.value = img.width.toString();
+                            if (heightInput) heightInput.value = img.height.toString();
+                        }
+                    };
+                    img.src = mediaData.url;
+                }
+            }
+        } catch (error) {
+            console.error('Error handling drop:', error);
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setMessage(null);
         if (!prompt) return;
+
+        // 모델이 이미지 입력을 요구하는 경우 이미지 필수 체크
+        if (currentModel.inputs.includes('image') && !imageFile) {
+            setMessage({ type: 'error', text: 'Please upload an image for this model' });
+            return;
+        }
 
         setIsGenerating(true);
 
@@ -41,6 +122,24 @@ export default function ImageGenerationForm() {
             formData.append('userId', 'user-with-settings');
             formData.append('modelId', currentModel.id);
             formData.append('prompt', prompt);
+
+            // 모델이 이미지 입력을 받는 경우 이미지를 base64로 인코딩하여 추가
+            if (currentModel.inputs.includes('image') && imageFile) {
+                const imageBase64 = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const result = reader.result as string;
+                        const base64String = result.split(',')[1];
+                        resolve(base64String);
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(imageFile);
+                });
+                // Use model-specific image input key (default: 'image')
+                const imageKey = currentModel.imageInputKey || 'image';
+                formData.append(imageKey, imageBase64);
+                formData.append('imageName', imageFile.name);
+            }
 
             // Collect dynamic parameters (Basic, Advanced, and Hidden)
             const form = e.target as HTMLFormElement;
@@ -155,6 +254,52 @@ export default function ImageGenerationForm() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Image Upload - 모델이 이미지 입력을 받는 경우 표시 */}
+                {currentModel.inputs.includes('image') && (
+                    <div className="space-y-2">
+                        <Label className="text-xs">Input Image</Label>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            className="hidden"
+                        />
+                        <div
+                            className="w-full p-4 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary transition-colors"
+                            onClick={() => fileInputRef.current?.click()}
+                            onDrop={handleDrop}
+                            onDragOver={handleDragOver}
+                        >
+                            {previewUrl ? (
+                                <div className="space-y-2">
+                                    <img
+                                        src={previewUrl}
+                                        alt="Preview"
+                                        className="max-w-full max-h-48 mx-auto rounded-lg"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setPreviewUrl('');
+                                            setImageFile(null);
+                                        }}
+                                        className="text-xs text-red-400 hover:text-red-300"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="text-center text-muted-foreground">
+                                    <PhotoIcon className="w-8 h-8 mx-auto mb-2" />
+                                    <p className="text-xs">Click to upload image</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 {/* Prompt */}
                 <div className="relative">
                     <textarea

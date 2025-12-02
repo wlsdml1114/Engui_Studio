@@ -223,8 +223,13 @@ export default function RightPanel() {
 
                                     {/* Type Badge */}
                                     {job.type === 'video' && (
-                                        <div className="absolute bottom-0 right-0 bg-black/60 px-1 py-0.5 text-[6px] font-mono text-white/90 uppercase rounded-tl-sm">
+                                        <div className="absolute bottom-0 right-0 bg-purple-500/70 px-1 py-0.5 text-[6px] font-mono text-white uppercase rounded-tl-sm">
                                             VID
+                                        </div>
+                                    )}
+                                    {job.type === 'image' && (
+                                        <div className="absolute bottom-0 right-0 bg-blue-500/70 px-1 py-0.5 text-[6px] font-mono text-white uppercase rounded-tl-sm">
+                                            IMG
                                         </div>
                                     )}
                                 </div>

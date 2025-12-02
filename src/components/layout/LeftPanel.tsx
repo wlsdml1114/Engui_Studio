@@ -36,7 +36,7 @@ export default function LeftPanel() {
     return (
         <div className="flex h-full border-r border-border bg-card">
             {/* Form Area */}
-            <div className="flex-1 flex flex-col min-w-[320px] max-w-[400px] overflow-hidden">
+            <div className="w-[340px] flex flex-col overflow-hidden flex-shrink-0">
                 {/* Header with Logo, Socials, and Settings */}
                 <div className="p-4 border-b border-border flex items-center justify-between gap-3 bg-muted/10">
                     <div className="flex items-center gap-2">

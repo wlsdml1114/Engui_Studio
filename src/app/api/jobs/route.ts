@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       id, // RunPod ID or custom ID
-      userId = 'default-user', // Default user if not provided
+      userId = 'user-with-settings', // Default user if not provided (must match GET default)
       workspaceId,
       type,
       status = 'queued',
@@ -63,13 +63,9 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // 캐시 무효화 (해당 사용자 및 워크스페이스의 모든 캐시 제거)
-    for (const [key, _] of cache.entries()) {
-      if (key.includes(userId) || (workspaceId && key.includes(workspaceId))) {
-        cache.delete(key);
-        console.log('🗑️ Cache invalidated:', key);
-      }
-    }
+    // 캐시 완전 무효화 (모든 캐시 제거)
+    cache.clear();
+    console.log('🗑️ All cache cleared after job creation/update');
 
     return NextResponse.json({ success: true, job }, { status: 201 });
   } catch (error) {

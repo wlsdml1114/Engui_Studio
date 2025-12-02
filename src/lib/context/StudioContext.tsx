@@ -176,20 +176,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     const [selectedKeyframeIds, setSelectedKeyframeIds] = useState<string[]>([]);
     const [exportDialogOpen, setExportDialogOpen] = useState<boolean>(false);
 
-    const [jobs, setJobs] = useState<Job[]>(() => {
-        if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('engui_jobs');
-            return saved ? JSON.parse(saved) : [];
-        }
-        return [];
-    });
-
-    // Persist jobs to localStorage
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('engui_jobs', JSON.stringify(jobs));
-        }
-    }, [jobs]);
+    // Jobs should always come from DB, not localStorage
+    const [jobs, setJobs] = useState<Job[]>([]);
 
     const [settings, setSettings] = useState<StudioSettings>(() => {
         if (typeof window !== 'undefined') {
@@ -378,6 +366,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             if (data.success) {
                 console.log('✅ Fetched jobs:', data.jobs.length, 'jobs');
                 console.log('📊 Job statuses:', data.jobs.map((j: Job) => ({ id: j.id.substring(0, 8), status: j.status, workspaceId: j.workspaceId })));
+                
+                // Simply replace with fetched jobs - server is source of truth
                 setJobs(data.jobs);
             }
         } catch (error) {
@@ -405,8 +395,18 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             });
             const data = await response.json();
             console.log('✅ Job saved to DB:', data);
+            
+            // Update with server response to ensure consistency
+            if (data.success && data.job) {
+                setJobs(prev => prev.map(j => j.id === job.id ? {
+                    ...data.job,
+                    createdAt: new Date(data.job.createdAt).getTime()
+                } : j));
+            }
         } catch (error) {
             console.error('Failed to save job:', error);
+            // Rollback optimistic update on error
+            setJobs(prev => prev.filter(j => j.id !== job.id));
         }
     };
 
@@ -467,12 +467,30 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
             if (activeJobs.length === 0) return;
 
-            // Refresh jobs from DB to get updated status
-            await fetchJobs();
+            // For WAN 2.2 jobs, check DB directly since they update in background
+            const wan22Jobs = activeJobs.filter(job => job.modelId === 'wan22');
+            if (wan22Jobs.length > 0 && activeWorkspaceId) {
+                try {
+                    const response = await fetch(`/api/jobs?workspaceId=${activeWorkspaceId}&limit=50`);
+                    const data = await response.json();
+                    if (data.success) {
+                        // Update only wan22 jobs from DB
+                        wan22Jobs.forEach(wan22Job => {
+                            const updatedJob = data.jobs.find((j: Job) => j.id === wan22Job.id);
+                            if (updatedJob && updatedJob.status !== wan22Job.status) {
+                                console.log(`🔄 WAN 2.2 job ${wan22Job.id} status updated: ${wan22Job.status} → ${updatedJob.status}`);
+                                setJobs(prev => prev.map(j => j.id === wan22Job.id ? updatedJob : j));
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch wan22 job status:', error);
+                }
+            }
 
             for (const job of activeJobs) {
                 try {
-                    // Skip WAN 2.2 jobs - they handle their own status updates in the background
+                    // Skip WAN 2.2 jobs - already handled above
                     if (job.modelId === 'wan22') {
                         continue;
                     }

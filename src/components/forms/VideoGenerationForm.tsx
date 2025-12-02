@@ -12,9 +12,12 @@ export default function VideoGenerationForm() {
     const { selectedModel, setSelectedModel, settings, addJob, activeWorkspaceId } = useStudio();
     const [prompt, setPrompt] = useState('');
     const [imageFile, setImageFile] = useState<File | null>(null);
-    const [previewUrl, setPreviewUrl] = useState<string>('');
+    const [videoFile, setVideoFile] = useState<File | null>(null);
+    const [imagePreviewUrl, setImagePreviewUrl] = useState<string>('');
+    const [videoPreviewUrl, setVideoPreviewUrl] = useState<string>('');
     const [showAdvanced, setShowAdvanced] = useState(false);
-    const [isDragOver, setIsDragOver] = useState(false);
+    const [isDragOverImage, setIsDragOverImage] = useState(false);
+    const [isDragOverVideo, setIsDragOverVideo] = useState(false);
 
     const videoModels = getModelsByType('video');
 
@@ -34,53 +37,106 @@ export default function VideoGenerationForm() {
         const file = e.target.files?.[0];
         if (file) {
             setImageFile(file);
-            setPreviewUrl(URL.createObjectURL(file));
+            setImagePreviewUrl(URL.createObjectURL(file));
+        }
+    };
+
+    const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setVideoFile(file);
+            setVideoPreviewUrl(URL.createObjectURL(file));
         }
     };
 
     const handleRemoveImage = () => {
         setImageFile(null);
-        setPreviewUrl('');
+        setImagePreviewUrl('');
     };
 
-    const handleDrop = async (e: React.DragEvent) => {
+    const handleRemoveVideo = () => {
+        setVideoFile(null);
+        setVideoPreviewUrl('');
+    };
+
+    const handleImageDrop = async (e: React.DragEvent) => {
         e.preventDefault();
-        setIsDragOver(false);
+        setIsDragOverImage(false);
 
         try {
-            // Try to get media data from workspace
             const mediaDataStr = e.dataTransfer.getData('application/json');
             if (mediaDataStr) {
                 const mediaData = JSON.parse(mediaDataStr);
-                // Only accept images for video generation
-                if (mediaData.type === 'image') {
-                    setPreviewUrl(mediaData.url);
-                    // Note: We're using the URL directly, not converting to File
-                    // The form submission will need to handle this case
+                if (mediaData.type === 'image' && mediaData.url) {
+                    const response = await fetch(mediaData.url);
+                    const blob = await response.blob();
+                    const file = new File([blob], `workspace-${mediaData.id}.png`, { type: 'image/png' });
+                    
+                    setImageFile(file);
+                    setImagePreviewUrl(mediaData.url);
                 }
                 return;
             }
 
-            // Handle file drops
             const files = Array.from(e.dataTransfer.files);
             const imageFile = files.find(f => f.type.startsWith('image/'));
             if (imageFile) {
                 setImageFile(imageFile);
-                setPreviewUrl(URL.createObjectURL(imageFile));
+                setImagePreviewUrl(URL.createObjectURL(imageFile));
             }
         } catch (error) {
-            console.error('Failed to handle drop:', error);
+            console.error('Failed to handle image drop:', error);
         }
     };
 
-    const handleDragOver = (e: React.DragEvent) => {
+    const handleVideoDrop = async (e: React.DragEvent) => {
         e.preventDefault();
-        setIsDragOver(true);
+        setIsDragOverVideo(false);
+
+        try {
+            const mediaDataStr = e.dataTransfer.getData('application/json');
+            if (mediaDataStr) {
+                const mediaData = JSON.parse(mediaDataStr);
+                if (mediaData.type === 'video' && mediaData.url) {
+                    const response = await fetch(mediaData.url);
+                    const blob = await response.blob();
+                    const file = new File([blob], `workspace-${mediaData.id}.mp4`, { type: 'video/mp4' });
+                    
+                    setVideoFile(file);
+                    setVideoPreviewUrl(mediaData.url);
+                }
+                return;
+            }
+
+            const files = Array.from(e.dataTransfer.files);
+            const videoFile = files.find(f => f.type.startsWith('video/'));
+            if (videoFile) {
+                setVideoFile(videoFile);
+                setVideoPreviewUrl(URL.createObjectURL(videoFile));
+            }
+        } catch (error) {
+            console.error('Failed to handle video drop:', error);
+        }
     };
 
-    const handleDragLeave = (e: React.DragEvent) => {
+    const handleImageDragOver = (e: React.DragEvent) => {
         e.preventDefault();
-        setIsDragOver(false);
+        setIsDragOverImage(true);
+    };
+
+    const handleImageDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragOverImage(false);
+    };
+
+    const handleVideoDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragOverVideo(true);
+    };
+
+    const handleVideoDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragOverVideo(false);
     };
 
     const [isGenerating, setIsGenerating] = useState(false);
@@ -107,6 +163,10 @@ export default function VideoGenerationForm() {
 
             if (imageFile) {
                 formData.append('image', imageFile);
+            }
+
+            if (videoFile) {
+                formData.append('video', videoFile);
             }
 
             // Collect dynamic parameters (Basic, Advanced, and Hidden)
@@ -161,6 +221,12 @@ export default function VideoGenerationForm() {
             let response;
             if (currentModel.id === 'wan22') {
                 response = await fetch('/api/wan22', {
+                    method: 'POST',
+                    headers: headers,
+                    body: formData,
+                });
+            } else if (currentModel.id === 'wan-animate') {
+                response = await fetch('/api/wan-animate', {
                     method: 'POST',
                     headers: headers,
                     body: formData,
@@ -240,9 +306,9 @@ export default function VideoGenerationForm() {
                 {currentModel.inputs.includes('image') && (
                     <div className="space-y-2">
                         <Label className="text-xs text-muted-foreground font-medium">Image Reference</Label>
-                        {previewUrl ? (
+                        {imagePreviewUrl ? (
                             <div className="relative group rounded-lg overflow-hidden border border-border">
-                                <img src={previewUrl} alt="Reference" className="w-full h-40 object-cover" />
+                                <img src={imagePreviewUrl} alt="Reference" className="w-full h-40 object-cover" />
                                 <button
                                     type="button"
                                     onClick={handleRemoveImage}
@@ -256,11 +322,11 @@ export default function VideoGenerationForm() {
                         ) : (
                             <div 
                                 className={`border border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer relative ${
-                                    isDragOver ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted/20'
+                                    isDragOverImage ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted/20'
                                 }`}
-                                onDrop={handleDrop}
-                                onDragOver={handleDragOver}
-                                onDragLeave={handleDragLeave}
+                                onDrop={handleImageDrop}
+                                onDragOver={handleImageDragOver}
+                                onDragLeave={handleImageDragLeave}
                             >
                                 <input
                                     type="file"
@@ -270,7 +336,50 @@ export default function VideoGenerationForm() {
                                 />
                                 <PhotoIcon className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                                 <span className="text-xs text-muted-foreground">
-                                    {isDragOver ? 'Drop image here' : 'Click or drop image'}
+                                    {isDragOverImage ? 'Drop image here' : 'Click or drop image'}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Video Input (Conditional) */}
+                {currentModel.inputs.includes('video') && (
+                    <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground font-medium">Video Reference</Label>
+                        {videoPreviewUrl ? (
+                            <div className="relative group rounded-lg overflow-hidden border border-border">
+                                <video src={videoPreviewUrl} className="w-full h-40 object-cover" controls />
+                                <button
+                                    type="button"
+                                    onClick={handleRemoveVideo}
+                                    className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 text-white rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                                        <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 001.5.06l.3-7.5z" clipRule="evenodd" />
+                                    </svg>
+                                </button>
+                            </div>
+                        ) : (
+                            <div 
+                                className={`border border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer relative ${
+                                    isDragOverVideo ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted/20'
+                                }`}
+                                onDrop={handleVideoDrop}
+                                onDragOver={handleVideoDragOver}
+                                onDragLeave={handleVideoDragLeave}
+                            >
+                                <input
+                                    type="file"
+                                    accept="video/*"
+                                    onChange={handleVideoUpload}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                />
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 mx-auto mb-2 text-muted-foreground">
+                                    <path strokeLinecap="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+                                </svg>
+                                <span className="text-xs text-muted-foreground">
+                                    {isDragOverVideo ? 'Drop video here' : 'Click or drop video'}
                                 </span>
                             </div>
                         )}
