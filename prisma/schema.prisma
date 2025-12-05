@@ -28,6 +28,11 @@ model Job {
   error         String?   // 에러 메시지 추가
   cost          Float?    // 비용 추가
   completedAt   DateTime?
+  
+  // Media input paths for job input reuse
+  imageInputPath String?  // Path to input image file
+  videoInputPath String?  // Path to input video file
+  audioInputPath String?  // Path to input audio file
 
   // 관계 설정
   workspace     Workspace? @relation("WorkspaceJobs", fields: [workspaceId], references: [id])
@@ -118,10 +123,27 @@ model Workspace {
 
   // 관계 설정
   jobs        Job[]     @relation("WorkspaceJobs")
+  media       WorkspaceMedia[] @relation("WorkspaceMedia")
   
   @@unique([userId, name]) // 사용자별 워크스페이스 이름은 고유해야 함
   @@index([userId])
   @@map("workspaces")
+}
+
+model WorkspaceMedia {
+  id          String    @id @default(uuid())
+  workspaceId String
+  type        String    // 'image' | 'video' | 'audio'
+  url         String
+  prompt      String?
+  modelId     String?
+  createdAt   DateTime  @default(now())
+
+  // 관계 설정
+  workspace   Workspace @relation("WorkspaceMedia", fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@map("workspace_media")
 }
 
 model VideoProject {

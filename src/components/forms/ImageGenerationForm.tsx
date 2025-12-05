@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PhotoIcon } from '@heroicons/react/24/outline';
+import { loadFileFromPath } from '@/lib/fileUtils';
 
 export default function ImageGenerationForm() {
     const { selectedModel, setSelectedModel, settings, addJob, activeWorkspaceId } = useStudio();
@@ -14,7 +15,11 @@ export default function ImageGenerationForm() {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string>('');
+    const [parameterValues, setParameterValues] = useState<Record<string, any>>({});
+    const [isLoadingMedia, setIsLoadingMedia] = useState(false);
+    const [showReuseSuccess, setShowReuseSuccess] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const formRef = useRef<HTMLDivElement>(null);
 
     const imageModels = getModelsByType('image');
 
@@ -28,16 +33,169 @@ export default function ImageGenerationForm() {
         }
     }, [selectedModel, setSelectedModel, imageModels]);
 
+    const currentModel = getModelById(selectedModel || '') || imageModels[0];
+
+    // Initialize parameter values with defaults when model changes
+    useEffect(() => {
+        if (currentModel) {
+            const initialValues: Record<string, any> = {};
+            currentModel.parameters.forEach(param => {
+                if (param.default !== undefined) {
+                    initialValues[param.name] = param.default;
+                }
+            });
+            setParameterValues(initialValues);
+        }
+    }, [selectedModel]);
+
     // 모델이 변경될 때 이미지 파일 초기화
     useEffect(() => {
         setImageFile(null);
         setPreviewUrl('');
     }, [selectedModel]);
 
-    const currentModel = getModelById(selectedModel || '') || imageModels[0];
+    // Handle reuse job input event
+    useEffect(() => {
+        const handleReuseInput = async (event: CustomEvent) => {
+            const { modelId, prompt: jobPrompt, options, type, imageInputPath } = event.detail;
+            
+            // Only handle if it's an image job
+            if (type !== 'image') return;
+
+            console.log('🔄 Reusing image input:', { modelId, prompt: jobPrompt, options, imageInputPath });
+
+            try {
+                setIsLoadingMedia(true);
+
+                // Switch to correct model if different from current
+                if (modelId && modelId !== selectedModel) {
+                    setSelectedModel(modelId);
+                }
+
+                // Set prompt
+                if (jobPrompt) {
+                    setPrompt(jobPrompt);
+                }
+
+                // Parse options safely
+                const parsedOptions = typeof options === 'string' ? JSON.parse(options) : (options || {});
+
+                // Load image file from path if exists
+                const imagePath = imageInputPath || parsedOptions.image_path;
+                if (imagePath) {
+                    console.log('📥 Loading image from path:', imagePath);
+                    const file = await loadFileFromPath(imagePath);
+                    if (file) {
+                        setImageFile(file);
+                        setPreviewUrl(imagePath);
+                        console.log('✅ Image file loaded successfully');
+                    } else {
+                        console.warn('⚠️ Failed to load image file');
+                    }
+                }
+
+                // Apply parameter values in parent-first order
+                // First, collect all parameter values from options
+                const allParamValues: Record<string, any> = {};
+                Object.keys(parsedOptions).forEach(key => {
+                    // Skip internal fields and file paths
+                    if (!key.includes('_path') && key !== 'runpodJobId' && key !== 'error') {
+                        allParamValues[key] = parsedOptions[key];
+                    }
+                });
+
+                // Get model configuration to identify dependencies
+                const model = getModelById(modelId);
+                if (model) {
+                    // Separate parameters into parent and dependent
+                    const parentParams: string[] = [];
+                    const dependentParams: Array<{ name: string; dependsOn: string }> = [];
+                    
+                    model.parameters.forEach(param => {
+                        if (param.dependsOn) {
+                            dependentParams.push({ 
+                                name: param.name, 
+                                dependsOn: param.dependsOn.parameter 
+                            });
+                        } else if (allParamValues[param.name] !== undefined) {
+                            parentParams.push(param.name);
+                        }
+                    });
+
+                    // Apply parent parameters first
+                    const parentValues: Record<string, any> = {};
+                    parentParams.forEach(paramName => {
+                        parentValues[paramName] = allParamValues[paramName];
+                    });
+                    setParameterValues(prev => ({ ...prev, ...parentValues }));
+
+                    // Wait for parent parameters to be applied (next render cycle)
+                    await new Promise(resolve => setTimeout(resolve, 0));
+
+                    // Then apply dependent parameters (only if their conditions are met)
+                    const dependentValues: Record<string, any> = {};
+                    dependentParams.forEach(({ name, dependsOn }) => {
+                        if (allParamValues[name] !== undefined) {
+                            // Find the parameter configuration
+                            const paramConfig = model.parameters.find(p => p.name === name);
+                            if (paramConfig && paramConfig.dependsOn) {
+                                // Check if the dependency condition is met
+                                const parentValue = parentValues[dependsOn] ?? allParamValues[dependsOn];
+                                if (parentValue === paramConfig.dependsOn.value) {
+                                    // Condition met, populate the value
+                                    dependentValues[name] = allParamValues[name];
+                                }
+                                // If condition not met, skip this parameter (Requirement 5.5)
+                            }
+                        }
+                    });
+                    setParameterValues(prev => ({ ...prev, ...dependentValues }));
+                } else {
+                    // Fallback: apply all at once if model not found
+                    setParameterValues(prev => ({ ...prev, ...allParamValues }));
+                }
+
+                console.log('✅ Applied all input values from job in parent-first order');
+
+                // Show success feedback
+                setShowReuseSuccess(true);
+                setTimeout(() => setShowReuseSuccess(false), 3000);
+
+                // Focus the form for user review
+                setTimeout(() => {
+                    if (formRef.current && typeof formRef.current.scrollIntoView === 'function') {
+                        formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }, 100);
+
+            } catch (error) {
+                console.error('Error handling reuse input:', error);
+            } finally {
+                setIsLoadingMedia(false);
+            }
+        };
+
+        window.addEventListener('reuseJobInput', handleReuseInput as any);
+        return () => window.removeEventListener('reuseJobInput', handleReuseInput as any);
+    }, [setSelectedModel, selectedModel]);
 
     const [isGenerating, setIsGenerating] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+    // Handler for parameter changes
+    const handleParameterChange = (paramName: string, value: any) => {
+        setParameterValues(prev => ({
+            ...prev,
+            [paramName]: value
+        }));
+    };
+
+    // Check if a parameter should be visible based on dependsOn
+    const isParameterVisible = (param: any) => {
+        if (!param.dependsOn) return true;
+        const dependentValue = parameterValues[param.dependsOn.parameter];
+        return dependentValue === param.dependsOn.value;
+    };
 
     const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -122,47 +280,32 @@ export default function ImageGenerationForm() {
             formData.append('userId', 'user-with-settings');
             formData.append('modelId', currentModel.id);
             formData.append('prompt', prompt);
-
-            // 모델이 이미지 입력을 받는 경우 이미지를 base64로 인코딩하여 추가
-            if (currentModel.inputs.includes('image') && imageFile) {
-                const imageBase64 = await new Promise<string>((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                        const result = reader.result as string;
-                        const base64String = result.split(',')[1];
-                        resolve(base64String);
-                    };
-                    reader.onerror = reject;
-                    reader.readAsDataURL(imageFile);
-                });
-                // Use model-specific image input key (default: 'image')
-                const imageKey = currentModel.imageInputKey || 'image';
-                formData.append(imageKey, imageBase64);
-                formData.append('imageName', imageFile.name);
+            
+            // Add workspace ID
+            if (activeWorkspaceId) {
+                formData.append('workspaceId', activeWorkspaceId);
             }
 
-            // Collect dynamic parameters (Basic, Advanced, and Hidden)
-            const form = e.target as HTMLFormElement;
+            // 모델이 이미지 입력을 받는 경우 File 객체를 직접 추가
+            if (currentModel.inputs.includes('image') && imageFile) {
+                // Always append as 'image' field - server will handle the key mapping
+                formData.append('image', imageFile);
+                console.log('📤 Appending image file:', imageFile.name, imageFile.size, 'bytes');
+            }
+
+            // Collect dynamic parameters from state
+            // Use parameterValues state to ensure ALL parameters are included,
+            // including conditional ones that may not be currently visible
             currentModel.parameters.forEach(param => {
-                if (param.group === 'hidden') {
-                    // Append hidden parameters directly from default values
-                    if (param.default !== undefined) {
-                        formData.append(param.name, param.default.toString());
-                    }
-                } else {
-                    const input = form.elements.namedItem(param.name) as HTMLInputElement | HTMLSelectElement;
-                    if (input) {
-                        if (input.type === 'checkbox') {
-                            formData.append(param.name, (input as HTMLInputElement).checked.toString());
-                        } else {
-                            formData.append(param.name, input.value);
-                        }
-                    }
+                const value = parameterValues[param.name] ?? param.default;
+                if (value !== undefined && value !== null) {
+                    formData.append(param.name, value.toString());
                 }
             });
 
             // Handle Dimensions
             if (currentModel.capabilities.dimensions?.length) {
+                const form = e.target as HTMLFormElement;
                 const dimInput = form.elements.namedItem('dimensions') as HTMLSelectElement;
                 if (dimInput) formData.append('dimensions', dimInput.value);
             }
@@ -182,20 +325,12 @@ export default function ImageGenerationForm() {
                 headers['X-RunPod-Endpoint-Id'] = endpointId;
             }
 
-            let response;
-            if (currentModel.api.type === 'runpod') {
-                response = await fetch('/api/generate/runpod', {
-                    method: 'POST',
-                    headers: headers,
-                    body: formData,
-                });
-            } else {
-                response = await fetch('/api/generate', {
-                    method: 'POST',
-                    headers: headers,
-                    body: formData,
-                });
-            }
+            // Use unified API route for all models
+            const response = await fetch('/api/generate', {
+                method: 'POST',
+                headers: headers,
+                body: formData,
+            });
 
             const data = await response.json();
 
@@ -229,7 +364,19 @@ export default function ImageGenerationForm() {
     if (!currentModel) return <div>Loading...</div>;
 
     return (
-        <div className="space-y-4 pb-20">
+        <div ref={formRef} className="space-y-4 pb-20">
+            {/* Success Toast */}
+            {showReuseSuccess && (
+                <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 fade-in duration-300">
+                    <div className="bg-green-500/10 border border-green-500/20 text-green-500 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-sm font-medium">Input reused successfully</span>
+                    </div>
+                </div>
+            )}
+            
             {/* Model Selector Card */}
             <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Using</Label>
@@ -267,11 +414,16 @@ export default function ImageGenerationForm() {
                         />
                         <div
                             className="w-full p-4 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary transition-colors"
-                            onClick={() => fileInputRef.current?.click()}
+                            onClick={() => !isLoadingMedia && fileInputRef.current?.click()}
                             onDrop={handleDrop}
                             onDragOver={handleDragOver}
                         >
-                            {previewUrl ? (
+                            {isLoadingMedia ? (
+                                <div className="text-center text-muted-foreground">
+                                    <div className="w-8 h-8 mx-auto mb-2 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                                    <p className="text-xs">Loading media file...</p>
+                                </div>
+                            ) : previewUrl ? (
                                 <div className="space-y-2">
                                     <img
                                         src={previewUrl}
@@ -311,7 +463,7 @@ export default function ImageGenerationForm() {
                 </div>
 
                 {/* Basic Parameters */}
-                {currentModel.parameters.filter(p => p.group === 'basic').map(param => (
+                {currentModel.parameters.filter(p => p.group === 'basic' && isParameterVisible(p)).map(param => (
                     <div key={`${param.name}-${param.default}`} className="space-y-2">
                         <Label className="text-xs">{param.label}</Label>
                         {param.type === 'boolean' ? (
@@ -321,7 +473,8 @@ export default function ImageGenerationForm() {
                                     name={param.name}
                                     id={param.name}
                                     className="rounded border-border"
-                                    defaultChecked={param.default}
+                                    checked={parameterValues[param.name] ?? param.default}
+                                    onChange={(e) => handleParameterChange(param.name, e.target.checked)}
                                 />
                                 <label htmlFor={param.name} className="text-xs text-muted-foreground">Enable</label>
                             </div>
@@ -329,7 +482,8 @@ export default function ImageGenerationForm() {
                             <select
                                 name={param.name}
                                 className="w-full p-2 rounded-md border border-border bg-background text-sm"
-                                defaultValue={param.default}
+                                value={parameterValues[param.name] ?? param.default}
+                                onChange={(e) => handleParameterChange(param.name, e.target.value)}
                             >
                                 {param.options?.map(opt => (
                                     <option key={opt} value={opt} className="bg-zinc-950 text-zinc-100">{opt}</option>
@@ -339,14 +493,16 @@ export default function ImageGenerationForm() {
                             <Input
                                 type="text"
                                 name={param.name}
-                                defaultValue={param.default}
+                                value={parameterValues[param.name] ?? param.default}
+                                onChange={(e) => handleParameterChange(param.name, e.target.value)}
                                 className="h-8 text-sm"
                             />
                         ) : (
                             <Input
                                 type="number"
                                 name={param.name}
-                                defaultValue={param.default}
+                                value={parameterValues[param.name] ?? param.default}
+                                onChange={(e) => handleParameterChange(param.name, parseFloat(e.target.value))}
                                 min={param.min}
                                 max={param.max}
                                 step={param.step}
@@ -390,7 +546,7 @@ export default function ImageGenerationForm() {
                     </button>
 
                     <div className={`space-y-4 animate-in slide-in-from-top-2 duration-200 ${showAdvanced ? '' : 'hidden'}`}>
-                        {currentModel.parameters.filter(p => !p.group || p.group === 'advanced').map(param => (
+                        {currentModel.parameters.filter(p => (!p.group || p.group === 'advanced') && isParameterVisible(p)).map(param => (
                             <div key={`${param.name}-${param.default}`} className="space-y-2">
                                 <Label className="text-xs">{param.label}</Label>
                                 {param.type === 'boolean' ? (
@@ -400,7 +556,8 @@ export default function ImageGenerationForm() {
                                             name={param.name}
                                             id={param.name}
                                             className="rounded border-border"
-                                            defaultChecked={param.default}
+                                            checked={parameterValues[param.name] ?? param.default}
+                                            onChange={(e) => handleParameterChange(param.name, e.target.checked)}
                                         />
                                         <label htmlFor={param.name} className="text-xs text-muted-foreground">Enable</label>
                                     </div>
@@ -408,7 +565,8 @@ export default function ImageGenerationForm() {
                                     <select
                                         name={param.name}
                                         className="w-full p-2 rounded-md border border-border bg-background text-sm"
-                                        defaultValue={param.default}
+                                        value={parameterValues[param.name] ?? param.default}
+                                        onChange={(e) => handleParameterChange(param.name, e.target.value)}
                                     >
                                         {param.options?.map(opt => (
                                             <option key={opt} value={opt} className="bg-zinc-950 text-zinc-100">{opt}</option>
@@ -418,14 +576,16 @@ export default function ImageGenerationForm() {
                                     <Input
                                         type="text"
                                         name={param.name}
-                                        defaultValue={param.default}
+                                        value={parameterValues[param.name] ?? param.default}
+                                        onChange={(e) => handleParameterChange(param.name, e.target.value)}
                                         className="h-8 text-sm"
                                     />
                                 ) : (
                                     <Input
                                         type="number"
                                         name={param.name}
-                                        defaultValue={param.default}
+                                        value={parameterValues[param.name] ?? param.default}
+                                        onChange={(e) => handleParameterChange(param.name, parseFloat(e.target.value))}
                                         min={param.min}
                                         max={param.max}
                                         step={param.step}
@@ -443,15 +603,12 @@ export default function ImageGenerationForm() {
                             {message.text}
                         </div>
                     )}
-                    <p className="text-[10px] text-center text-muted-foreground mb-2">
-                        {currentModel.provider} pricing will be shown after generation
-                    </p>
                     <Button
                         type="submit"
-                        disabled={isGenerating}
+                        disabled={isGenerating || isLoadingMedia}
                         className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold py-2.5"
                     >
-                        {isGenerating ? 'Generating...' : 'Generate'}
+                        {isLoadingMedia ? 'Loading media...' : isGenerating ? 'Generating...' : 'Generate'}
                     </Button>
                 </div>
             </form >

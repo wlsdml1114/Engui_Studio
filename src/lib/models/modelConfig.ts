@@ -25,6 +25,14 @@ export interface ModelParameter {
     };
 }
 
+export interface ConditionalInput {
+    type: ModelInputType;
+    dependsOn?: {
+        parameter: string;
+        value: any;
+    };
+}
+
 export interface ModelConfig {
     id: string;
     name: string;
@@ -49,6 +57,10 @@ export interface ModelConfig {
     // Input field names for API payload
     imageInputKey?: string; // Key name for image input in API payload (default: 'image')
     videoInputKey?: string; // Key name for video input in API payload (default: 'video')
+    audioInputKey?: string; // Key name for audio input in API payload (default: 'audio')
+    
+    // Conditional inputs - for models that accept different input types based on parameters
+    conditionalInputs?: ConditionalInput[];
 }
 
 export const MODELS: ModelConfig[] = [
@@ -64,6 +76,7 @@ export const MODELS: ModelConfig[] = [
             endpoint: 'wan22'
         },
         capabilities: {},
+        imageInputKey: 'image_path',
         parameters: [
             { name: 'width', label: 'Width', type: 'number', default: 768, min: 256, max: 2048, step: 64, group: 'basic' },
             { name: 'height', label: 'Height', type: 'number', default: 512, min: 256, max: 2048, step: 64, group: 'basic' },
@@ -71,6 +84,7 @@ export const MODELS: ModelConfig[] = [
             { name: 'seed', label: 'Seed', type: 'number', default: 42, group: 'advanced' },
             { name: 'cfg', label: 'CFG Scale', type: 'number', default: 1.0, min: 1, max: 20, step: 0.1, group: 'hidden' },
             { name: 'steps', label: 'Steps', type: 'number', default: 6, min: 4, max: 50, group: 'hidden' },
+            { name: 'length', label: 'Length', type: 'number', default: 81, min: 81, max: 161, group: 'advanced' },
         ]
     },
     {
@@ -83,9 +97,9 @@ export const MODELS: ModelConfig[] = [
             type: 'runpod',
             endpoint: 'wan-animate'
         },
-        capabilities: {
-            // dimensions removed to allow manual width/height control
-        },
+        capabilities: {},
+        imageInputKey: 'image_path',
+        videoInputKey: 'video_path',
         parameters: [
             { name: 'mode', label: 'Mode', type: 'select', options: ['replace', 'animate'], default: 'replace', group: 'hidden' },
             { name: 'width', label: 'Width', type: 'number', default: 512, min: 64, max: 2048, step: 64, group: 'basic', validation: { multipleOf: 64 } },
@@ -102,16 +116,22 @@ export const MODELS: ModelConfig[] = [
     {
         id: 'infinite-talk',
         name: 'Infinite Talk',
-        provider: 'Infinite Talk',
+        provider: 'MeiGen',
         type: 'video',
         inputs: ['image', 'video', 'audio'],
         api: {
             type: 'runpod',
             endpoint: 'infinite-talk'
         },
-        capabilities: {
-            // dimensions removed to allow manual width/height control
-        },
+        capabilities: {},
+        imageInputKey: 'image_path',
+        videoInputKey: 'video_path',
+        audioInputKey: 'wav_path',
+        conditionalInputs: [
+            { type: 'image', dependsOn: { parameter: 'input_type', value: 'image' } },
+            { type: 'video', dependsOn: { parameter: 'input_type', value: 'video' } },
+            { type: 'audio' } // Always shown
+        ],
         parameters: [
             { name: 'input_type', label: 'Input Type', type: 'select', options: ['image', 'video'], default: 'image', group: 'basic' },
             { name: 'person_count', label: 'Person Count', type: 'select', options: ['single', 'multi'], default: 'single', group: 'basic' },
@@ -123,40 +143,40 @@ export const MODELS: ModelConfig[] = [
             { name: 'audio2_end', label: 'Audio 2 End (s)', type: 'string', default: '', group: 'advanced', dependsOn: { parameter: 'person_count', value: 'multi' } }
         ]
     },
-    {
-        id: 'google-veo',
-        name: 'Veo',
-        provider: 'Google',
-        type: 'video',
-        inputs: ['text'],
-        api: {
-            type: 'external',
-            endpoint: 'https://api.google.com/veo/generate'
-        },
-        capabilities: {
-            dimensions: ['1920x1080', '1080x1920'],
-            durations: [6, 24]
-        },
-        parameters: []
-    },
-    {
-        id: 'kling',
-        name: 'Kling',
-        provider: 'Kling AI',
-        type: 'video',
-        inputs: ['text', 'image'],
-        api: {
-            type: 'external',
-            endpoint: 'https://api.kling.ai/v1/videos'
-        },
-        capabilities: {
-            dimensions: ['16:9', '9:16', '1:1'],
-            durations: [5, 10]
-        },
-        parameters: [
-            { name: 'mode', label: 'Mode', type: 'select', options: ['Standard', 'Pro'], default: 'Standard', group: 'basic' }
-        ]
-    },
+    // {
+    //     id: 'google-veo',
+    //     name: 'Veo',
+    //     provider: 'Google',
+    //     type: 'video',
+    //     inputs: ['text'],
+    //     api: {
+    //         type: 'external',
+    //         endpoint: 'https://api.google.com/veo/generate'
+    //     },
+    //     capabilities: {
+    //         dimensions: ['1920x1080', '1080x1920'],
+    //         durations: [6, 24]
+    //     },
+    //     parameters: []
+    // },
+    // {
+    //     id: 'kling',
+    //     name: 'Kling',
+    //     provider: 'Kling AI',
+    //     type: 'video',
+    //     inputs: ['text', 'image'],
+    //     api: {
+    //         type: 'external',
+    //         endpoint: 'https://api.kling.ai/v1/videos'
+    //     },
+    //     capabilities: {
+    //         dimensions: ['16:9', '9:16', '1:1'],
+    //         durations: [5, 10]
+    //     },
+    //     parameters: [
+    //         { name: 'mode', label: 'Mode', type: 'select', options: ['Standard', 'Pro'], default: 'Standard', group: 'basic' }
+    //     ]
+    // },
 
     // --- Image Models ---
     {
@@ -192,7 +212,7 @@ export const MODELS: ModelConfig[] = [
             endpoint: 'qwen-image-edit'
         },
         capabilities: {},
-        imageInputKey: 'image_base64', // Qwen expects base64 image with this key name
+        imageInputKey: 'image_path',
         parameters: [
             { name: 'width', label: 'Width', type: 'number', default: 512, min: 256, max: 1920, step: 64, group: 'basic', validation: { multipleOf: 64 } },
             { name: 'height', label: 'Height', type: 'number', default: 512, min: 256, max: 1920, step: 64, group: 'basic', validation: { multipleOf: 64 } },
@@ -313,4 +333,35 @@ export function getVisibleParameters(
         const dependentValue = currentValues[param.dependsOn.parameter];
         return dependentValue === param.dependsOn.value;
     });
+}
+
+/**
+ * Check if an input type should be visible based on conditionalInputs configuration
+ */
+export function isInputVisible(
+    model: ModelConfig,
+    inputType: ModelInputType,
+    currentValues: Record<string, any>
+): boolean {
+    // If no conditionalInputs defined, use default behavior
+    if (!model.conditionalInputs || model.conditionalInputs.length === 0) {
+        return model.inputs.includes(inputType);
+    }
+
+    // Find the conditional input configuration
+    const conditionalInput = model.conditionalInputs.find(ci => ci.type === inputType);
+    
+    // If input type not in conditionalInputs, don't show it
+    if (!conditionalInput) {
+        return false;
+    }
+
+    // If no dependsOn, always show
+    if (!conditionalInput.dependsOn) {
+        return true;
+    }
+
+    // Check if dependent parameter's value matches
+    const dependentValue = currentValues[conditionalInput.dependsOn.parameter];
+    return dependentValue === conditionalInput.dependsOn.value;
 }

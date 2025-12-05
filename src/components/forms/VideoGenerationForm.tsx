@@ -1,23 +1,30 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStudio } from '@/lib/context/StudioContext';
-import { getModelsByType, getModelById } from '@/lib/models/modelConfig';
+import { getModelsByType, getModelById, isInputVisible } from '@/lib/models/modelConfig';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PhotoIcon } from '@heroicons/react/24/outline';
+import { loadFileFromPath } from '@/lib/fileUtils';
 
 export default function VideoGenerationForm() {
     const { selectedModel, setSelectedModel, settings, addJob, activeWorkspaceId } = useStudio();
     const [prompt, setPrompt] = useState('');
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [videoFile, setVideoFile] = useState<File | null>(null);
+    const [audioFile, setAudioFile] = useState<File | null>(null);
+    const [audioFile2, setAudioFile2] = useState<File | null>(null);
     const [imagePreviewUrl, setImagePreviewUrl] = useState<string>('');
     const [videoPreviewUrl, setVideoPreviewUrl] = useState<string>('');
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [isDragOverImage, setIsDragOverImage] = useState(false);
     const [isDragOverVideo, setIsDragOverVideo] = useState(false);
+    const [parameterValues, setParameterValues] = useState<Record<string, any>>({});
+    const [isLoadingMedia, setIsLoadingMedia] = useState(false);
+    const [showReuseSuccess, setShowReuseSuccess] = useState(false);
+    const formRef = useRef<HTMLDivElement>(null);
 
     const videoModels = getModelsByType('video');
 
@@ -32,6 +39,219 @@ export default function VideoGenerationForm() {
     }, [selectedModel, setSelectedModel, videoModels]);
 
     const currentModel = getModelById(selectedModel || '') || videoModels[0];
+
+    // Initialize parameter values with defaults
+    useEffect(() => {
+        if (currentModel) {
+            const initialValues: Record<string, any> = {};
+            currentModel.parameters.forEach(param => {
+                if (param.default !== undefined) {
+                    initialValues[param.name] = param.default;
+                }
+            });
+            setParameterValues(initialValues);
+        }
+    }, [currentModel]);
+
+    // Handle reuse job input event
+    useEffect(() => {
+        console.log('📝 VideoGenerationForm: Registering reuseJobInput event listener');
+        
+        const handleReuseInput = async (event: CustomEvent) => {
+            console.log('📨 VideoGenerationForm: Received reuseJobInput event', event.detail);
+            
+            const { modelId, prompt: jobPrompt, options, type, imageInputPath, videoInputPath, audioInputPath } = event.detail;
+            
+            // Only handle if it's a video job
+            if (type !== 'video') {
+                console.log('⏭️ Skipping: Not a video job, type is', type);
+                return;
+            }
+
+            console.log('🔄 Reusing video input:', { modelId, prompt: jobPrompt, options, imageInputPath, videoInputPath, audioInputPath });
+
+            try {
+                setIsLoadingMedia(true);
+
+                // Switch to correct model if different from current
+                if (modelId && modelId !== selectedModel) {
+                    setSelectedModel(modelId);
+                }
+
+                // Set prompt
+                if (jobPrompt) {
+                    setPrompt(jobPrompt);
+                }
+
+                // Parse options safely
+                const parsedOptions = typeof options === 'string' ? JSON.parse(options) : (options || {});
+                
+                // Apply parameter values in parent-first order
+                // First, collect all parameter values from options
+                const allParamValues: Record<string, any> = {};
+                Object.keys(parsedOptions).forEach(key => {
+                    // Skip file paths and internal fields
+                    if (!key.includes('_path') && key !== 'runpodJobId' && key !== 'error') {
+                        allParamValues[key] = parsedOptions[key];
+                    }
+                });
+
+                // Get model configuration to identify dependencies
+                const model = getModelById(modelId);
+                if (model) {
+                    // Separate parameters into parent and dependent
+                    const parentParams: string[] = [];
+                    const dependentParams: Array<{ name: string; dependsOn: string }> = [];
+                    
+                    model.parameters.forEach(param => {
+                        if (param.dependsOn) {
+                            dependentParams.push({ 
+                                name: param.name, 
+                                dependsOn: param.dependsOn.parameter 
+                            });
+                        } else if (allParamValues[param.name] !== undefined) {
+                            parentParams.push(param.name);
+                        }
+                    });
+
+                    // Apply parent parameters first
+                    const parentValues: Record<string, any> = {};
+                    parentParams.forEach(paramName => {
+                        parentValues[paramName] = allParamValues[paramName];
+                    });
+                    setParameterValues(prev => ({ ...prev, ...parentValues }));
+
+                    // Wait for parent parameters to be applied (next render cycle)
+                    await new Promise(resolve => setTimeout(resolve, 0));
+
+                    // Then apply dependent parameters (only if their conditions are met)
+                    const dependentValues: Record<string, any> = {};
+                    dependentParams.forEach(({ name, dependsOn }) => {
+                        if (allParamValues[name] !== undefined) {
+                            // Find the parameter configuration
+                            const paramConfig = model.parameters.find(p => p.name === name);
+                            if (paramConfig && paramConfig.dependsOn) {
+                                // Check if the dependency condition is met
+                                const parentValue = parentValues[dependsOn] ?? allParamValues[dependsOn];
+                                if (parentValue === paramConfig.dependsOn.value) {
+                                    // Condition met, populate the value
+                                    dependentValues[name] = allParamValues[name];
+                                }
+                                // If condition not met, skip this parameter (Requirement 5.5)
+                            }
+                        }
+                    });
+                    setParameterValues(prev => ({ ...prev, ...dependentValues }));
+                } else {
+                    // Fallback: apply all at once if model not found
+                    setParameterValues(prev => ({ ...prev, ...allParamValues }));
+                }
+
+                // Load image file from path if exists
+                const imagePath = imageInputPath || parsedOptions.image_path;
+                if (imagePath) {
+                    console.log('📥 Loading image from path:', imagePath);
+                    const file = await loadFileFromPath(imagePath);
+                    if (file) {
+                        setImageFile(file);
+                        setImagePreviewUrl(imagePath);
+                        console.log('✅ Image file loaded successfully');
+                    } else {
+                        console.warn('⚠️ Failed to load image file');
+                    }
+                }
+
+                // Load video file from path if exists
+                const videoPath = videoInputPath || parsedOptions.video_path;
+                if (videoPath) {
+                    console.log('📥 Loading video from path:', videoPath);
+                    const file = await loadFileFromPath(videoPath);
+                    if (file) {
+                        setVideoFile(file);
+                        setVideoPreviewUrl(videoPath);
+                        console.log('✅ Video file loaded successfully');
+                    } else {
+                        console.warn('⚠️ Failed to load video file');
+                    }
+                }
+
+                // Load audio file from path if exists
+                const audioPath = audioInputPath || parsedOptions.wav_path || parsedOptions.audio;
+                if (audioPath) {
+                    console.log('📥 Loading audio from path:', audioPath);
+                    const file = await loadFileFromPath(audioPath);
+                    if (file) {
+                        setAudioFile(file);
+                        console.log('✅ Audio file loaded successfully');
+                    } else {
+                        console.warn('⚠️ Failed to load audio file');
+                    }
+                }
+
+                // Load second audio file if exists
+                if (parsedOptions.wav_path_2) {
+                    console.log('📥 Loading second audio from path:', parsedOptions.wav_path_2);
+                    const file = await loadFileFromPath(parsedOptions.wav_path_2);
+                    if (file) {
+                        setAudioFile2(file);
+                        console.log('✅ Second audio file loaded successfully');
+                    } else {
+                        console.warn('⚠️ Failed to load second audio file');
+                    }
+                }
+
+                // Apply all input values from options to form inputs
+                // Wait a tick to ensure model has switched and form has re-rendered
+                setTimeout(() => {
+                    const form = document.querySelector('form');
+                    if (!form) return;
+
+                    // Apply all parameter values
+                    Object.keys(parsedOptions).forEach(key => {
+                        // Skip internal fields and file paths
+                        if (key.includes('_path') || key === 'runpodJobId' || key === 'error') {
+                            return;
+                        }
+
+                        const input = form.elements.namedItem(key) as HTMLInputElement | HTMLSelectElement;
+                        if (input) {
+                            if (input.type === 'checkbox') {
+                                (input as HTMLInputElement).checked = parsedOptions[key] === true || parsedOptions[key] === 'true';
+                            } else if (input.type === 'number') {
+                                input.value = String(parsedOptions[key]);
+                            } else {
+                                input.value = String(parsedOptions[key]);
+                            }
+                        }
+                    });
+
+                    console.log('✅ Applied all input values from job');
+                }, 100);
+
+                // Show success feedback
+                setShowReuseSuccess(true);
+                setTimeout(() => setShowReuseSuccess(false), 3000);
+
+                // Focus the form for user review
+                setTimeout(() => {
+                    if (formRef.current && typeof formRef.current.scrollIntoView === 'function') {
+                        formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }, 100);
+
+            } catch (error) {
+                console.error('Error handling reuse input:', error);
+            } finally {
+                setIsLoadingMedia(false);
+            }
+        };
+
+        window.addEventListener('reuseJobInput', handleReuseInput as any);
+        return () => {
+            console.log('🧹 VideoGenerationForm: Cleaning up reuseJobInput event listener');
+            window.removeEventListener('reuseJobInput', handleReuseInput as any);
+        };
+    }, [setSelectedModel, selectedModel]);
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -57,6 +277,40 @@ export default function VideoGenerationForm() {
     const handleRemoveVideo = () => {
         setVideoFile(null);
         setVideoPreviewUrl('');
+    };
+
+    const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>, isSecondAudio = false) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (isSecondAudio) {
+                setAudioFile2(file);
+            } else {
+                setAudioFile(file);
+            }
+        }
+    };
+
+    const handleRemoveAudio = (isSecondAudio = false) => {
+        if (isSecondAudio) {
+            setAudioFile2(null);
+        } else {
+            setAudioFile(null);
+        }
+    };
+
+    // Update parameter values for conditional rendering
+    const handleParameterChange = (paramName: string, value: any) => {
+        setParameterValues(prev => ({
+            ...prev,
+            [paramName]: value
+        }));
+    };
+
+    // Check if a parameter should be visible based on dependsOn
+    const isParameterVisible = (param: any) => {
+        if (!param.dependsOn) return true;
+        const dependentValue = parameterValues[param.dependsOn.parameter];
+        return dependentValue === param.dependsOn.value;
     };
 
     const handleImageDrop = async (e: React.DragEvent) => {
@@ -169,28 +423,27 @@ export default function VideoGenerationForm() {
                 formData.append('video', videoFile);
             }
 
+            if (audioFile) {
+                formData.append('audio', audioFile);
+            }
+
+            if (audioFile2) {
+                formData.append('audio2', audioFile2);
+            }
+
             // Collect dynamic parameters (Basic, Advanced, and Hidden)
-            const form = e.target as HTMLFormElement;
+            // Use parameterValues state to ensure ALL parameters are included,
+            // including conditional ones that may not be currently visible
             currentModel.parameters.forEach(param => {
-                if (param.group === 'hidden') {
-                    // Append hidden parameters directly from default values
-                    if (param.default !== undefined) {
-                        formData.append(param.name, param.default.toString());
-                    }
-                } else {
-                    const input = form.elements.namedItem(param.name) as HTMLInputElement | HTMLSelectElement;
-                    if (input) {
-                        if (input.type === 'checkbox') {
-                            formData.append(param.name, (input as HTMLInputElement).checked.toString());
-                        } else {
-                            formData.append(param.name, input.value);
-                        }
-                    }
+                const value = parameterValues[param.name] ?? param.default;
+                if (value !== undefined && value !== null) {
+                    formData.append(param.name, value.toString());
                 }
             });
 
             // Handle Dimensions and Duration if supported
             if (currentModel.capabilities.dimensions?.length) {
+                const form = e.target as HTMLFormElement;
                 const dimInput = form.elements.namedItem('dimensions') as HTMLSelectElement;
                 if (dimInput) formData.append('dimensions', dimInput.value);
             }
@@ -218,32 +471,12 @@ export default function VideoGenerationForm() {
                 headers['X-RunPod-Endpoint-Id'] = endpointId;
             }
 
-            let response;
-            if (currentModel.id === 'wan22') {
-                response = await fetch('/api/wan22', {
-                    method: 'POST',
-                    headers: headers,
-                    body: formData,
-                });
-            } else if (currentModel.id === 'wan-animate') {
-                response = await fetch('/api/wan-animate', {
-                    method: 'POST',
-                    headers: headers,
-                    body: formData,
-                });
-            } else if (currentModel.api.type === 'runpod') {
-                response = await fetch('/api/generate/runpod', {
-                    method: 'POST',
-                    headers: headers,
-                    body: formData,
-                });
-            } else {
-                response = await fetch('/api/generate', {
-                    method: 'POST',
-                    headers: headers,
-                    body: formData,
-                });
-            }
+            // Use unified API route for all models
+            const response = await fetch('/api/generate', {
+                method: 'POST',
+                headers: headers,
+                body: formData,
+            });
 
             const data = await response.json();
 
@@ -277,7 +510,19 @@ export default function VideoGenerationForm() {
     if (!currentModel) return <div>Loading...</div>;
 
     return (
-        <div className="space-y-4 pb-20">
+        <div ref={formRef} className="space-y-4 pb-20">
+            {/* Success Toast */}
+            {showReuseSuccess && (
+                <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 fade-in duration-300">
+                    <div className="bg-green-500/10 border border-green-500/20 text-green-500 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-sm font-medium">Input reused successfully</span>
+                    </div>
+                </div>
+            )}
+            
             {/* Model Selector Card */}
             <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Using</Label>
@@ -303,10 +548,15 @@ export default function VideoGenerationForm() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Image Input (Conditional) */}
-                {currentModel.inputs.includes('image') && (
+                {isInputVisible(currentModel, 'image', parameterValues) && (
                     <div className="space-y-2">
                         <Label className="text-xs text-muted-foreground font-medium">Image Reference</Label>
-                        {imagePreviewUrl ? (
+                        {isLoadingMedia ? (
+                            <div className="border border-dashed rounded-lg p-8 text-center">
+                                <div className="w-8 h-8 mx-auto mb-2 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                                <span className="text-xs text-muted-foreground">Loading media files...</span>
+                            </div>
+                        ) : imagePreviewUrl ? (
                             <div className="relative group rounded-lg overflow-hidden border border-border">
                                 <img src={imagePreviewUrl} alt="Reference" className="w-full h-40 object-cover" />
                                 <button
@@ -333,6 +583,7 @@ export default function VideoGenerationForm() {
                                     accept="image/*"
                                     onChange={handleImageUpload}
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    disabled={isLoadingMedia}
                                 />
                                 <PhotoIcon className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                                 <span className="text-xs text-muted-foreground">
@@ -344,7 +595,7 @@ export default function VideoGenerationForm() {
                 )}
 
                 {/* Video Input (Conditional) */}
-                {currentModel.inputs.includes('video') && (
+                {isInputVisible(currentModel, 'video', parameterValues) && (
                     <div className="space-y-2">
                         <Label className="text-xs text-muted-foreground font-medium">Video Reference</Label>
                         {videoPreviewUrl ? (
@@ -386,6 +637,80 @@ export default function VideoGenerationForm() {
                     </div>
                 )}
 
+                {/* Audio Input (Conditional) */}
+                {isInputVisible(currentModel, 'audio', parameterValues) && (
+                    <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground font-medium">Audio {parameterValues['person_count'] === 'multi' ? '1' : ''}</Label>
+                        {audioFile ? (
+                            <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-muted/30">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-muted-foreground">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                                </svg>
+                                <span className="flex-1 text-sm truncate">{audioFile.name}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemoveAudio(false)}
+                                    className="p-1 hover:bg-muted rounded transition-colors"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                                        <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                                    </svg>
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="border border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer relative border-border hover:bg-muted/20">
+                                <input
+                                    type="file"
+                                    accept="audio/*"
+                                    onChange={(e) => handleAudioUpload(e, false)}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                />
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 mx-auto mb-2 text-muted-foreground">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                                </svg>
+                                <span className="text-xs text-muted-foreground">Click or drop audio</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Second Audio Input (Conditional - for multi-person) */}
+                {isInputVisible(currentModel, 'audio', parameterValues) && parameterValues['person_count'] === 'multi' && (
+                    <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground font-medium">Audio 2</Label>
+                        {audioFile2 ? (
+                            <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-muted/30">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-muted-foreground">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                                </svg>
+                                <span className="flex-1 text-sm truncate">{audioFile2.name}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemoveAudio(true)}
+                                    className="p-1 hover:bg-muted rounded transition-colors"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                                        <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                                    </svg>
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="border border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer relative border-border hover:bg-muted/20">
+                                <input
+                                    type="file"
+                                    accept="audio/*"
+                                    onChange={(e) => handleAudioUpload(e, true)}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                />
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 mx-auto mb-2 text-muted-foreground">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                                </svg>
+                                <span className="text-xs text-muted-foreground">Click or drop audio</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Prompt */}
                 {currentModel.inputs.includes('text') && (
                     <div className="relative">
@@ -399,7 +724,7 @@ export default function VideoGenerationForm() {
                 )}
 
                 {/* Basic Parameters */}
-                {currentModel.parameters.filter(p => p.group === 'basic').map(param => (
+                {currentModel.parameters.filter(p => p.group === 'basic' && isParameterVisible(p)).map(param => (
                     <div key={`${param.name}-${param.default}`} className="space-y-2">
                         <Label className="text-xs">{param.label}</Label>
                         {param.type === 'boolean' ? (
@@ -410,6 +735,7 @@ export default function VideoGenerationForm() {
                                     id={param.name}
                                     className="rounded border-border"
                                     defaultChecked={param.default}
+                                    onChange={(e) => handleParameterChange(param.name, e.target.checked)}
                                 />
                                 <label htmlFor={param.name} className="text-xs text-muted-foreground">Enable</label>
                             </div>
@@ -418,6 +744,7 @@ export default function VideoGenerationForm() {
                                 name={param.name}
                                 className="w-full p-2 rounded-md border border-border bg-background text-sm"
                                 defaultValue={param.default}
+                                onChange={(e) => handleParameterChange(param.name, e.target.value)}
                             >
                                 {param.options?.map(opt => (
                                     <option key={opt} value={opt} className="bg-zinc-950 text-zinc-100">{opt}</option>
@@ -429,6 +756,7 @@ export default function VideoGenerationForm() {
                                 name={param.name}
                                 defaultValue={param.default}
                                 className="h-8 text-sm"
+                                onChange={(e) => handleParameterChange(param.name, e.target.value)}
                             />
                         ) : (
                             <Input
@@ -439,6 +767,7 @@ export default function VideoGenerationForm() {
                                 max={param.max}
                                 step={param.step}
                                 className="h-8 text-sm"
+                                onChange={(e) => handleParameterChange(param.name, parseFloat(e.target.value))}
                             />
                         )}
                     </div>
@@ -497,7 +826,7 @@ export default function VideoGenerationForm() {
                         )}
 
                         {/* Advanced Parameters */}
-                        {currentModel.parameters.filter(p => !p.group || p.group === 'advanced').map(param => (
+                        {currentModel.parameters.filter(p => (!p.group || p.group === 'advanced') && isParameterVisible(p)).map(param => (
                             <div key={`${param.name}-${param.default}`} className="space-y-2">
                                 <Label className="text-xs">{param.label}</Label>
                                 {param.type === 'boolean' ? (
@@ -508,6 +837,7 @@ export default function VideoGenerationForm() {
                                             id={param.name}
                                             className="rounded border-border"
                                             defaultChecked={param.default}
+                                            onChange={(e) => handleParameterChange(param.name, e.target.checked)}
                                         />
                                         <label htmlFor={param.name} className="text-xs text-muted-foreground">Enable</label>
                                     </div>
@@ -516,6 +846,7 @@ export default function VideoGenerationForm() {
                                         name={param.name}
                                         className="w-full p-2 rounded-md border border-border bg-background text-sm"
                                         defaultValue={param.default}
+                                        onChange={(e) => handleParameterChange(param.name, e.target.value)}
                                     >
                                         {param.options?.map(opt => (
                                             <option key={opt} value={opt} className="bg-zinc-950 text-zinc-100">{opt}</option>
@@ -527,6 +858,7 @@ export default function VideoGenerationForm() {
                                         name={param.name}
                                         defaultValue={param.default}
                                         className="h-8 text-sm"
+                                        onChange={(e) => handleParameterChange(param.name, e.target.value)}
                                     />
                                 ) : (
                                     <Input
@@ -537,6 +869,7 @@ export default function VideoGenerationForm() {
                                         max={param.max}
                                         step={param.step}
                                         className="h-8 text-sm"
+                                        onChange={(e) => handleParameterChange(param.name, parseFloat(e.target.value))}
                                     />
                                 )}
                             </div>
@@ -550,15 +883,12 @@ export default function VideoGenerationForm() {
                             {message.text}
                         </div>
                     )}
-                    <p className="text-[10px] text-center text-muted-foreground mb-2">
-                        {currentModel.provider} pricing will be shown after generation
-                    </p>
                     <Button
                         type="submit"
-                        disabled={isGenerating}
+                        disabled={isGenerating || isLoadingMedia}
                         className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold py-2.5"
                     >
-                        {isGenerating ? 'Generating...' : 'Generate'}
+                        {isLoadingMedia ? 'Loading media...' : isGenerating ? 'Generating...' : 'Generate'}
                     </Button>
                 </div>
             </form >

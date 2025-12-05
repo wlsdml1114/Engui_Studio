@@ -13,7 +13,7 @@ interface SettingsDialogProps {
     onClose: () => void;
 }
 
-type SettingsTab = 'general' | 'runpod' | 'storage';
+type SettingsTab = 'general' | 'runpod' | 'upscale' | 'storage';
 
 export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
     const { settings, updateSettings } = useStudio();
@@ -92,6 +92,13 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
         }));
     };
 
+    const updateUpscaleEndpoint = (key: keyof StudioSettings['upscale'], value: string) => {
+        setFormData(prev => ({
+            ...prev,
+            upscale: { ...prev.upscale, [key]: value }
+        }));
+    };
+
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
             <div className="bg-card w-full max-w-2xl h-[600px] rounded-xl border border-border shadow-2xl overflow-hidden flex flex-col">
@@ -118,6 +125,12 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                             className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'runpod' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'}`}
                         >
                             RunPod Config
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('upscale')}
+                            className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'upscale' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'}`}
+                        >
+                            Upscale Endpoints
                         </button>
                         <button
                             onClick={() => setActiveTab('storage')}
@@ -192,6 +205,31 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                                                     />
                                                 </div>
                                             ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'upscale' && (
+                            <div className="space-y-6">
+                                <div className="space-y-4">
+                                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Upscale Endpoint</h3>
+                                    <p className="text-sm text-muted-foreground">
+                                        Configure RunPod endpoint for image and video upscaling. This endpoint handles all upscale types (image, video, and frame interpolation).
+                                    </p>
+                                    
+                                    <div className="space-y-4 mt-4">
+                                        <div className="space-y-2">
+                                            <Label>Upscale Endpoint ID</Label>
+                                            <Input
+                                                value={formData.upscale?.endpoint || ''}
+                                                onChange={(e) => updateUpscaleEndpoint('endpoint', e.target.value)}
+                                                placeholder="Enter upscale endpoint ID"
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                RunPod endpoint that handles image upscaling, video upscaling, and frame interpolation
+                                            </p>
                                         </div>
                                     </div>
                                 </div>

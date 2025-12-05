@@ -25,6 +25,9 @@ export interface StudioSettings {
     runpod: {
         endpoints: Record<string, string>; // modelId -> endpointId
     };
+    upscale: {
+        endpoint?: string; // Unified upscale endpoint (handles image, video, and frame interpolation)
+    };
     storage: {
         endpointUrl?: string;
         bucket?: string;
@@ -53,6 +56,16 @@ export interface Job {
     endpointId?: string;
     cost?: number;
     workspaceId?: string;
+}
+
+export interface WorkspaceMedia {
+    id: string;
+    workspaceId: string;
+    type: 'image' | 'video' | 'audio';
+    url: string;
+    prompt?: string;
+    modelId?: string;
+    createdAt: number;
 }
 
 // Video Editor Types
@@ -113,10 +126,12 @@ interface StudioContextType {
     addJob: (job: Job) => void;
     updateJobStatus: (id: string, status: Job['status'], resultUrl?: string, error?: string, cost?: number) => void;
     deleteJob: (id: string) => void;
+    reuseJobInput: (jobId: string) => void;
 
     // Workspaces
     workspaces: Workspace[];
     activeWorkspaceId: string | null;
+    workspaceMedia: WorkspaceMedia[];
     createWorkspace: (name: string) => Promise<void>;
     selectWorkspace: (id: string) => void;
     deleteWorkspace: (id: string) => Promise<void>;
@@ -163,6 +178,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     // Workspace State
     const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
     const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
+    const [workspaceMedia, setWorkspaceMedia] = useState<WorkspaceMedia[]>([]);
 
     // Video Editor State
     const [currentProject, setCurrentProject] = useState<VideoProject | null>(null);
@@ -361,11 +377,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
         try {
             console.log('🔄 Fetching jobs for workspace:', activeWorkspaceId);
-            const response = await fetch(`/api/jobs?workspaceId=${activeWorkspaceId}&limit=50`);
+            // Fetch jobs filtered by workspaceId
+            const response = await fetch(`/api/jobs?userId=user-with-settings&workspaceId=${activeWorkspaceId}&limit=50`);
             const data = await response.json();
             if (data.success) {
-                console.log('✅ Fetched jobs:', data.jobs.length, 'jobs');
-                console.log('📊 Job statuses:', data.jobs.map((j: Job) => ({ id: j.id.substring(0, 8), status: j.status, workspaceId: j.workspaceId })));
+                console.log('✅ Fetched jobs:', data.jobs.length, 'jobs for workspace:', activeWorkspaceId);
+                console.log('📊 Job statuses:', data.jobs.map((j: Job) => ({ id: j.id.substring(0, 8), status: j.status, resultUrl: j.resultUrl ? '✓' : '✗' })));
                 
                 // Simply replace with fetched jobs - server is source of truth
                 setJobs(data.jobs);
@@ -381,6 +398,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         console.log('➕ Adding job:', {
             jobId: job.id,
             workspaceId: activeWorkspaceId,
+            assignedWorkspaceId: jobWithWorkspace.workspaceId,
             status: job.status
         });
 
@@ -411,10 +429,42 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     };
 
     const updateJobStatus = async (id: string, status: Job['status'], resultUrl?: string, error?: string, cost?: number) => {
+        // Find the job to get its details
+        const job = jobs.find(j => j.id === id);
+        
         // Optimistic update
         setJobs(prev => prev.map(job =>
             job.id === id ? { ...job, status, resultUrl, error, cost } : job
         ));
+
+        // If job completed successfully with a result, add to workspace media
+        if (status === 'completed' && resultUrl && job && activeWorkspaceId) {
+            console.log(`✅ Job ${id} completed, adding to workspace media:`, resultUrl);
+            
+            const newMedia: WorkspaceMedia = {
+                id: `media-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                workspaceId: activeWorkspaceId,
+                type: job.type,
+                url: resultUrl,
+                prompt: job.prompt,
+                modelId: job.modelId,
+                createdAt: Date.now(),
+            };
+
+            setWorkspaceMedia(prev => [...prev, newMedia]);
+
+            // Save to database
+            try {
+                await fetch('/api/workspace-media', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newMedia)
+                });
+                console.log(`💾 Media saved to workspace: ${newMedia.id}`);
+            } catch (err) {
+                console.error('Failed to save media to workspace:', err);
+            }
+        }
 
         try {
             await fetch(`/api/jobs/${id}`, {
@@ -440,13 +490,124 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    const reuseJobInput = async (jobId: string) => {
+        const job = jobs.find(j => j.id === jobId);
+        if (!job) {
+            console.warn('Job not found:', jobId);
+            return;
+        }
+
+        console.log('🔄 Reusing job input:', job);
+        
+        // Set the model
+        setSelectedModel(job.modelId);
+
+        // Fetch full job details from API to get options and media paths
+        try {
+            const response = await fetch(`/api/jobs/${jobId}`);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch job: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.success && data.job) {
+                // Parse options JSON safely with error handling
+                let options = {};
+                try {
+                    options = typeof data.job.options === 'string' 
+                        ? JSON.parse(data.job.options) 
+                        : (data.job.options || {});
+                } catch (parseError) {
+                    console.error('Failed to parse job options:', parseError);
+                    options = {};
+                }
+
+                console.log('📋 Job options:', options);
+                console.log('📁 Media paths:', {
+                    image: data.job.imageInputPath,
+                    video: data.job.videoInputPath,
+                    audio: data.job.audioInputPath
+                });
+
+                // Dispatch custom event with complete job data including media paths
+                // Add a small delay to allow LeftPanel to switch tabs and mount the correct form
+                if (typeof window !== 'undefined') {
+                    console.log('⏰ Scheduling reuseJobInput event dispatch in 100ms...');
+                    setTimeout(() => {
+                        try {
+                            console.log('📤 Dispatching reuseJobInput event:', {
+                                modelId: job.modelId,
+                                type: job.type,
+                                hasOptions: !!options,
+                                imageInputPath: data.job.imageInputPath,
+                                videoInputPath: data.job.videoInputPath,
+                                audioInputPath: data.job.audioInputPath
+                            });
+                            window.dispatchEvent(new CustomEvent('reuseJobInput', {
+                                detail: {
+                                    modelId: job.modelId,
+                                    prompt: job.prompt,
+                                    type: job.type,
+                                    options: options,
+                                    imageInputPath: data.job.imageInputPath,
+                                    videoInputPath: data.job.videoInputPath,
+                                    audioInputPath: data.job.audioInputPath
+                                }
+                            }));
+                            console.log('✅ Event dispatched successfully');
+                        } catch (eventError) {
+                            console.error('Failed to dispatch reuseJobInput event:', eventError);
+                        }
+                    }, 100);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to fetch job details:', error);
+            // Fallback to basic reuse without options
+            // Add a small delay to allow LeftPanel to switch tabs and mount the correct form
+            if (typeof window !== 'undefined') {
+                setTimeout(() => {
+                    try {
+                        window.dispatchEvent(new CustomEvent('reuseJobInput', {
+                            detail: {
+                                modelId: job.modelId,
+                                prompt: job.prompt,
+                                type: job.type,
+                                options: {}
+                            }
+                        }));
+                    } catch (eventError) {
+                        console.error('Failed to dispatch fallback reuseJobInput event:', eventError);
+                    }
+                }, 100);
+            }
+        }
+    };
+
     // Initial Load
     useEffect(() => {
         console.log('🚀 StudioContext: Initial load, fetching workspaces...');
         fetchWorkspaces();
     }, []);
 
-    // Fetch jobs when workspace changes
+    // Fetch workspace media
+    const fetchWorkspaceMedia = async () => {
+        if (!activeWorkspaceId) return;
+
+        try {
+            const response = await fetch(`/api/workspace-media?workspaceId=${activeWorkspaceId}`);
+            const data = await response.json();
+            if (data.success) {
+                console.log(`📚 Loaded ${data.media.length} media items for workspace ${activeWorkspaceId}`);
+                setWorkspaceMedia(data.media);
+            }
+        } catch (error) {
+            console.error('Failed to fetch workspace media:', error);
+        }
+    };
+
+    // Fetch jobs and media when workspace changes
     useEffect(() => {
         console.log('🔄 Workspace changed:', activeWorkspaceId);
         if (activeWorkspaceId) {
@@ -455,6 +616,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                 localStorage.setItem('activeWorkspaceId', activeWorkspaceId);
             }
             fetchJobs();
+            fetchWorkspaceMedia();
         } else {
             console.warn('⚠️ No active workspace ID set');
         }
@@ -467,45 +629,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
             if (activeJobs.length === 0) return;
 
-            // For WAN 2.2 jobs, check DB directly since they update in background
-            const wan22Jobs = activeJobs.filter(job => job.modelId === 'wan22');
-            if (wan22Jobs.length > 0 && activeWorkspaceId) {
-                try {
-                    const response = await fetch(`/api/jobs?workspaceId=${activeWorkspaceId}&limit=50`);
-                    const data = await response.json();
-                    if (data.success) {
-                        // Update only wan22 jobs from DB
-                        wan22Jobs.forEach(wan22Job => {
-                            const updatedJob = data.jobs.find((j: Job) => j.id === wan22Job.id);
-                            if (updatedJob && updatedJob.status !== wan22Job.status) {
-                                console.log(`🔄 WAN 2.2 job ${wan22Job.id} status updated: ${wan22Job.status} → ${updatedJob.status}`);
-                                setJobs(prev => prev.map(j => j.id === wan22Job.id ? updatedJob : j));
-                            }
-                        });
-                    }
-                } catch (error) {
-                    console.error('Failed to fetch wan22 job status:', error);
-                }
-            }
-
+            // Check all active jobs using unified status API
             for (const job of activeJobs) {
                 try {
-                    // Skip WAN 2.2 jobs - already handled above
-                    if (job.modelId === 'wan22') {
-                        continue;
-                    }
 
-                    // Use stored endpointId or fallback
-                    const endpointId = job.endpointId || settings.runpod.endpoints[job.modelId];
-
-                    if (!settings.apiKeys.runpod || !endpointId) continue;
-
-                    const response = await fetch(`/api/generate/status?jobId=${job.id}`, {
-                        headers: {
-                            'X-RunPod-Key': settings.apiKeys.runpod,
-                            'X-RunPod-Endpoint-Id': endpointId
-                        }
-                    });
+                    // Use unified status API (no headers needed)
+                    const response = await fetch(`/api/generate/status?jobId=${job.id}&userId=user-with-settings`);
 
                     const data = await response.json();
 
@@ -522,8 +651,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                             } else if (typeof data.output === 'string') {
                                 resultUrl = data.output;
                             } else if (typeof data.output === 'object') {
-                                // Common patterns
-                                if (data.output.image) resultUrl = data.output.image;
+                                // Common patterns - check S3 paths first
+                                if (data.output.s3_path) resultUrl = data.output.s3_path;
+                                else if (data.output.output_path) resultUrl = data.output.output_path;
+                                else if (data.output.image_path) resultUrl = data.output.image_path;
+                                else if (data.output.video_path) resultUrl = data.output.video_path;
+                                else if (data.output.image) resultUrl = data.output.image;
                                 else if (data.output.image_url) resultUrl = data.output.image_url;
                                 else if (data.output.video) resultUrl = data.output.video;
                                 else if (data.output.video_url) resultUrl = data.output.video_url;
@@ -890,10 +1023,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             addJob,
             updateJobStatus,
             deleteJob,
+            reuseJobInput,
 
             // Workspaces
             workspaces,
             activeWorkspaceId,
+            workspaceMedia,
             createWorkspace,
             selectWorkspace,
             deleteWorkspace,

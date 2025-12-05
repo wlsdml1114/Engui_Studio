@@ -127,21 +127,9 @@ export function JobDetailsDialog({ job, open, onOpenChange }: JobDetailsDialogPr
                                     </div>
                                 </div>
                                 <div className="space-y-1">
-                                    <span className="text-xs text-muted-foreground">Cost</span>
-                                    <div className="text-sm font-medium">
-                                        {job.cost !== undefined && job.cost !== null ? `$${job.cost.toFixed(4)}` : '-'}
-                                    </div>
-                                </div>
-                                <div className="space-y-1">
                                     <span className="text-xs text-muted-foreground">Created</span>
                                     <div className="text-sm font-medium">
                                         {new Date(job.createdAt).toLocaleTimeString()}
-                                    </div>
-                                </div>
-                                <div className="space-y-1">
-                                    <span className="text-xs text-muted-foreground">Dimensions</span>
-                                    <div className="text-sm font-medium">
-                                        -
                                     </div>
                                 </div>
                             </div>

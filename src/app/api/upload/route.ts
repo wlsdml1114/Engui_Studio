@@ -29,14 +29,17 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes);
     await writeFile(filepath, buffer);
 
-    // Return the public URL
+    // Return the public URL and file path
     const url = `/results/${filename}`;
+    const filePath = filepath;
     
     console.log(`✅ File uploaded: ${filename}`);
+    console.log(`📁 File path: ${filePath}`);
 
     return NextResponse.json({
       success: true,
       url,
+      filePath,
       filename,
       originalName: file.name,
       size: file.size,

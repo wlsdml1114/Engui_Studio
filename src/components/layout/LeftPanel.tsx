@@ -33,6 +33,43 @@ export default function LeftPanel() {
     const [generationMode, setGenerationMode] = useState<GenerationMode>('image');
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
+    // Listen for job reuse events and switch to appropriate tab
+    React.useEffect(() => {
+        const handleReuseInput = (event: CustomEvent) => {
+            const { type, _redispatched } = event.detail;
+            
+            // Ignore re-dispatched events to prevent infinite loop
+            if (_redispatched) {
+                return;
+            }
+            
+            console.log('🎯 LeftPanel received reuseJobInput event, type:', type);
+            
+            if (type === 'video') {
+                setGenerationMode('video');
+                // Re-dispatch event after tab switch to ensure form is mounted
+                setTimeout(() => {
+                    console.log('🔄 Re-dispatching event after tab switch');
+                    window.dispatchEvent(new CustomEvent('reuseJobInput', { 
+                        detail: { ...event.detail, _redispatched: true }
+                    }));
+                }, 150);
+            } else if (type === 'image') {
+                setGenerationMode('image');
+                // Re-dispatch event after tab switch to ensure form is mounted
+                setTimeout(() => {
+                    console.log('🔄 Re-dispatching event after tab switch');
+                    window.dispatchEvent(new CustomEvent('reuseJobInput', { 
+                        detail: { ...event.detail, _redispatched: true }
+                    }));
+                }, 150);
+            }
+        };
+
+        window.addEventListener('reuseJobInput', handleReuseInput as any);
+        return () => window.removeEventListener('reuseJobInput', handleReuseInput as any);
+    }, []);
+
     return (
         <div className="flex h-full border-r border-border bg-card">
             {/* Form Area */}

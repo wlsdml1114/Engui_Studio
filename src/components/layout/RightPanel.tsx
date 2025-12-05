@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export default function RightPanel() {
-    const { jobs, workspaces, activeWorkspaceId, selectWorkspace, createWorkspace, deleteJob } = useStudio();
+    const { jobs, workspaces, activeWorkspaceId, selectWorkspace, createWorkspace, deleteJob, reuseJobInput } = useStudio();
     const [selectedJob, setSelectedJob] = useState<Job | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [filter, setFilter] = useState<'all' | 'image' | 'video'>('all');
@@ -120,7 +120,7 @@ export default function RightPanel() {
                                     <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" className="w-[280px]">
+                            <DropdownMenuContent align="start" className="w-[280px] bg-[#1a1a2e]/95 backdrop-blur-md border-white/10">
                                 <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Switch Workspace</DropdownMenuLabel>
                                 {workspaces.map(ws => (
                                     <DropdownMenuItem key={ws.id} onClick={() => selectWorkspace(ws.id)} className="justify-between">
@@ -255,18 +255,123 @@ export default function RightPanel() {
                                             {timeAgo(job.createdAt)}
                                         </span>
                                         <div className="flex items-center gap-2">
-                                            {job.status === 'failed' ? (
+                                            {job.status === 'failed' && (
                                                 <span className="text-[9px] text-red-500 font-medium">Failed</span>
-                                            ) : (job.cost !== undefined && job.cost !== null) ? (
-                                                <span className="text-[10px] font-mono text-green-500/90 font-medium">
-                                                    ${job.cost.toFixed(4)}
-                                                </span>
-                                            ) : null}
+                                            )}
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Delete Button (Hover) */}
+                                {/* Action Buttons (Bottom Right - Hover) */}
+                                {job.status === 'completed' && job.resultUrl && (
+                                    <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                                        <div className="relative group/tooltip">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    reuseJobInput(job.id);
+                                                }}
+                                                className="p-1.5 text-muted-foreground/70 hover:text-primary hover:bg-primary/10 rounded-md transition-colors shadow-sm bg-background/80 backdrop-blur-sm border border-border/50"
+                                                aria-label="Reuse all inputs from this generation"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                                                    <path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clipRule="evenodd" />
+                                                </svg>
+                                            </button>
+                                            {/* Tooltip */}
+                                            <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-popover text-popover-foreground text-[10px] rounded shadow-lg border border-border whitespace-nowrap opacity-0 group-hover/tooltip:opacity-100 transition-opacity pointer-events-none">
+                                                Reuse inputs
+                                                <div className="absolute top-full right-2 -mt-px w-2 h-2 bg-popover border-r border-b border-border transform rotate-45"></div>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Upscale Button */}
+                                        <div className="relative group/tooltip">
+                                            <button
+                                                onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    try {
+                                                        const response = await fetch('/api/upscale', {
+                                                            method: 'POST',
+                                                            headers: { 'Content-Type': 'application/json' },
+                                                            body: JSON.stringify({
+                                                                jobId: job.id,
+                                                                type: job.type
+                                                            })
+                                                        });
+                                                        const data = await response.json();
+                                                        if (data.success) {
+                                                            console.log('Upscale job created:', data.job.id);
+                                                            // Refresh jobs list
+                                                            window.location.reload();
+                                                        } else {
+                                                            alert(`Failed to create upscale job: ${data.error}`);
+                                                        }
+                                                    } catch (error) {
+                                                        console.error('Error creating upscale job:', error);
+                                                        alert('Failed to create upscale job');
+                                                    }
+                                                }}
+                                                className="p-1.5 text-muted-foreground/70 hover:text-green-500 hover:bg-green-500/10 rounded-md transition-colors shadow-sm bg-background/80 backdrop-blur-sm border border-border/50"
+                                                aria-label={`Upscale ${job.type}`}
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                                                    <path d="M10 3.75a2 2 0 10-4 0 2 2 0 004 0zM17.25 4.5a.75.75 0 000-1.5h-5.5a.75.75 0 000 1.5h5.5zM5 3.75a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5a.75.75 0 01.75.75zM4.25 17a.75.75 0 000-1.5h-1.5a.75.75 0 000 1.5h1.5zM17.25 17a.75.75 0 000-1.5h-5.5a.75.75 0 000 1.5h5.5zM9 10a.75.75 0 01.75-.75h5.5a.75.75 0 010 1.5h-5.5A.75.75 0 019 10zM4.25 10.75a.75.75 0 000-1.5h-1.5a.75.75 0 000 1.5h1.5zM10 16.25a2 2 0 10-4 0 2 2 0 004 0zM10 10a2 2 0 10-4 0 2 2 0 004 0z" />
+                                                </svg>
+                                            </button>
+                                            {/* Tooltip */}
+                                            <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-popover text-popover-foreground text-[10px] rounded shadow-lg border border-border whitespace-nowrap opacity-0 group-hover/tooltip:opacity-100 transition-opacity pointer-events-none">
+                                                Upscale
+                                                <div className="absolute top-full right-2 -mt-px w-2 h-2 bg-popover border-r border-b border-border transform rotate-45"></div>
+                                            </div>
+                                        </div>
+
+                                        {/* Upscale + Frame Interpolation Button (Video only) */}
+                                        {job.type === 'video' && (
+                                            <div className="relative group/tooltip">
+                                                <button
+                                                    onClick={async (e) => {
+                                                        e.stopPropagation();
+                                                        try {
+                                                            const response = await fetch('/api/upscale', {
+                                                                method: 'POST',
+                                                                headers: { 'Content-Type': 'application/json' },
+                                                                body: JSON.stringify({
+                                                                    jobId: job.id,
+                                                                    type: 'video-interpolation'
+                                                                })
+                                                            });
+                                                            const data = await response.json();
+                                                            if (data.success) {
+                                                                console.log('Upscale + FI job created:', data.job.id);
+                                                                // Refresh jobs list
+                                                                window.location.reload();
+                                                            } else {
+                                                                alert(`Failed to create upscale job: ${data.error}`);
+                                                            }
+                                                        } catch (error) {
+                                                            console.error('Error creating upscale job:', error);
+                                                            alert('Failed to create upscale job');
+                                                        }
+                                                    }}
+                                                    className="p-1.5 text-muted-foreground/70 hover:text-purple-500 hover:bg-purple-500/10 rounded-md transition-colors shadow-sm bg-background/80 backdrop-blur-sm border border-border/50"
+                                                    aria-label="Upscale + Frame Interpolation"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                                                        <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+                                                    </svg>
+                                                </button>
+                                                {/* Tooltip */}
+                                                <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-popover text-popover-foreground text-[10px] rounded shadow-lg border border-border whitespace-nowrap opacity-0 group-hover/tooltip:opacity-100 transition-opacity pointer-events-none">
+                                                    Upscale + Frame Interpolation
+                                                    <div className="absolute top-full right-2 -mt-px w-2 h-2 bg-popover border-r border-b border-border transform rotate-45"></div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Delete Button (Top Right - Hover) */}
                                 <button
                                     onClick={(e) => handleDeleteJob(e, job.id)}
                                     className="absolute top-2 right-2 p-1.5 text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/10 rounded-md opacity-0 group-hover:opacity-100 transition-all"
