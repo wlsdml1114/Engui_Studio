@@ -81,21 +81,52 @@ class RunPodService {
         };
 
       case 'wan22':
-        return {
-          input: {
-            prompt: input.prompt,
-            image_path: input.image_path,
-            width: input.width,
-            height: input.height,
-            seed: input.seed,
-            cfg: input.cfg,
-            length: input.length,
-            steps: input.steps,
-            context_overlap: input.context_overlap,
-            ...(input.end_image_path && { end_image_path: input.end_image_path }),
-            ...(input.lora_pairs && { lora_pairs: input.lora_pairs })
-          }
+        const wan22Input: Record<string, any> = {
+          prompt: input.prompt,
+          image_path: input.image_path,
+          width: input.width,
+          height: input.height,
+          seed: input.seed,
+          cfg: input.cfg,
+          length: input.length,
+          steps: input.steps,
+          context_overlap: input.context_overlap,
+          ...(input.end_image_path && { end_image_path: input.end_image_path })
         };
+
+        // Build lora_pairs array from individual LoRA parameters
+        const loraPairs: Array<{high: string, low: string, high_weight: number, low_weight: number}> = [];
+        
+        for (let i = 1; i <= 4; i++) {
+          const highKey = `lora_high_${i}`;
+          const lowKey = `lora_low_${i}`;
+          const highWeightKey = `lora_high_${i}_weight`;
+          const lowWeightKey = `lora_low_${i}_weight`;
+          
+          const highPath = input[highKey];
+          const lowPath = input[lowKey];
+          
+          // Only add pair if both high and low are provided
+          if (highPath && lowPath) {
+            // Extract filename from path (remove /runpod-volume/loras/ prefix)
+            const highFilename = highPath.replace(/^\/runpod-volume\/loras\//, '');
+            const lowFilename = lowPath.replace(/^\/runpod-volume\/loras\//, '');
+            
+            loraPairs.push({
+              high: highFilename,
+              low: lowFilename,
+              high_weight: input[highWeightKey] ?? 1.0,
+              low_weight: input[lowWeightKey] ?? 1.0
+            });
+          }
+        }
+        
+        // Only add lora_pairs if we have at least one pair
+        if (loraPairs.length > 0) {
+          wan22Input.lora_pairs = loraPairs;
+        }
+        
+        return { input: wan22Input };
 
       case 'wan-animate':
         return {

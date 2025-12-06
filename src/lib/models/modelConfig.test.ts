@@ -136,7 +136,7 @@ describe('Property 1: Model Configuration Completeness', () => {
     // Check required fields
     expect(model!.id).toBe('infinite-talk');
     expect(model!.name).toBe('Infinite Talk');
-    expect(model!.provider).toBe('Infinite Talk');
+    expect(model!.provider).toBe('MeiGen');
     expect(model!.type).toBe('video');
     expect(model!.inputs).toContain('image');
     expect(model!.inputs).toContain('video');
@@ -276,8 +276,7 @@ describe('Property 2: Parameter Group Assignment Validity', () => {
     const advancedParams = model!.parameters.filter(p => p.group === 'advanced').map(p => p.name);
     const hiddenParams = model!.parameters.filter(p => p.group === 'hidden').map(p => p.name);
     
-    // Basic: mode, width, height
-    expect(basicParams).toContain('mode');
+    // Basic: width, height (mode is hidden)
     expect(basicParams).toContain('width');
     expect(basicParams).toContain('height');
     
@@ -287,7 +286,8 @@ describe('Property 2: Parameter Group Assignment Validity', () => {
     expect(advancedParams).toContain('seed');
     expect(advancedParams).toContain('fps');
     
-    // Hidden: points_store, coordinates, neg_coordinates
+    // Hidden: mode, points_store, coordinates, neg_coordinates
+    expect(hiddenParams).toContain('mode');
     expect(hiddenParams).toContain('points_store');
     expect(hiddenParams).toContain('coordinates');
     expect(hiddenParams).toContain('neg_coordinates');
@@ -680,6 +680,96 @@ describe('getVisibleParameters', () => {
   });
 });
 
+
+describe('LoRA Model Configuration', () => {
+  /**
+   * Tests for LoRA parameter type and model configuration
+   */
+  
+  it('ModelParameterType includes lora-selector', () => {
+    // This test verifies that the type system includes 'lora-selector'
+    const loraParam: ModelParameter = {
+      name: 'lora',
+      label: 'LoRA Model',
+      type: 'lora-selector',
+      default: '',
+      group: 'advanced'
+    };
+    
+    expect(loraParam.type).toBe('lora-selector');
+  });
+
+  it('wan22 model has lora_high and lora_low parameters', () => {
+    const model = getModelById('wan22');
+    expect(model).toBeDefined();
+    
+    const paramNames = model!.parameters.map(p => p.name);
+    expect(paramNames).toContain('lora_high');
+    expect(paramNames).toContain('lora_low');
+    
+    const loraHigh = model!.parameters.find(p => p.name === 'lora_high');
+    const loraLow = model!.parameters.find(p => p.name === 'lora_low');
+    
+    expect(loraHigh).toBeDefined();
+    expect(loraHigh!.type).toBe('lora-selector');
+    expect(loraHigh!.label).toBe('High LoRA');
+    expect(loraHigh!.default).toBe('');
+    expect(loraHigh!.group).toBe('advanced');
+    expect(loraHigh!.description).toContain('high-level features');
+    
+    expect(loraLow).toBeDefined();
+    expect(loraLow!.type).toBe('lora-selector');
+    expect(loraLow!.label).toBe('Low LoRA');
+    expect(loraLow!.default).toBe('');
+    expect(loraLow!.group).toBe('advanced');
+    expect(loraLow!.description).toContain('low-level features');
+  });
+
+  it('flux-krea model has lora parameter with lora-selector type', () => {
+    const model = getModelById('flux-krea');
+    expect(model).toBeDefined();
+    
+    const loraParam = model!.parameters.find(p => p.name === 'lora');
+    expect(loraParam).toBeDefined();
+    expect(loraParam!.type).toBe('lora-selector');
+    expect(loraParam!.label).toBe('LoRA Model');
+    expect(loraParam!.default).toBe('');
+    expect(loraParam!.group).toBe('advanced');
+    expect(loraParam!.description).toContain('custom styling');
+  });
+
+  it('all lora-selector parameters have empty string as default', () => {
+    for (const model of MODELS) {
+      const loraParams = model.parameters.filter(p => p.type === 'lora-selector');
+      for (const param of loraParams) {
+        expect(param.default).toBe('');
+      }
+    }
+  });
+
+  it('all lora-selector parameters are in advanced group', () => {
+    for (const model of MODELS) {
+      const loraParams = model.parameters.filter(p => p.type === 'lora-selector');
+      for (const param of loraParams) {
+        expect(param.group).toBe('advanced');
+      }
+    }
+  });
+
+  it('retrieves models with lora-selector parameters correctly', () => {
+    const wan22 = getModelById('wan22');
+    const fluxKrea = getModelById('flux-krea');
+    
+    expect(wan22).toBeDefined();
+    expect(fluxKrea).toBeDefined();
+    
+    const wan22LoraParams = wan22!.parameters.filter(p => p.type === 'lora-selector');
+    const fluxKreaLoraParams = fluxKrea!.parameters.filter(p => p.type === 'lora-selector');
+    
+    expect(wan22LoraParams).toHaveLength(2); // lora_high and lora_low
+    expect(fluxKreaLoraParams).toHaveLength(1); // lora
+  });
+});
 
 describe('validateModelInputs', () => {
   /**

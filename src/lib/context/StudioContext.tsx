@@ -933,10 +933,22 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         }));
 
         try {
+            // Transform keyframe data to match API expectations
+            const apiPayload = {
+                trackId: newKeyframe.trackId,
+                timestamp: newKeyframe.timestamp,
+                duration: newKeyframe.duration,
+                dataType: newKeyframe.data.type,
+                mediaId: newKeyframe.data.mediaId,
+                url: newKeyframe.data.url,
+                prompt: newKeyframe.data.prompt || '',
+                originalDuration: newKeyframe.data.originalDuration,
+            };
+            
             const response = await fetch('/api/video-keyframes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newKeyframe),
+                body: JSON.stringify(apiPayload),
             });
             const data = await response.json();
             if (data.success && data.keyframe) {

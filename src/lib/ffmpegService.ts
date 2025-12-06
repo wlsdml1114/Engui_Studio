@@ -197,6 +197,240 @@ export class FFmpegService {
   }
 
   /**
+   * Extract audio from a video file and save it as a separate audio file
+   * @param videoPath - Path to the source video file (can be local path or public URL)
+   * @param outputPath - Path where the extracted audio should be saved (optional)
+   * @returns Promise<string> - Path to the extracted audio file
+   */
+  async extractAudioFromVideo(
+    videoPath: string,
+    outputPath?: string
+  ): Promise<string> {
+    // Resolve file path for local and public URLs
+    let resolvedInputPath = videoPath;
+    if (videoPath.startsWith('/')) {
+      // Absolute path starting with / - treat as public URL
+      resolvedInputPath = path.join(process.cwd(), 'public', videoPath);
+    } else if (videoPath.startsWith('http://') || videoPath.startsWith('https://')) {
+      // Remote URL - not supported for now
+      throw new Error('Remote URLs are not supported for audio extraction');
+    } else if (!path.isAbsolute(videoPath)) {
+      // Relative path - resolve from public directory
+      resolvedInputPath = path.join(process.cwd(), 'public', videoPath);
+    }
+
+    // Verify input file exists
+    if (!fs.existsSync(resolvedInputPath)) {
+      throw new Error(`Video file not found: ${resolvedInputPath}`);
+    }
+
+    // Generate output path if not provided
+    if (!outputPath) {
+      const videoBasename = path.basename(videoPath, path.extname(videoPath));
+      const timestamp = Date.now();
+      const audioFilename = `${videoBasename}-audio-${timestamp}.mp3`;
+      outputPath = path.join(process.cwd(), 'public', 'results', 'audio', audioFilename);
+    }
+
+    // Create output directory structure
+    const outputDir = path.dirname(outputPath);
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    // Determine FFmpeg path (prefer local)
+    let ffmpegCommand = this.ffmpegPath;
+    const localPath = path.join(process.cwd(), 'ffmpeg', 'ffmpeg.exe');
+    if (fs.existsSync(localPath)) {
+      ffmpegCommand = localPath;
+      console.log(`[FFmpeg] Using local FFmpeg for audio extraction: ${localPath}`);
+    }
+
+    // FFmpeg command for audio extraction
+    // -vn: no video
+    // -acodec libmp3lame: encode to mp3
+    // -q:a 2: high quality audio (VBR quality scale 0-9, lower is better)
+    const command = `"${ffmpegCommand}" -y -i "${resolvedInputPath}" -vn -acodec libmp3lame -q:a 2 "${outputPath}"`;
+
+    try {
+      console.log(`[FFmpeg] Extracting audio: ${resolvedInputPath} -> ${outputPath}`);
+      console.log(`[FFmpeg] Command: ${command}`);
+
+      const { stdout, stderr } = await execAsync(command, {
+        timeout: 60000, // 60 seconds timeout
+        maxBuffer: 1024 * 1024 * 10 // 10MB buffer
+      });
+
+      // Check for errors in stderr
+      if (stderr) {
+        // FFmpeg outputs progress to stderr, so we need to check for actual errors
+        if (stderr.includes('No audio streams found') || 
+            stderr.includes('Output file is empty') ||
+            stderr.includes('Invalid data found')) {
+          throw new Error('No audio track found in video file');
+        }
+        
+        if (stderr.includes('Unsupported codec') || 
+            stderr.includes('Unknown decoder')) {
+          throw new Error('Unsupported audio format');
+        }
+        
+        // Log warnings but don't fail
+        if (!stderr.includes('time=')) {
+          console.warn(`[FFmpeg] Audio extraction warning: ${stderr}`);
+        }
+      }
+
+      // Verify output file was created and has content
+      if (!fs.existsSync(outputPath)) {
+        throw new Error('Audio file was not created');
+      }
+
+      const stats = fs.statSync(outputPath);
+      if (stats.size === 0) {
+        fs.unlinkSync(outputPath); // Clean up empty file
+        throw new Error('Extracted audio file is empty - video may not contain audio');
+      }
+
+      console.log(`[FFmpeg] Audio extracted successfully: ${outputPath} (${stats.size} bytes)`);
+      
+      // Return relative path from public directory for web access
+      const relativePath = outputPath.replace(path.join(process.cwd(), 'public'), '');
+      return relativePath.startsWith('/') ? relativePath : '/' + relativePath;
+    } catch (error) {
+      console.error(`[FFmpeg] Error extracting audio:`, error);
+      
+      // Clean up partial files
+      if (outputPath && fs.existsSync(outputPath)) {
+        try {
+          fs.unlinkSync(outputPath);
+        } catch (cleanupError) {
+          console.warn(`[FFmpeg] Failed to clean up partial file: ${cleanupError}`);
+        }
+      }
+      
+      throw new Error(`Failed to extract audio: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Creates a muted version of a video file (removes audio track)
+   * @param videoPath - Path to the source video file (can be local path or public URL)
+   * @param outputPath - Path where the muted video should be saved (optional)
+   * @returns Promise<string> - Path to the muted video file
+   */
+  async createMutedVideo(
+    videoPath: string,
+    outputPath?: string
+  ): Promise<string> {
+    // Resolve file path for local and public URLs
+    let resolvedInputPath = videoPath;
+    if (videoPath.startsWith('/')) {
+      // Absolute path starting with / - treat as public URL
+      resolvedInputPath = path.join(process.cwd(), 'public', videoPath);
+    } else if (videoPath.startsWith('http://') || videoPath.startsWith('https://')) {
+      // Remote URL - not supported for now
+      throw new Error('Remote URLs are not supported for video muting');
+    } else if (!path.isAbsolute(videoPath)) {
+      // Relative path - resolve from public directory
+      resolvedInputPath = path.join(process.cwd(), 'public', videoPath);
+    }
+
+    // Verify input file exists
+    if (!fs.existsSync(resolvedInputPath)) {
+      throw new Error(`Video file not found: ${resolvedInputPath}`);
+    }
+
+    // Generate output path if not provided
+    if (!outputPath) {
+      const videoBasename = path.basename(videoPath, path.extname(videoPath));
+      const videoExt = path.extname(videoPath);
+      const timestamp = Date.now();
+      const mutedFilename = `${videoBasename}-muted-${timestamp}${videoExt}`;
+      outputPath = path.join(process.cwd(), 'public', 'results', 'video', mutedFilename);
+    }
+
+    // Create output directory structure
+    const outputDir = path.dirname(outputPath);
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    // Determine FFmpeg path (prefer local)
+    let ffmpegCommand = this.ffmpegPath;
+    const localPath = path.join(process.cwd(), 'ffmpeg', 'ffmpeg.exe');
+    if (fs.existsSync(localPath)) {
+      ffmpegCommand = localPath;
+      console.log(`[FFmpeg] Using local FFmpeg for video muting: ${localPath}`);
+    }
+
+    // FFmpeg command for removing audio
+    // -an: no audio
+    // -vcodec copy: copy video stream without re-encoding (fast and lossless)
+    const command = `"${ffmpegCommand}" -y -i "${resolvedInputPath}" -an -vcodec copy "${outputPath}"`;
+
+    try {
+      console.log(`[FFmpeg] Creating muted video: ${resolvedInputPath} -> ${outputPath}`);
+      console.log(`[FFmpeg] Command: ${command}`);
+
+      const { stdout, stderr } = await execAsync(command, {
+        timeout: 120000, // 120 seconds timeout (video processing can take longer)
+        maxBuffer: 1024 * 1024 * 10 // 10MB buffer
+      });
+
+      // Check for errors in stderr
+      if (stderr) {
+        // FFmpeg outputs progress to stderr, so we need to check for actual errors
+        if (stderr.includes('Invalid data found') ||
+            stderr.includes('Error while decoding') ||
+            stderr.includes('Conversion failed')) {
+          throw new Error('Failed to process video file');
+        }
+        
+        if (stderr.includes('Unsupported codec') || 
+            stderr.includes('Unknown decoder')) {
+          throw new Error('Unsupported video format');
+        }
+        
+        // Log warnings but don't fail
+        if (!stderr.includes('time=')) {
+          console.warn(`[FFmpeg] Video muting warning: ${stderr}`);
+        }
+      }
+
+      // Verify output file was created and has content
+      if (!fs.existsSync(outputPath)) {
+        throw new Error('Muted video file was not created');
+      }
+
+      const stats = fs.statSync(outputPath);
+      if (stats.size === 0) {
+        fs.unlinkSync(outputPath); // Clean up empty file
+        throw new Error('Muted video file is empty');
+      }
+
+      console.log(`[FFmpeg] Muted video created successfully: ${outputPath} (${stats.size} bytes)`);
+      
+      // Return relative path from public directory for web access
+      const relativePath = outputPath.replace(path.join(process.cwd(), 'public'), '');
+      return relativePath.startsWith('/') ? relativePath : '/' + relativePath;
+    } catch (error) {
+      console.error(`[FFmpeg] Error creating muted video:`, error);
+      
+      // Clean up partial files
+      if (outputPath && fs.existsSync(outputPath)) {
+        try {
+          fs.unlinkSync(outputPath);
+        } catch (cleanupError) {
+          console.warn(`[FFmpeg] Failed to clean up partial file: ${cleanupError}`);
+        }
+      }
+      
+      throw new Error(`Failed to create muted video: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * 오디오 구간 트림
    * - startSeconds, endSeconds 둘 다 초 단위. endSeconds가 없으면 start부터 끝까지
    * - 입력이 잘못되면 에러를 던짐

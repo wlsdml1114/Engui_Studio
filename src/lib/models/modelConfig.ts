@@ -2,10 +2,12 @@ export type ModelInputType = 'text' | 'image' | 'video' | 'audio';
 export type ApiType = 'runpod' | 'external';
 export type ModelType = 'image' | 'video' | 'audio';
 
+export type ModelParameterType = 'string' | 'number' | 'boolean' | 'select' | 'lora-selector';
+
 export interface ModelParameter {
     name: string;
     label: string;
-    type: 'string' | 'number' | 'boolean' | 'select';
+    type: ModelParameterType;
     options?: string[];
     default?: any;
     min?: number;
@@ -85,6 +87,14 @@ export const MODELS: ModelConfig[] = [
             { name: 'cfg', label: 'CFG Scale', type: 'number', default: 1.0, min: 1, max: 20, step: 0.1, group: 'hidden' },
             { name: 'steps', label: 'Steps', type: 'number', default: 6, min: 4, max: 50, group: 'hidden' },
             { name: 'length', label: 'Length', type: 'number', default: 81, min: 81, max: 161, group: 'advanced' },
+            { name: 'lora_high_1', label: 'High LoRA 1', type: 'lora-selector', default: '', group: 'advanced', description: 'First LoRA pair - high-level features' },
+            { name: 'lora_low_1', label: 'Low LoRA 1', type: 'lora-selector', default: '', group: 'advanced', description: 'First LoRA pair - low-level features' },
+            { name: 'lora_high_2', label: 'High LoRA 2', type: 'lora-selector', default: '', group: 'advanced', description: 'Second LoRA pair - high-level features' },
+            { name: 'lora_low_2', label: 'Low LoRA 2', type: 'lora-selector', default: '', group: 'advanced', description: 'Second LoRA pair - low-level features' },
+            { name: 'lora_high_3', label: 'High LoRA 3', type: 'lora-selector', default: '', group: 'advanced', description: 'Third LoRA pair - high-level features' },
+            { name: 'lora_low_3', label: 'Low LoRA 3', type: 'lora-selector', default: '', group: 'advanced', description: 'Third LoRA pair - low-level features' },
+            { name: 'lora_high_4', label: 'High LoRA 4', type: 'lora-selector', default: '', group: 'advanced', description: 'Fourth LoRA pair - high-level features' },
+            { name: 'lora_low_4', label: 'Low LoRA 4', type: 'lora-selector', default: '', group: 'advanced', description: 'Fourth LoRA pair - low-level features' },
         ]
     },
     {
@@ -197,8 +207,8 @@ export const MODELS: ModelConfig[] = [
             { name: 'height', label: 'Height', type: 'number', default: 1024, min: 512, max: 2048, step: 64, group: 'basic' },
             { name: 'guidance', label: 'Guidance Scale', type: 'number', default: 1.0, min: 1, max: 20, step: 0.1, group: 'hidden' },
             { name: 'seed', label: 'Seed', type: 'number', default: 1234, description: '-1 for random', group: 'advanced' },
-            { name: 'lora', label: 'LoRA', type: 'string', default: '', group: 'advanced' },
-            { name: 'loraWeight', label: 'LoRA Weight', type: 'number', default: 1.0, min: 0.1, max: 2.0, step: 0.1, group: 'advanced' }
+            // { name: 'lora', label: 'LoRA Model', type: 'lora-selector', default: '', group: 'advanced', description: 'LoRA model for custom styling' },
+            // { name: 'loraWeight', label: 'LoRA Weight', type: 'number', default: 1.0, min: 0.1, max: 2.0, step: 0.1, group: 'advanced' }
         ]
     },
     {

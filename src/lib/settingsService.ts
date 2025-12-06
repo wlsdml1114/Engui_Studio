@@ -17,10 +17,15 @@ if (process.env.NODE_ENV !== 'production') {
 
 interface ServiceConfig {
   runpod: RunPodConfig;
+  upscale?: UpscaleConfig;
   s3: S3Config;
   workspace?: WorkspaceConfig;
   ui?: UIConfig;
   qwenImageEditHandler?: QwenImageEditHandlerConfig;
+}
+
+interface UpscaleConfig {
+  endpoint?: string;
 }
 
 interface QwenImageEditHandlerConfig {
@@ -138,6 +143,9 @@ class SettingsService {
           },
           generateTimeout: 3600 // 기본값 3600초 (1시간)
         },
+        upscale: {
+          endpoint: '' // Upscale endpoint 추가
+        },
         s3: {
           endpointUrl: '',
           accessKeyId: '',
@@ -216,6 +224,10 @@ class SettingsService {
           } else if (setting.serviceName === 'ui') {
             if (setting.configKey === 'language') {
               settings.ui.language = value as 'ko' | 'en';
+            }
+          } else if (setting.serviceName === 'upscale') {
+            if (setting.configKey === 'endpoint') {
+              settings.upscale.endpoint = value;
             }
           } else if (setting.serviceName === 'qwenImageEditHandler') {
             if (!settings.qwenImageEditHandler) {
@@ -320,6 +332,18 @@ class SettingsService {
             serviceName: 'runpod',
             configKey: 'generateTimeout',
             configValue: String(settings.runpod.generateTimeout),
+            isEncrypted: false
+          });
+        }
+      }
+
+      // Process Upscale settings
+      if (settings.upscale) {
+        if (settings.upscale.endpoint) {
+          flatSettings.push({
+            serviceName: 'upscale',
+            configKey: 'endpoint',
+            configValue: settings.upscale.endpoint,
             isEncrypted: false
           });
         }

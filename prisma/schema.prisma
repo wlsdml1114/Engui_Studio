@@ -124,6 +124,7 @@ model Workspace {
   // 관계 설정
   jobs        Job[]     @relation("WorkspaceJobs")
   media       WorkspaceMedia[] @relation("WorkspaceMedia")
+  loras       LoRA[]
   
   @@unique([userId, name]) // 사용자별 워크스페이스 이름은 고유해야 함
   @@index([userId])
@@ -189,4 +190,22 @@ model VideoKeyFrame {
   track     VideoTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
   
   @@map("video_keyframes")
+}
+
+model LoRA {
+  id          String    @id @default(uuid())
+  name        String
+  fileName    String
+  s3Path      String    // Path in S3 bucket
+  s3Url       String    // Full S3 URL
+  fileSize    BigInt    // File size in bytes
+  extension   String    // .safetensors or .ckpt
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  uploadedAt  DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId])
+  @@index([uploadedAt])
+  @@map("loras")
 }

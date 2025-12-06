@@ -210,17 +210,17 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
           }
 
           // Get actual media duration for audio and video files
-          // Use blob URL for duration detection (faster than server URL)
-          const blobUrl = URL.createObjectURL(file);
+          // Use server URL if available, otherwise use blob URL
+          const durationUrl = uploadData.success ? url : URL.createObjectURL(file);
           let duration: number;
           let originalDuration: number;
           
           if (file.type.startsWith('video/')) {
-            duration = await getMediaDuration(blobUrl, 'video');
+            duration = await getMediaDuration(durationUrl, 'video');
             originalDuration = duration;
           } else if (file.type.startsWith('audio/')) {
             // Both music and voiceover are audio types
-            duration = await getMediaDuration(blobUrl, 'audio');
+            duration = await getMediaDuration(durationUrl, 'audio');
             originalDuration = duration;
           } else {
             // Default 5 seconds for images
@@ -228,8 +228,17 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
             originalDuration = duration;
           }
           
-          // Clean up blob URL after getting duration
-          URL.revokeObjectURL(blobUrl);
+          // Clean up blob URL if it was used
+          if (!uploadData.success && durationUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(durationUrl);
+          }
+          
+          // Log upload status
+          if (uploadData.success) {
+            console.log(`✓ File uploaded successfully: ${file.name} -> ${url}`);
+          } else {
+            console.warn(`⚠ File upload failed for ${file.name}, using blob URL`);
+          }
 
           // Find or create appropriate track
           let track = tracks.find(t => t.type === trackType);
@@ -244,7 +253,85 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
             track = { id: trackId, projectId: project.id, type: trackType, label: `${trackType} Track`, locked: false, order: tracks.length };
           }
 
-          // Add keyframe at the end of existing content or at start
+          // For videos with uploaded files, check for audio and process
+          let finalUrl = url;
+          if (mediaType === 'video' && uploadData.success) {
+            try {
+              console.log('Detecting audio in uploaded video:', url);
+              // Detect audio using server-side detection
+              const audioDetectionResponse = await fetch('/api/video-tracks/detect-audio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ videoPath: url }),
+              });
+
+              if (audioDetectionResponse.ok) {
+                const { hasAudio } = await audioDetectionResponse.json();
+                console.log('Audio detection result:', hasAudio);
+
+                if (hasAudio) {
+                  console.log('Video has audio, creating muted version...');
+                  // Create muted version
+                  const mutedResponse = await fetch('/api/video-tracks/create-muted', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ videoPath: url }),
+                  });
+
+                  if (mutedResponse.ok) {
+                    const { mutedVideoPath } = await mutedResponse.json();
+                    finalUrl = mutedVideoPath;
+                    console.log('✓ Using muted video:', mutedVideoPath);
+                  }
+
+                  // Extract audio
+                  console.log('Extracting audio...');
+                  const audioResponse = await fetch('/api/video-tracks/extract-audio', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ videoPath: url }),
+                  });
+
+                  if (audioResponse.ok) {
+                    const { audioPath } = await audioResponse.json();
+                    console.log('✓ Audio extracted:', audioPath);
+
+                    // Find or create audio track
+                    let audioTrack = tracks.find(t => t.type === 'music');
+                    if (!audioTrack) {
+                      const audioTrackId = await addTrack({
+                        projectId: project.id,
+                        type: 'music',
+                        label: 'Music Track',
+                        locked: false,
+                        order: tracks.length + 1,
+                      });
+                      audioTrack = { id: audioTrackId, projectId: project.id, type: 'music', label: 'Music Track', locked: false, order: tracks.length + 1 };
+                    }
+
+                    // Add audio keyframe
+                    await addKeyframe({
+                      trackId: audioTrack.id,
+                      timestamp: 0,
+                      duration,
+                      data: {
+                        type: 'music',
+                        mediaId: `local-audio-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                        url: audioPath,
+                        prompt: `${file.name} (audio)`,
+                        originalDuration,
+                      },
+                    });
+                    console.log('✓ Audio keyframe added');
+                  }
+                }
+              }
+            } catch (error) {
+              console.error('Audio processing failed:', error);
+            }
+          }
+
+          // Add video keyframe (with muted video if audio was present)
           await addKeyframe({
             trackId: track.id,
             timestamp: 0,
@@ -252,7 +339,7 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
             data: {
               type: mediaType,
               mediaId: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              url,
+              url: finalUrl,
               prompt: file.name,
               originalDuration, // Store original duration for waveform scaling
             },

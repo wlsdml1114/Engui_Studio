@@ -8,6 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PhotoIcon } from '@heroicons/react/24/outline';
 import { loadFileFromPath } from '@/lib/fileUtils';
+import { LoRASelector, type LoRAFile } from '@/components/lora/LoRASelector';
+import { LoRAPairSelector } from '@/components/lora/LoRAPairSelector';
+import { LoRAManagementDialog } from '@/components/lora/LoRAManagementDialog';
 
 export default function VideoGenerationForm() {
     const { selectedModel, setSelectedModel, settings, addJob, activeWorkspaceId } = useStudio();
@@ -25,6 +28,19 @@ export default function VideoGenerationForm() {
     const [isLoadingMedia, setIsLoadingMedia] = useState(false);
     const [showReuseSuccess, setShowReuseSuccess] = useState(false);
     const formRef = useRef<HTMLDivElement>(null);
+    
+    // LoRA state
+    const [showLoRADialog, setShowLoRADialog] = useState(false);
+    const [availableLoras, setAvailableLoras] = useState<LoRAFile[]>([]);
+    const [isLoadingLoras, setIsLoadingLoras] = useState(false);
+    const [loraHigh1Weight, setLoraHigh1Weight] = useState(0.8);
+    const [loraLow1Weight, setLoraLow1Weight] = useState(0.8);
+    const [loraHigh2Weight, setLoraHigh2Weight] = useState(0.8);
+    const [loraLow2Weight, setLoraLow2Weight] = useState(0.8);
+    const [loraHigh3Weight, setLoraHigh3Weight] = useState(0.8);
+    const [loraLow3Weight, setLoraLow3Weight] = useState(0.8);
+    const [loraHigh4Weight, setLoraHigh4Weight] = useState(0.8);
+    const [loraLow4Weight, setLoraLow4Weight] = useState(0.8);
 
     const videoModels = getModelsByType('video');
 
@@ -40,6 +56,34 @@ export default function VideoGenerationForm() {
 
     const currentModel = getModelById(selectedModel || '') || videoModels[0];
 
+    // Check if current model has LoRA parameters
+    const hasLoRAParameter = (model: typeof currentModel) => {
+        return model?.parameters.some(param => param.type === 'lora-selector');
+    };
+
+    // Fetch available LoRAs
+    const fetchAvailableLoras = async () => {
+        if (!activeWorkspaceId) return;
+        
+        setIsLoadingLoras(true);
+        try {
+            const response = await fetch(`/api/lora?workspaceId=${activeWorkspaceId}`);
+            const data = await response.json();
+            
+            if (data.success && data.loras) {
+                setAvailableLoras(data.loras);
+            } else {
+                console.error('Failed to fetch LoRAs:', data.error);
+                setAvailableLoras([]);
+            }
+        } catch (error) {
+            console.error('Error fetching LoRAs:', error);
+            setAvailableLoras([]);
+        } finally {
+            setIsLoadingLoras(false);
+        }
+    };
+
     // Initialize parameter values with defaults
     useEffect(() => {
         if (currentModel) {
@@ -52,6 +96,13 @@ export default function VideoGenerationForm() {
             setParameterValues(initialValues);
         }
     }, [currentModel]);
+
+    // Fetch LoRAs when model changes or dialog closes
+    useEffect(() => {
+        if (currentModel && hasLoRAParameter(currentModel)) {
+            fetchAvailableLoras();
+        }
+    }, [currentModel, showLoRADialog, activeWorkspaceId]);
 
     // Handle reuse job input event
     useEffect(() => {
@@ -86,12 +137,24 @@ export default function VideoGenerationForm() {
                 // Parse options safely
                 const parsedOptions = typeof options === 'string' ? JSON.parse(options) : (options || {});
                 
+                // Restore LoRA weights for WAN 2.2
+                if (modelId === 'wan22') {
+                    if (parsedOptions.lora_high_1_weight !== undefined) setLoraHigh1Weight(parseFloat(parsedOptions.lora_high_1_weight));
+                    if (parsedOptions.lora_low_1_weight !== undefined) setLoraLow1Weight(parseFloat(parsedOptions.lora_low_1_weight));
+                    if (parsedOptions.lora_high_2_weight !== undefined) setLoraHigh2Weight(parseFloat(parsedOptions.lora_high_2_weight));
+                    if (parsedOptions.lora_low_2_weight !== undefined) setLoraLow2Weight(parseFloat(parsedOptions.lora_low_2_weight));
+                    if (parsedOptions.lora_high_3_weight !== undefined) setLoraHigh3Weight(parseFloat(parsedOptions.lora_high_3_weight));
+                    if (parsedOptions.lora_low_3_weight !== undefined) setLoraLow3Weight(parseFloat(parsedOptions.lora_low_3_weight));
+                    if (parsedOptions.lora_high_4_weight !== undefined) setLoraHigh4Weight(parseFloat(parsedOptions.lora_high_4_weight));
+                    if (parsedOptions.lora_low_4_weight !== undefined) setLoraLow4Weight(parseFloat(parsedOptions.lora_low_4_weight));
+                }
+                
                 // Apply parameter values in parent-first order
                 // First, collect all parameter values from options
                 const allParamValues: Record<string, any> = {};
                 Object.keys(parsedOptions).forEach(key => {
-                    // Skip file paths and internal fields
-                    if (!key.includes('_path') && key !== 'runpodJobId' && key !== 'error') {
+                    // Skip file paths, internal fields, and weight parameters (handled separately)
+                    if (!key.includes('_path') && key !== 'runpodJobId' && key !== 'error' && !key.includes('_weight')) {
                         allParamValues[key] = parsedOptions[key];
                     }
                 });
@@ -441,6 +504,18 @@ export default function VideoGenerationForm() {
                 }
             });
 
+            // Add LoRA weights for WAN 2.2 (4 pairs = 8 weights)
+            if (currentModel.id === 'wan22') {
+                formData.append('lora_high_1_weight', loraHigh1Weight.toString());
+                formData.append('lora_low_1_weight', loraLow1Weight.toString());
+                formData.append('lora_high_2_weight', loraHigh2Weight.toString());
+                formData.append('lora_low_2_weight', loraLow2Weight.toString());
+                formData.append('lora_high_3_weight', loraHigh3Weight.toString());
+                formData.append('lora_low_3_weight', loraLow3Weight.toString());
+                formData.append('lora_high_4_weight', loraHigh4Weight.toString());
+                formData.append('lora_low_4_weight', loraLow4Weight.toString());
+            }
+
             // Handle Dimensions and Duration if supported
             if (currentModel.capabilities.dimensions?.length) {
                 const form = e.target as HTMLFormElement;
@@ -546,7 +621,7 @@ export default function VideoGenerationForm() {
                 </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4" role="form">
                 {/* Image Input (Conditional) */}
                 {isInputVisible(currentModel, 'image', parameterValues) && (
                     <div className="space-y-2">
@@ -826,51 +901,129 @@ export default function VideoGenerationForm() {
                         )}
 
                         {/* Advanced Parameters */}
-                        {currentModel.parameters.filter(p => (!p.group || p.group === 'advanced') && isParameterVisible(p)).map(param => (
+                        {/* Special handling for WAN 2.2 LoRA pairs (4 pairs = 8 LoRAs) */}
+                        {currentModel.id === 'wan22' && (
+                            <>
+                                <LoRAPairSelector
+                                    highValue={parameterValues['lora_high_1'] || ''}
+                                    lowValue={parameterValues['lora_low_1'] || ''}
+                                    highWeight={loraHigh1Weight}
+                                    lowWeight={loraLow1Weight}
+                                    onHighChange={(value) => handleParameterChange('lora_high_1', value)}
+                                    onLowChange={(value) => handleParameterChange('lora_low_1', value)}
+                                    onHighWeightChange={setLoraHigh1Weight}
+                                    onLowWeightChange={setLoraLow1Weight}
+                                    availableLoras={availableLoras}
+                                    onManageClick={() => setShowLoRADialog(true)}
+                                />
+                                <LoRAPairSelector
+                                    highValue={parameterValues['lora_high_2'] || ''}
+                                    lowValue={parameterValues['lora_low_2'] || ''}
+                                    highWeight={loraHigh2Weight}
+                                    lowWeight={loraLow2Weight}
+                                    onHighChange={(value) => handleParameterChange('lora_high_2', value)}
+                                    onLowChange={(value) => handleParameterChange('lora_low_2', value)}
+                                    onHighWeightChange={setLoraHigh2Weight}
+                                    onLowWeightChange={setLoraLow2Weight}
+                                    availableLoras={availableLoras}
+                                    onManageClick={() => setShowLoRADialog(true)}
+                                />
+                                <LoRAPairSelector
+                                    highValue={parameterValues['lora_high_3'] || ''}
+                                    lowValue={parameterValues['lora_low_3'] || ''}
+                                    highWeight={loraHigh3Weight}
+                                    lowWeight={loraLow3Weight}
+                                    onHighChange={(value) => handleParameterChange('lora_high_3', value)}
+                                    onLowChange={(value) => handleParameterChange('lora_low_3', value)}
+                                    onHighWeightChange={setLoraHigh3Weight}
+                                    onLowWeightChange={setLoraLow3Weight}
+                                    availableLoras={availableLoras}
+                                    onManageClick={() => setShowLoRADialog(true)}
+                                />
+                                <LoRAPairSelector
+                                    highValue={parameterValues['lora_high_4'] || ''}
+                                    lowValue={parameterValues['lora_low_4'] || ''}
+                                    highWeight={loraHigh4Weight}
+                                    lowWeight={loraLow4Weight}
+                                    onHighChange={(value) => handleParameterChange('lora_high_4', value)}
+                                    onLowChange={(value) => handleParameterChange('lora_low_4', value)}
+                                    onHighWeightChange={setLoraHigh4Weight}
+                                    onLowWeightChange={setLoraLow4Weight}
+                                    availableLoras={availableLoras}
+                                    onManageClick={() => setShowLoRADialog(true)}
+                                />
+                            </>
+                        )}
+                        
+                        {currentModel.parameters.filter(p => {
+                            // Filter out LoRA parameters for WAN 2.2 (handled by LoRAPairSelector)
+                            if (currentModel.id === 'wan22' && (
+                                p.name === 'lora_high_1' || p.name === 'lora_low_1' ||
+                                p.name === 'lora_high_2' || p.name === 'lora_low_2' ||
+                                p.name === 'lora_high_3' || p.name === 'lora_low_3' ||
+                                p.name === 'lora_high_4' || p.name === 'lora_low_4'
+                            )) {
+                                return false;
+                            }
+                            return (!p.group || p.group === 'advanced') && isParameterVisible(p);
+                        }).map(param => (
                             <div key={`${param.name}-${param.default}`} className="space-y-2">
-                                <Label className="text-xs">{param.label}</Label>
-                                {param.type === 'boolean' ? (
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            name={param.name}
-                                            id={param.name}
-                                            className="rounded border-border"
-                                            defaultChecked={param.default}
-                                            onChange={(e) => handleParameterChange(param.name, e.target.checked)}
-                                        />
-                                        <label htmlFor={param.name} className="text-xs text-muted-foreground">Enable</label>
-                                    </div>
-                                ) : param.type === 'select' ? (
-                                    <select
-                                        name={param.name}
-                                        className="w-full p-2 rounded-md border border-border bg-background text-sm"
-                                        defaultValue={param.default}
-                                        onChange={(e) => handleParameterChange(param.name, e.target.value)}
-                                    >
-                                        {param.options?.map(opt => (
-                                            <option key={opt} value={opt} className="bg-zinc-950 text-zinc-100">{opt}</option>
-                                        ))}
-                                    </select>
-                                ) : param.type === 'string' ? (
-                                    <Input
-                                        type="text"
-                                        name={param.name}
-                                        defaultValue={param.default}
-                                        className="h-8 text-sm"
-                                        onChange={(e) => handleParameterChange(param.name, e.target.value)}
+                                {param.type === 'lora-selector' ? (
+                                    <LoRASelector
+                                        value={parameterValues[param.name] || ''}
+                                        onChange={(value) => handleParameterChange(param.name, value)}
+                                        label={param.label}
+                                        description={param.description}
+                                        availableLoras={availableLoras}
+                                        onManageClick={() => setShowLoRADialog(true)}
                                     />
                                 ) : (
-                                    <Input
-                                        type="number"
-                                        name={param.name}
-                                        defaultValue={param.default}
-                                        min={param.min}
-                                        max={param.max}
-                                        step={param.step}
-                                        className="h-8 text-sm"
-                                        onChange={(e) => handleParameterChange(param.name, parseFloat(e.target.value))}
-                                    />
+                                    <>
+                                        <Label className="text-xs">{param.label}</Label>
+                                        {param.type === 'boolean' ? (
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    name={param.name}
+                                                    id={param.name}
+                                                    className="rounded border-border"
+                                                    defaultChecked={param.default}
+                                                    onChange={(e) => handleParameterChange(param.name, e.target.checked)}
+                                                />
+                                                <label htmlFor={param.name} className="text-xs text-muted-foreground">Enable</label>
+                                            </div>
+                                        ) : param.type === 'select' ? (
+                                            <select
+                                                name={param.name}
+                                                className="w-full p-2 rounded-md border border-border bg-background text-sm"
+                                                defaultValue={param.default}
+                                                onChange={(e) => handleParameterChange(param.name, e.target.value)}
+                                            >
+                                                {param.options?.map(opt => (
+                                                    <option key={opt} value={opt} className="bg-zinc-950 text-zinc-100">{opt}</option>
+                                                ))}
+                                            </select>
+                                        ) : param.type === 'string' ? (
+                                            <Input
+                                                type="text"
+                                                name={param.name}
+                                                defaultValue={param.default}
+                                                className="h-8 text-sm"
+                                                onChange={(e) => handleParameterChange(param.name, e.target.value)}
+                                            />
+                                        ) : (
+                                            <Input
+                                                type="number"
+                                                name={param.name}
+                                                defaultValue={param.default}
+                                                min={param.min}
+                                                max={param.max}
+                                                step={param.step}
+                                                className="h-8 text-sm"
+                                                onChange={(e) => handleParameterChange(param.name, parseFloat(e.target.value))}
+                                            />
+                                        )}
+                                    </>
                                 )}
                             </div>
                         ))}
@@ -891,7 +1044,15 @@ export default function VideoGenerationForm() {
                         {isLoadingMedia ? 'Loading media...' : isGenerating ? 'Generating...' : 'Generate'}
                     </Button>
                 </div>
-            </form >
-        </div >
+            </form>
+
+            {/* LoRA Management Dialog */}
+            <LoRAManagementDialog
+                open={showLoRADialog}
+                onOpenChange={setShowLoRADialog}
+                onLoRAUploaded={fetchAvailableLoras}
+                workspaceId={activeWorkspaceId || undefined}
+            />
+        </div>
     );
 }

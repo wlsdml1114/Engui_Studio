@@ -7,19 +7,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { MODELS } from '@/lib/models/modelConfig';
+import { LoRAManagementDialog } from '@/components/lora/LoRAManagementDialog';
 
 interface SettingsDialogProps {
     isOpen: boolean;
     onClose: () => void;
 }
 
-type SettingsTab = 'general' | 'runpod' | 'upscale' | 'storage';
+type SettingsTab = 'general' | 'runpod' | 'upscale' | 'storage' | 'lora';
 
 export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
-    const { settings, updateSettings } = useStudio();
+    const { settings, updateSettings, activeWorkspaceId } = useStudio();
     const [activeTab, setActiveTab] = useState<SettingsTab>('general');
     const [formData, setFormData] = useState<StudioSettings>(settings);
     const [isSaving, setIsSaving] = useState(false);
+    const [showLoRADialog, setShowLoRADialog] = useState(false);
     
     // modelConfig에서 RunPod 모델들을 가져오기
     const runpodModels = MODELS.filter(model => model.api.type === 'runpod');
@@ -137,6 +139,12 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                             className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'storage' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'}`}
                         >
                             Storage (S3)
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('lora')}
+                            className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'lora' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'}`}
+                        >
+                            LoRA Management
                         </button>
                     </div>
 
@@ -285,6 +293,36 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                                 </div>
                             </div>
                         )}
+
+                        {activeTab === 'lora' && (
+                            <div className="space-y-6">
+                                <div className="space-y-4">
+                                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">LoRA Management</h3>
+                                    <p className="text-sm text-muted-foreground">
+                                        Manage your LoRA models for custom styling and fine-tuning. Upload, sync, and organize LoRA files for use in image and video generation.
+                                    </p>
+                                    
+                                    <div className="pt-4">
+                                        <Button 
+                                            onClick={() => setShowLoRADialog(true)}
+                                            className="w-full"
+                                        >
+                                            Open LoRA Manager
+                                        </Button>
+                                    </div>
+
+                                    <div className="mt-6 p-4 bg-muted/30 rounded-lg border border-border">
+                                        <h4 className="text-sm font-medium mb-2">About LoRA Models</h4>
+                                        <ul className="text-xs text-muted-foreground space-y-1">
+                                            <li>• Upload custom LoRA models (.safetensors format)</li>
+                                            <li>• Sync LoRAs from your S3 bucket</li>
+                                            <li>• Organize LoRAs by high/low noise pairs</li>
+                                            <li>• Use LoRAs in generation forms for custom styling</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -296,6 +334,14 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                     </Button>
                 </div>
             </div>
+
+            {/* LoRA Management Dialog */}
+            <LoRAManagementDialog
+                open={showLoRADialog}
+                onOpenChange={setShowLoRADialog}
+                onLoRAUploaded={() => {}}
+                workspaceId={activeWorkspaceId || undefined}
+            />
         </div>
     );
 }

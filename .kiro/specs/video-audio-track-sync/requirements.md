@@ -27,6 +27,7 @@ This feature enables automatic audio track synchronization when video media cont
 3. WHEN the system creates an audio keyframe from video THEN the system SHALL set the audio keyframe duration to match the video keyframe duration
 4. WHEN a video media item without audio is added to a video track THEN the system SHALL NOT create an audio keyframe
 5. WHEN multiple audio tracks are available THEN the system SHALL select the first available audio track (music or voiceover) that has no conflicting keyframes at the target timestamp
+6. WHEN a user adds a video media item with audio to a video track THEN the system SHALL create a muted version of the video for the video track to prevent duplicate audio playback
 
 ### Requirement 2
 
@@ -48,6 +49,9 @@ This feature enables automatic audio track synchronization when video media cont
 2. WHEN the system saves extracted audio THEN the system SHALL use a consistent naming convention that references the source video
 3. WHEN the system creates an audio keyframe THEN the system SHALL store the audio file URL in the keyframe data
 4. WHEN the system creates an audio keyframe THEN the system SHALL store the original audio duration in the keyframe data for waveform rendering
+5. WHEN the system creates a muted video file THEN the system SHALL save it as a separate file in the workspace
+6. WHEN the system saves a muted video THEN the system SHALL use a consistent naming convention that references the source video
+7. WHEN the system creates a video keyframe from a video with audio THEN the system SHALL store the muted video file URL in the keyframe data
 
 ### Requirement 4
 

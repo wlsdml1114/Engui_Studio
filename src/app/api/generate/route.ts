@@ -234,6 +234,24 @@ export async function POST(request: NextRequest) {
             }
         });
 
+        // Collect LoRA weights for WAN 2.2 (4 pairs = 8 weights)
+        if (modelId === 'wan22') {
+            for (let i = 1; i <= 4; i++) {
+                const highWeightKey = `lora_high_${i}_weight`;
+                const lowWeightKey = `lora_low_${i}_weight`;
+                
+                const highWeight = formData.get(highWeightKey);
+                const lowWeight = formData.get(lowWeightKey);
+                
+                if (highWeight !== null) {
+                    parameters[highWeightKey] = parseFloat(highWeight as string);
+                }
+                if (lowWeight !== null) {
+                    parameters[lowWeightKey] = parseFloat(lowWeight as string);
+                }
+            }
+        }
+
         // Add prompt if model accepts text
         if (model.inputs.includes('text') && prompt) {
             inputData.prompt = prompt;

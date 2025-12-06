@@ -8,6 +8,8 @@ import { VideoTrackRow } from './VideoTrackRow';
 import { TimelineControls } from './TimelineControls';
 import { validateKeyframeData } from '@/lib/videoEditorValidation';
 import { AlertCircle } from 'lucide-react';
+import { hasAudioTrack } from '@/lib/audioDetectionService';
+import { findAvailableAudioTrack } from '@/lib/trackSelectionService';
 
 const BASE_PIXELS_PER_SECOND = 100;
 const TRACK_TYPE_ORDER = ['video', 'music', 'voiceover'] as const;
@@ -35,6 +37,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
   const { setCurrentTimestamp, addKeyframe, addTrack, updateKeyframe, removeKeyframe, player, setZoom } = useStudio();
   const timelineRef = useRef<HTMLDivElement>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'warning' | 'error' } | null>(null);
 
   // Memoize calculations
   const durationSeconds = useMemo(() => project.duration / 1000, [project.duration]);
@@ -234,6 +237,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
   const handleDrop = useCallback(async (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setValidationError(null);
+    setNotification(null);
     
     try {
       const mediaDataStr = event.dataTransfer.getData('application/json');
@@ -308,14 +312,148 @@ export const VideoTimeline = React.memo(function VideoTimeline({
         return;
       }
 
-      // Add keyframe
+      // If video type, check for audio and create muted version if needed
+      let finalVideoUrl = mediaUrl;
+      if (normalizedType === 'video' && mediaUrl) {
+        // Skip audio processing for blob URLs (browser-only, can't be processed server-side)
+        const isBlobUrl = mediaUrl.startsWith('blob:');
+        
+        if (isBlobUrl) {
+          console.log('Blob URL detected, skipping server-side audio processing:', mediaUrl);
+          // For blob URLs, use client-side detection only
+          try {
+            const hasAudio = await hasAudioTrack(mediaUrl);
+            if (hasAudio) {
+              console.warn('Blob URL video has audio but cannot be processed server-side. Audio will play from video track.');
+              setNotification({
+                message: 'Video uploaded from file - audio cannot be separated. Please use generated videos for audio separation.',
+                type: 'warning',
+              });
+            }
+          } catch (error) {
+            console.warn('Failed to detect audio in blob URL:', error);
+          }
+        } else {
+          // For regular URLs (generated videos), process audio
+          try {
+            // Detect audio presence using server-side detection (more reliable)
+            console.log('Detecting audio in video:', mediaUrl);
+            const audioDetectionResponse = await fetch('/api/video-tracks/detect-audio', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ videoPath: mediaUrl }),
+            });
+
+            let hasAudio = false;
+            if (audioDetectionResponse.ok) {
+              const { hasAudio: detected } = await audioDetectionResponse.json();
+              hasAudio = detected;
+              console.log('Audio detection result:', hasAudio);
+            } else {
+              console.warn('Audio detection failed, falling back to client-side detection');
+              // Fallback to client-side detection
+              hasAudio = await hasAudioTrack(mediaUrl);
+            }
+          
+          if (hasAudio) {
+            console.log('Video has audio, creating muted version...');
+            // Create muted version of the video for the video track
+            const mutedResponse = await fetch('/api/video-tracks/create-muted', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ videoPath: mediaUrl }),
+            });
+
+            if (mutedResponse.ok) {
+              const { mutedVideoPath } = await mutedResponse.json();
+              finalVideoUrl = mutedVideoPath;
+              console.log('✓ Using muted video for video track:', mutedVideoPath);
+            } else {
+              const errorData = await mutedResponse.json();
+              console.error('Failed to create muted video:', errorData);
+              console.warn('Using original video with audio');
+            }
+
+            console.log('Extracting audio from video...');
+
+            // Extract audio asynchronously
+            // Note: This requires server-side API call since FFmpeg runs on server
+            const audioResponse = await fetch('/api/video-tracks/extract-audio', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ videoPath: mediaUrl }),
+            });
+
+            if (!audioResponse.ok) {
+              throw new Error('Failed to extract audio from video');
+            }
+
+            const { audioPath } = await audioResponse.json();
+            console.log('✓ Audio extracted:', audioPath);
+            
+            // Find available audio track
+            const audioTrackId = findAvailableAudioTrack(
+              tracks,
+              keyframes,
+              timestamp,
+              duration
+            );
+            
+            console.log('Available audio track:', audioTrackId);
+            
+            if (audioTrackId) {
+              // Determine track type for audio keyframe
+              const audioTrack = tracks.find(t => t.id === audioTrackId);
+              const audioType = audioTrack?.type === 'voiceover' ? 'voiceover' : 'music';
+              
+              // Add synchronized audio keyframe
+              await addKeyframe({
+                trackId: audioTrackId,
+                timestamp,
+                duration,
+                data: {
+                  type: audioType,
+                  mediaId: `${mediaId}-audio`,
+                  url: audioPath,
+                  prompt: `${mediaName} (audio)`,
+                  originalDuration: duration,
+                },
+              });
+              
+              console.log('✓ Audio keyframe added to track:', audioTrackId);
+            } else {
+              console.warn('No available audio track found');
+              // Show warning notification
+              setNotification({
+                message: 'No available audio track for extracted audio',
+                type: 'warning',
+              });
+            }
+            } else {
+              console.log('Video has no audio, skipping extraction');
+            }
+          } catch (error) {
+            console.error('Audio extraction failed:', error);
+            setNotification({
+              message: 'Failed to extract audio from video',
+              type: 'error',
+            });
+            // Don't throw - continue with video keyframe
+          }
+        }
+      }
+
+      // Update keyframe data with final video URL (muted if audio was present)
+      keyframeData.data.url = finalVideoUrl;
+
+      // Add video keyframe with muted video URL if audio was present
       await addKeyframe(keyframeData);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to add media';
       setValidationError(errorMessage);
       console.error('Failed to handle drop:', error);
     }
-  }, [timelineWidth, durationSeconds, getTrackIdForMediaType, addKeyframe, getMediaDuration]);
+  }, [timelineWidth, durationSeconds, getTrackIdForMediaType, addKeyframe, getMediaDuration, tracks, keyframes]);
 
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -497,6 +635,52 @@ export const VideoTimeline = React.memo(function VideoTimeline({
             onClick={() => setValidationError(null)}
             className="text-destructive hover:text-destructive/80 text-sm font-medium"
             aria-label="Dismiss validation error"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Notification Display */}
+      {notification && (
+        <div 
+          className={cn(
+            "border-l-4 p-3 flex items-start gap-2",
+            notification.type === 'success' && "bg-green-500/10 border-green-500",
+            notification.type === 'warning' && "bg-yellow-500/10 border-yellow-500",
+            notification.type === 'error' && "bg-destructive/10 border-destructive"
+          )}
+          role="status"
+          aria-live="polite"
+        >
+          <AlertCircle 
+            className={cn(
+              "w-5 h-5 flex-shrink-0 mt-0.5",
+              notification.type === 'success' && "text-green-500",
+              notification.type === 'warning' && "text-yellow-500",
+              notification.type === 'error' && "text-destructive"
+            )} 
+            aria-hidden="true" 
+          />
+          <div className="flex-1">
+            <p className={cn(
+              "text-sm",
+              notification.type === 'success' && "text-green-500",
+              notification.type === 'warning' && "text-yellow-500",
+              notification.type === 'error' && "text-destructive"
+            )}>
+              {notification.message}
+            </p>
+          </div>
+          <button
+            onClick={() => setNotification(null)}
+            className={cn(
+              "text-sm font-medium",
+              notification.type === 'success' && "text-green-500 hover:text-green-500/80",
+              notification.type === 'warning' && "text-yellow-500 hover:text-yellow-500/80",
+              notification.type === 'error' && "text-destructive hover:text-destructive/80"
+            )}
+            aria-label="Dismiss notification"
           >
             Dismiss
           </button>
