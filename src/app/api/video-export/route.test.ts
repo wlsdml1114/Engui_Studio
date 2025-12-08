@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import * as fc from 'fast-check';
 import { POST } from './route';
 import { prisma } from '@/lib/prisma';
 import { NextRequest } from 'next/server';
 import * as remotionBundler from '@remotion/bundler';
 import * as remotionRenderer from '@remotion/renderer';
 import * as fsPromises from 'fs/promises';
+import type { AspectRatio, QualityPreset } from '@/lib/resolutionConfig';
 
 // Mock Remotion modules
 vi.mock('@remotion/bundler', () => ({
@@ -406,6 +408,417 @@ describe.sequential('Video Export API Routes', () => {
       expect(response.status).toBe(200);
       // The composition should be selected with correct dimensions
       expect(remotionRenderer.selectComposition).toHaveBeenCalled();
+    });
+
+    // Feature: video-resolution-audio-controls, Property 16: Export uses project resolution
+    // Validates: Requirements 9.1
+    it('should use project resolution in export for all valid resolution configurations', () => {
+      fc.assert(
+        fc.asyncProperty(
+          fc.constantFrom<AspectRatio>('16:9', '9:16'),
+          fc.constantFrom<QualityPreset>('480p', '720p', '1080p'),
+          fc.integer({ min: 100, max: 2000 }),
+          fc.integer({ min: 100, max: 2000 }),
+          async (aspectRatio, qualityPreset, width, height) => {
+            // Create a test project with specific resolution
+            const project = {
+              id: 'test-project',
+              title: 'Test Project',
+              description: 'Test',
+              aspectRatio,
+              qualityPreset,
+              width,
+              height,
+              duration: 10000,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            };
+
+            const tracks = [
+              {
+                id: 'track-1',
+                projectId: project.id,
+                type: 'video',
+                label: 'Video Track',
+                locked: true,
+                order: 0,
+                volume: 100,
+                muted: false,
+              },
+            ];
+
+            const keyframes = {
+              'track-1': [
+                {
+                  id: 'kf-1',
+                  trackId: 'track-1',
+                  timestamp: 0,
+                  duration: 5000,
+                  data: {
+                    type: 'video',
+                    mediaId: 'video-1',
+                    url: 'http://example.com/video.mp4',
+                  },
+                },
+              ],
+            };
+
+            const request = new NextRequest('http://localhost:3000/api/video-export', {
+              method: 'POST',
+              body: JSON.stringify({
+                project,
+                tracks,
+                keyframes,
+                options: { format: 'mp4' },
+              }),
+            });
+
+            const response = await POST(request);
+            const data = await response.json();
+
+            // Verify export succeeded
+            expect(response.status).toBe(200);
+            expect(data.success).toBe(true);
+
+            // Verify selectComposition was called with correct metadata
+            const selectCall = vi.mocked(remotionRenderer.selectComposition).mock.calls[
+              vi.mocked(remotionRenderer.selectComposition).mock.calls.length - 1
+            ][0];
+            
+            expect(selectCall.inputProps.project.width).toBe(width);
+            expect(selectCall.inputProps.project.height).toBe(height);
+            expect(selectCall.inputProps.project.aspectRatio).toBe(aspectRatio);
+            expect(selectCall.inputProps.project.qualityPreset).toBe(qualityPreset);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    // Feature: video-resolution-audio-controls, Property 17: Export reflects track volume
+    // Validates: Requirements 9.2
+    it('should pass track volume settings to composition for all valid volume values', () => {
+      fc.assert(
+        fc.asyncProperty(
+          fc.integer({ min: 0, max: 200 }),
+          async (trackVolume) => {
+            const project = {
+              id: 'test-project',
+              title: 'Test Project',
+              description: 'Test',
+              aspectRatio: '16:9' as AspectRatio,
+              qualityPreset: '720p' as QualityPreset,
+              width: 1280,
+              height: 720,
+              duration: 10000,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            };
+
+            const tracks = [
+              {
+                id: 'audio-track-1',
+                projectId: project.id,
+                type: 'music',
+                label: 'Music Track',
+                locked: true,
+                order: 0,
+                volume: trackVolume,
+                muted: false,
+              },
+            ];
+
+            const keyframes = {
+              'audio-track-1': [
+                {
+                  id: 'kf-1',
+                  trackId: 'audio-track-1',
+                  timestamp: 0,
+                  duration: 5000,
+                  data: {
+                    type: 'music',
+                    mediaId: 'audio-1',
+                    url: 'http://example.com/audio.mp3',
+                  },
+                },
+              ],
+            };
+
+            const request = new NextRequest('http://localhost:3000/api/video-export', {
+              method: 'POST',
+              body: JSON.stringify({
+                project,
+                tracks,
+                keyframes,
+                options: { format: 'mp4' },
+              }),
+            });
+
+            const response = await POST(request);
+            const data = await response.json();
+
+            // Verify export succeeded
+            expect(response.status).toBe(200);
+            expect(data.success).toBe(true);
+
+            // Verify track volume is passed to composition
+            const selectCall = vi.mocked(remotionRenderer.selectComposition).mock.calls[
+              vi.mocked(remotionRenderer.selectComposition).mock.calls.length - 1
+            ][0];
+            
+            expect(selectCall.inputProps.tracks).toHaveLength(1);
+            expect(selectCall.inputProps.tracks[0].volume).toBe(trackVolume);
+            expect(selectCall.inputProps.tracks[0].type).toBe('music');
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    // Feature: video-resolution-audio-controls, Property 18: Export reflects keyframe volume
+    // Validates: Requirements 9.3
+    it('should pass keyframe volume settings to composition for all valid volume values', () => {
+      fc.assert(
+        fc.asyncProperty(
+          fc.integer({ min: 0, max: 200 }),
+          fc.option(fc.integer({ min: 0, max: 200 }), { nil: null }),
+          async (trackVolume, keyframeVolume) => {
+            const project = {
+              id: 'test-project',
+              title: 'Test Project',
+              description: 'Test',
+              aspectRatio: '16:9' as AspectRatio,
+              qualityPreset: '720p' as QualityPreset,
+              width: 1280,
+              height: 720,
+              duration: 10000,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            };
+
+            const tracks = [
+              {
+                id: 'audio-track-1',
+                projectId: project.id,
+                type: 'music',
+                label: 'Music Track',
+                locked: true,
+                order: 0,
+                volume: trackVolume,
+                muted: false,
+              },
+            ];
+
+            const keyframes = {
+              'audio-track-1': [
+                {
+                  id: 'kf-1',
+                  trackId: 'audio-track-1',
+                  timestamp: 0,
+                  duration: 5000,
+                  data: {
+                    type: 'music',
+                    mediaId: 'audio-1',
+                    url: 'http://example.com/audio.mp3',
+                    volume: keyframeVolume,
+                  },
+                },
+              ],
+            };
+
+            const request = new NextRequest('http://localhost:3000/api/video-export', {
+              method: 'POST',
+              body: JSON.stringify({
+                project,
+                tracks,
+                keyframes,
+                options: { format: 'mp4' },
+              }),
+            });
+
+            const response = await POST(request);
+            const data = await response.json();
+
+            // Verify export succeeded
+            expect(response.status).toBe(200);
+            expect(data.success).toBe(true);
+
+            // Verify keyframe volume is passed to composition
+            const selectCall = vi.mocked(remotionRenderer.selectComposition).mock.calls[
+              vi.mocked(remotionRenderer.selectComposition).mock.calls.length - 1
+            ][0];
+            
+            const exportedKeyframes = selectCall.inputProps.keyframes['audio-track-1'];
+            expect(exportedKeyframes).toHaveLength(1);
+            expect(exportedKeyframes[0].data.volume).toBe(keyframeVolume);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    // Feature: video-resolution-audio-controls, Property 19: Export excludes muted tracks
+    // Validates: Requirements 9.4
+    it('should pass muted state to composition for all tracks', () => {
+      fc.assert(
+        fc.asyncProperty(
+          fc.boolean(),
+          fc.integer({ min: 0, max: 200 }),
+          async (muted, trackVolume) => {
+            const project = {
+              id: 'test-project',
+              title: 'Test Project',
+              description: 'Test',
+              aspectRatio: '16:9' as AspectRatio,
+              qualityPreset: '720p' as QualityPreset,
+              width: 1280,
+              height: 720,
+              duration: 10000,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            };
+
+            const tracks = [
+              {
+                id: 'audio-track-1',
+                projectId: project.id,
+                type: 'music',
+                label: 'Music Track',
+                locked: true,
+                order: 0,
+                volume: trackVolume,
+                muted,
+              },
+            ];
+
+            const keyframes = {
+              'audio-track-1': [
+                {
+                  id: 'kf-1',
+                  trackId: 'audio-track-1',
+                  timestamp: 0,
+                  duration: 5000,
+                  data: {
+                    type: 'music',
+                    mediaId: 'audio-1',
+                    url: 'http://example.com/audio.mp3',
+                  },
+                },
+              ],
+            };
+
+            const request = new NextRequest('http://localhost:3000/api/video-export', {
+              method: 'POST',
+              body: JSON.stringify({
+                project,
+                tracks,
+                keyframes,
+                options: { format: 'mp4' },
+              }),
+            });
+
+            const response = await POST(request);
+            const data = await response.json();
+
+            // Verify export succeeded
+            expect(response.status).toBe(200);
+            expect(data.success).toBe(true);
+
+            // Verify muted state is passed to composition
+            const selectCall = vi.mocked(remotionRenderer.selectComposition).mock.calls[
+              vi.mocked(remotionRenderer.selectComposition).mock.calls.length - 1
+            ][0];
+            
+            expect(selectCall.inputProps.tracks).toHaveLength(1);
+            expect(selectCall.inputProps.tracks[0].muted).toBe(muted);
+            
+            // The composition will handle muted tracks by setting volume to 0
+            // This is tested in the audioMixing tests
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    // Feature: video-resolution-audio-controls, Property 20: Export reflects fit mode
+    // Validates: Requirements 9.5
+    it('should pass fit mode settings to composition for all valid fit modes', () => {
+      fc.assert(
+        fc.asyncProperty(
+          fc.constantFrom('contain', 'cover', 'fill'),
+          async (fitMode) => {
+            const project = {
+              id: 'test-project',
+              title: 'Test Project',
+              description: 'Test',
+              aspectRatio: '16:9' as AspectRatio,
+              qualityPreset: '720p' as QualityPreset,
+              width: 1280,
+              height: 720,
+              duration: 10000,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            };
+
+            const tracks = [
+              {
+                id: 'video-track-1',
+                projectId: project.id,
+                type: 'video',
+                label: 'Video Track',
+                locked: true,
+                order: 0,
+                volume: 100,
+                muted: false,
+              },
+            ];
+
+            const keyframes = {
+              'video-track-1': [
+                {
+                  id: 'kf-1',
+                  trackId: 'video-track-1',
+                  timestamp: 0,
+                  duration: 5000,
+                  data: {
+                    type: 'video',
+                    mediaId: 'video-1',
+                    url: 'http://example.com/video.mp4',
+                    fitMode,
+                  },
+                },
+              ],
+            };
+
+            const request = new NextRequest('http://localhost:3000/api/video-export', {
+              method: 'POST',
+              body: JSON.stringify({
+                project,
+                tracks,
+                keyframes,
+                options: { format: 'mp4' },
+              }),
+            });
+
+            const response = await POST(request);
+            const data = await response.json();
+
+            // Verify export succeeded
+            expect(response.status).toBe(200);
+            expect(data.success).toBe(true);
+
+            // Verify fit mode is passed to composition
+            const selectCall = vi.mocked(remotionRenderer.selectComposition).mock.calls[
+              vi.mocked(remotionRenderer.selectComposition).mock.calls.length - 1
+            ][0];
+            
+            const exportedKeyframes = selectCall.inputProps.keyframes['video-track-1'];
+            expect(exportedKeyframes).toHaveLength(1);
+            expect(exportedKeyframes[0].data.fitMode).toBe(fitMode);
+          }
+        ),
+        { numRuns: 100 }
+      );
     });
   });
 });

@@ -9,8 +9,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Play, Pause, Download, Maximize2, Plus } from 'lucide-react';
+import { Play, Pause, Download, Maximize2, Plus, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ProjectSelector } from './ProjectSelector';
+import { ProjectSettingsDialog } from './ProjectSettingsDialog';
 
 interface VideoEditorHeaderProps {
   project: VideoProject;
@@ -33,11 +35,29 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
     tracks,
     addTrack,
     addKeyframe,
+    loadProject,
+    createProject,
   } = useStudio();
+
+  const [settingsDialogOpen, setSettingsDialogOpen] = React.useState(false);
 
   const handleAspectRatioChange = useCallback(async (aspectRatio: '16:9' | '9:16' | '1:1') => {
     await updateProject(project.id, { aspectRatio });
   }, [updateProject, project.id]);
+
+  const handleProjectSelect = useCallback(async (projectId: string) => {
+    await loadProject(projectId);
+  }, [loadProject]);
+
+  const handleNewProject = useCallback(async () => {
+    const projectId = await createProject({
+      title: `Project ${new Date().toLocaleDateString()}`,
+      description: '',
+      aspectRatio: '16:9',
+      duration: 30000,
+    });
+    await loadProject(projectId);
+  }, [createProject, loadProject]);
 
   const handlePlayPause = useCallback(() => {
     if (!player) return;
@@ -54,6 +74,14 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
   const handleExport = useCallback(() => {
     setExportDialogOpen(true);
   }, [setExportDialogOpen]);
+
+  const handleOpenSettings = useCallback(() => {
+    setSettingsDialogOpen(true);
+  }, []);
+
+  const handleSaveSettings = useCallback(async (updates: Partial<VideoProject>) => {
+    await updateProject(project.id, updates);
+  }, [updateProject, project.id]);
 
   // Helper to get media duration from URL - uses multiple detection methods for reliability
   const getMediaDuration = useCallback(async (url: string, type: 'audio' | 'video'): Promise<number> => {
@@ -249,8 +277,19 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
               label: `${trackType.charAt(0).toUpperCase() + trackType.slice(1)} Track`,
               locked: false,
               order: tracks.length,
+              volume: 100,
+              muted: false,
             });
-            track = { id: trackId, projectId: project.id, type: trackType, label: `${trackType} Track`, locked: false, order: tracks.length };
+            track = { 
+              id: trackId, 
+              projectId: project.id, 
+              type: trackType, 
+              label: `${trackType} Track`, 
+              locked: false, 
+              order: tracks.length,
+              volume: 100,
+              muted: false,
+            };
           }
 
           // For videos with uploaded files, check for audio and process
@@ -305,24 +344,37 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
                         label: 'Music Track',
                         locked: false,
                         order: tracks.length + 1,
+                        volume: 100,
+                        muted: false,
                       });
-                      audioTrack = { id: audioTrackId, projectId: project.id, type: 'music', label: 'Music Track', locked: false, order: tracks.length + 1 };
+                      audioTrack = { 
+                        id: audioTrackId, 
+                        projectId: project.id, 
+                        type: 'music', 
+                        label: 'Music Track', 
+                        locked: false, 
+                        order: tracks.length + 1,
+                        volume: 100,
+                        muted: false,
+                      };
                     }
 
                     // Add audio keyframe
-                    await addKeyframe({
-                      trackId: audioTrack.id,
-                      timestamp: 0,
-                      duration,
-                      data: {
-                        type: 'music',
-                        mediaId: `local-audio-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                        url: audioPath,
-                        prompt: `${file.name} (audio)`,
-                        originalDuration,
-                      },
-                    });
-                    console.log('✓ Audio keyframe added');
+                    if (audioTrack) {
+                      await addKeyframe({
+                        trackId: audioTrack.id,
+                        timestamp: 0,
+                        duration,
+                        data: {
+                          type: 'music',
+                          mediaId: `local-audio-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                          url: audioPath,
+                          prompt: `${file.name} (audio)`,
+                          originalDuration,
+                        },
+                      });
+                      console.log('✓ Audio keyframe added');
+                    }
                   }
                 }
               }
@@ -332,18 +384,20 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
           }
 
           // Add video keyframe (with muted video if audio was present)
-          await addKeyframe({
-            trackId: track.id,
-            timestamp: 0,
-            duration,
-            data: {
-              type: mediaType,
-              mediaId: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              url: finalUrl,
-              prompt: file.name,
-              originalDuration, // Store original duration for waveform scaling
-            },
-          });
+          if (track) {
+            await addKeyframe({
+              trackId: track.id,
+              timestamp: 0,
+              duration,
+              data: {
+                type: mediaType,
+                mediaId: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                url: finalUrl,
+                prompt: file.name,
+                originalDuration, // Store original duration for waveform scaling
+              },
+            });
+          }
         } catch (error) {
           console.error('Failed to add media file:', error);
         }
@@ -363,9 +417,13 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
         className
       )}
     >
-      {/* Left: Project Title */}
+      {/* Left: Project Selector */}
       <div className="flex items-center gap-4">
-        <h2 className="text-lg font-semibold">{project.title}</h2>
+        <ProjectSelector
+          currentProjectId={project.id}
+          onProjectSelect={handleProjectSelect}
+          onNewProject={handleNewProject}
+        />
       </div>
 
       {/* Center: Playback Controls */}
@@ -396,30 +454,19 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
         </Button>
       </div>
 
-      {/* Right: Aspect Ratio & Export */}
+      {/* Right: Settings & Export */}
       <div className="flex items-center gap-2">
-        {/* Aspect Ratio Selector */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Maximize2 className="h-4 w-4" />
-              {project.aspectRatio}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {ASPECT_RATIOS.map((ratio) => (
-              <DropdownMenuItem
-                key={ratio.value}
-                onClick={() => handleAspectRatioChange(ratio.value)}
-                className={cn(
-                  project.aspectRatio === ratio.value && 'bg-accent'
-                )}
-              >
-                {ratio.label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* Settings Button */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleOpenSettings}
+          className="gap-2"
+          aria-label="Project Settings"
+        >
+          <Settings className="h-4 w-4" />
+          Settings
+        </Button>
 
         {/* Export Button */}
         <Button
@@ -433,6 +480,14 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
           Export
         </Button>
       </div>
+
+      {/* Project Settings Dialog */}
+      <ProjectSettingsDialog
+        project={project}
+        open={settingsDialogOpen}
+        onOpenChange={setSettingsDialogOpen}
+        onSave={handleSaveSettings}
+      />
     </div>
   );
 });

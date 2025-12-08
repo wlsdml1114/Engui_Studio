@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "db:migrate": "prisma db push",
     "db:generate": "prisma generate",
+    "db:migrate-data": "tsx prisma/migrations/migrate-existing-data.ts",
     "db:backup": "node -e \"const {MigrationService} = require('./src/lib/migrationService.ts'); MigrationService.createBackup().then(path => console.log('Backup created:', path)).catch(console.error)\"",
     "db:validate": "node -e \"const {MigrationService} = require('./src/lib/migrationService.ts'); MigrationService.validateDataIntegrity().then(result => console.log('Data integrity:', result)).catch(console.error)\""
   },
@@ -62,6 +63,7 @@
     "postcss": "^8.5.6",
     "prisma": "6.12.0",
     "tailwindcss": "3.4.1",
+    "tsx": "^4.21.0",
     "typescript": "^5",
     "vitest": "^4.0.14"
   }

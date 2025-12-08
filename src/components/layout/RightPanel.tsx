@@ -15,9 +15,10 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { PropertiesPanel } from '@/components/video-editor/PropertiesPanel';
 
 export default function RightPanel() {
-    const { jobs, workspaces, activeWorkspaceId, selectWorkspace, createWorkspace, deleteJob, reuseJobInput } = useStudio();
+    const { jobs, workspaces, activeWorkspaceId, selectWorkspace, createWorkspace, deleteJob, reuseJobInput, addJob } = useStudio();
     const [selectedJob, setSelectedJob] = useState<Job | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [filter, setFilter] = useState<'all' | 'image' | 'video'>('all');
@@ -300,10 +301,10 @@ export default function RightPanel() {
                                                             })
                                                         });
                                                         const data = await response.json();
-                                                        if (data.success) {
+                                                        if (data.success && data.job) {
                                                             console.log('Upscale job created:', data.job.id);
-                                                            // Refresh jobs list
-                                                            window.location.reload();
+                                                            // Add the new job to context (will start polling automatically)
+                                                            addJob(data.job);
                                                         } else {
                                                             alert(`Failed to create upscale job: ${data.error}`);
                                                         }
@@ -342,10 +343,10 @@ export default function RightPanel() {
                                                                 })
                                                             });
                                                             const data = await response.json();
-                                                            if (data.success) {
+                                                            if (data.success && data.job) {
                                                                 console.log('Upscale + FI job created:', data.job.id);
-                                                                // Refresh jobs list
-                                                                window.location.reload();
+                                                                // Add the new job to context (will start polling automatically)
+                                                                addJob(data.job);
                                                             } else {
                                                                 alert(`Failed to create upscale job: ${data.error}`);
                                                             }
@@ -384,6 +385,9 @@ export default function RightPanel() {
                     })
                 )}
             </div>
+
+            {/* Properties Panel - shows when keyframe is selected */}
+            <PropertiesPanel />
 
             <JobDetailsDialog
                 job={selectedJob}

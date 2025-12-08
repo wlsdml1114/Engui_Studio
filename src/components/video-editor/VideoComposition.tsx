@@ -9,6 +9,8 @@ import {
   staticFile,
 } from 'remotion';
 import { VideoProject, VideoTrack, VideoKeyFrame } from '@/lib/context/StudioContext';
+import { fitMedia, FitMode } from '@/lib/mediaFitting';
+import { calculateFinalVolume, volumeToGain } from '@/lib/audioMixing';
 
 // Constants
 const FPS = 30;
@@ -42,10 +44,33 @@ export interface VideoCompositionProps {
 // Component to render a single video/image keyframe
 interface MediaKeyFrameProps {
   keyframe: VideoKeyFrame;
-  aspectRatio: '16:9' | '9:16' | '1:1';
+  canvasWidth: number;
+  canvasHeight: number;
 }
 
-function MediaKeyFrame({ keyframe, aspectRatio }: MediaKeyFrameProps) {
+function MediaKeyFrame({ keyframe, canvasWidth, canvasHeight }: MediaKeyFrameProps) {
+  // Get fit mode from keyframe data, default to 'contain'
+  const fitMode: FitMode = keyframe.data.fitMode || 'contain';
+  
+  // For now, we'll use a placeholder for media dimensions
+  // In a real implementation, we would need to load the media to get its actual dimensions
+  // For this implementation, we'll use CSS object-fit which handles this automatically
+  
+  const getObjectFit = (mode: FitMode): 'contain' | 'cover' | 'fill' => {
+    switch (mode) {
+      case 'contain':
+        return 'contain';
+      case 'cover':
+        return 'cover';
+      case 'fill':
+        return 'fill';
+      default:
+        return 'contain';
+    }
+  };
+  
+  const objectFit = getObjectFit(fitMode);
+  
   if (keyframe.data.type === 'video') {
     return (
       <OffthreadVideo
@@ -53,7 +78,7 @@ function MediaKeyFrame({ keyframe, aspectRatio }: MediaKeyFrameProps) {
         style={{
           width: '100%',
           height: '100%',
-          objectFit: 'cover',
+          objectFit,
         }}
       />
     );
@@ -66,7 +91,7 @@ function MediaKeyFrame({ keyframe, aspectRatio }: MediaKeyFrameProps) {
         style={{
           width: '100%',
           height: '100%',
-          objectFit: 'cover',
+          objectFit,
         }}
       />
     );
@@ -78,9 +103,11 @@ function MediaKeyFrame({ keyframe, aspectRatio }: MediaKeyFrameProps) {
 // Component to render audio keyframe using HTML5 Audio with Remotion sync
 interface AudioKeyFrameProps {
   keyframe: VideoKeyFrame;
+  trackVolume: number;
+  trackMuted: boolean;
 }
 
-function AudioKeyFrame({ keyframe }: AudioKeyFrameProps) {
+function AudioKeyFrame({ keyframe, trackVolume, trackMuted }: AudioKeyFrameProps) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -154,6 +181,13 @@ function AudioKeyFrame({ keyframe }: AudioKeyFrameProps) {
     }
     
     const audio = audioRef.current;
+    
+    // Calculate and apply final volume
+    const keyframeVolume = keyframe.data.volume;
+    const finalVolume = calculateFinalVolume(trackVolume, keyframeVolume, trackMuted);
+    const gain = volumeToGain(finalVolume);
+    audio.volume = Math.max(0, Math.min(1, gain)); // Clamp to 0-1 for HTML5 Audio
+    
     const currentTimeSec = frame / fps;
     
     // Only update if frame changed significantly (avoid micro-updates)
@@ -209,10 +243,11 @@ function AudioKeyFrame({ keyframe }: AudioKeyFrameProps) {
 interface TrackSequenceProps {
   track: VideoTrack;
   keyframes: VideoKeyFrame[];
-  aspectRatio: '16:9' | '9:16' | '1:1';
+  canvasWidth: number;
+  canvasHeight: number;
 }
 
-function VideoTrackSequence({ track, keyframes, aspectRatio }: TrackSequenceProps) {
+function VideoTrackSequence({ track, keyframes, canvasWidth, canvasHeight }: TrackSequenceProps) {
   // Sort keyframes by timestamp
   const sortedKeyframes = [...keyframes].sort((a, b) => a.timestamp - b.timestamp);
   
@@ -229,7 +264,11 @@ function VideoTrackSequence({ track, keyframes, aspectRatio }: TrackSequenceProp
             durationInFrames={durationFrames}
           >
             <AbsoluteFill>
-              <MediaKeyFrame keyframe={keyframe} aspectRatio={aspectRatio} />
+              <MediaKeyFrame 
+                keyframe={keyframe} 
+                canvasWidth={canvasWidth} 
+                canvasHeight={canvasHeight} 
+              />
             </AbsoluteFill>
           </Sequence>
         );
@@ -238,9 +277,13 @@ function VideoTrackSequence({ track, keyframes, aspectRatio }: TrackSequenceProp
   );
 }
 
-function AudioTrackSequence({ track, keyframes }: TrackSequenceProps) {
+function AudioTrackSequence({ track, keyframes, canvasWidth, canvasHeight }: TrackSequenceProps) {
   // Sort keyframes by timestamp
   const sortedKeyframes = [...keyframes].sort((a, b) => a.timestamp - b.timestamp);
+  
+  // Get track volume and muted state, with defaults
+  const trackVolume = track.volume ?? 100;
+  const trackMuted = track.muted ?? false;
   
   return (
     <>
@@ -266,7 +309,11 @@ function AudioTrackSequence({ track, keyframes }: TrackSequenceProps) {
             durationInFrames={durationFrames}
           >
             {/* HTML5 audio for preview playback */}
-            <AudioKeyFrame keyframe={keyframe} />
+            <AudioKeyFrame 
+              keyframe={keyframe} 
+              trackVolume={trackVolume}
+              trackMuted={trackMuted}
+            />
           </Sequence>
         );
       })}
@@ -276,6 +323,11 @@ function AudioTrackSequence({ track, keyframes }: TrackSequenceProps) {
 
 // Main composition component
 export function MainComposition({ project, tracks, keyframes }: VideoCompositionProps) {
+  // Get canvas dimensions from project settings
+  // Use project's width and height if available, otherwise fall back to aspect ratio calculation
+  const { width: canvasWidth, height: canvasHeight } = project.width && project.height
+    ? { width: project.width, height: project.height }
+    : getAspectRatioDimensions(project.aspectRatio);
   
   // Separate tracks by type
   const videoTracks = tracks.filter(t => t.type === 'video');
@@ -291,7 +343,8 @@ export function MainComposition({ project, tracks, keyframes }: VideoComposition
             key={track.id}
             track={track}
             keyframes={trackKeyframes}
-            aspectRatio={project.aspectRatio}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
           />
         );
       })}
@@ -304,7 +357,8 @@ export function MainComposition({ project, tracks, keyframes }: VideoComposition
             key={track.id}
             track={track}
             keyframes={trackKeyframes}
-            aspectRatio={project.aspectRatio}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
           />
         );
       })}

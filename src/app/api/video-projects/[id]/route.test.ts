@@ -157,7 +157,7 @@ describe.sequential('Video Projects [id] API Routes', () => {
         body: JSON.stringify({
           title: 'New Title',
           description: 'New Description',
-          aspectRatio: '1:1',
+          aspectRatio: '9:16',
           duration: 60000,
         }),
       });
@@ -167,8 +167,28 @@ describe.sequential('Video Projects [id] API Routes', () => {
       expect(response.status).toBe(200);
       expect(data.project.title).toBe('New Title');
       expect(data.project.description).toBe('New Description');
-      expect(data.project.aspectRatio).toBe('1:1');
+      expect(data.project.aspectRatio).toBe('9:16');
       expect(data.project.duration).toBe(60000);
+    });
+
+    it('should update resolution settings', async () => {
+      const request = new NextRequest(`http://localhost:3000/api/video-projects/${testProjectId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          aspectRatio: '9:16',
+          qualityPreset: '1080p',
+          width: 1080,
+          height: 1920,
+        }),
+      });
+      const response = await PATCH(request, { params: Promise.resolve({ id: testProjectId }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.project.aspectRatio).toBe('9:16');
+      expect(data.project.qualityPreset).toBe('1080p');
+      expect(data.project.width).toBe(1080);
+      expect(data.project.height).toBe(1920);
     });
 
     it('should return 400 for invalid aspectRatio', async () => {
@@ -180,7 +200,43 @@ describe.sequential('Video Projects [id] API Routes', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe('aspectRatio must be one of: 16:9, 9:16, 1:1');
+      expect(data.error).toBe('aspectRatio must be one of: 16:9, 9:16');
+    });
+
+    it('should return 400 for invalid qualityPreset', async () => {
+      const request = new NextRequest(`http://localhost:3000/api/video-projects/${testProjectId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ qualityPreset: '4K' }),
+      });
+      const response = await PATCH(request, { params: Promise.resolve({ id: testProjectId }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('qualityPreset must be one of: 480p, 720p, 1080p');
+    });
+
+    it('should return 400 for invalid width', async () => {
+      const request = new NextRequest(`http://localhost:3000/api/video-projects/${testProjectId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ width: -100 }),
+      });
+      const response = await PATCH(request, { params: Promise.resolve({ id: testProjectId }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('width must be a positive number');
+    });
+
+    it('should return 400 for invalid height', async () => {
+      const request = new NextRequest(`http://localhost:3000/api/video-projects/${testProjectId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ height: 0 }),
+      });
+      const response = await PATCH(request, { params: Promise.resolve({ id: testProjectId }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('height must be a positive number');
     });
 
     it('should return 400 for invalid duration', async () => {

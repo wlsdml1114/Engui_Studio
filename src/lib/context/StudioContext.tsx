@@ -74,6 +74,9 @@ export interface VideoProject {
     title: string;
     description: string;
     aspectRatio: '16:9' | '9:16' | '1:1';
+    qualityPreset?: string; // '480p' | '720p' | '1080p'
+    width?: number;
+    height?: number;
     duration: number; // milliseconds
     createdAt: number;
     updatedAt: number;
@@ -86,6 +89,8 @@ export interface VideoTrack {
     label: string;
     locked: boolean;
     order: number;
+    volume: number; // 0-200, default 100
+    muted: boolean; // default false
 }
 
 export interface VideoKeyFrame {
@@ -99,6 +104,8 @@ export interface VideoKeyFrame {
         url: string;
         prompt?: string;
         originalDuration?: number; // Original media duration in ms (for waveform scaling)
+        volume?: number; // 0-200, null means use track volume
+        fitMode?: 'contain' | 'cover' | 'fill'; // Media fitting mode for image/video
     };
 }
 
@@ -154,6 +161,7 @@ interface StudioContextType {
     updateProject: (projectId: string, updates: Partial<VideoProject>) => Promise<void>;
     deleteProject: (projectId: string) => Promise<void>;
     addTrack: (track: Omit<VideoTrack, 'id'>) => Promise<string>;
+    updateTrack: (trackId: string, updates: Partial<Pick<VideoTrack, 'volume' | 'muted'>>) => Promise<void>;
     removeTrack: (trackId: string) => Promise<void>;
     addKeyframe: (keyframe: Omit<VideoKeyFrame, 'id'>) => Promise<string>;
     updateKeyframe: (keyframeId: string, updates: Partial<VideoKeyFrame>) => Promise<void>;
@@ -585,10 +593,28 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    // --- Video Project Actions ---
+
+    const fetchProjects = async () => {
+        try {
+            console.log('📂 Fetching video projects...');
+            const response = await fetch('/api/video-projects?userId=user-with-settings');
+            const data = await response.json();
+            console.log('📂 Projects response:', data);
+            if (data.projects) {
+                setProjects(data.projects);
+                console.log('📂 Found projects:', data.projects.length);
+            }
+        } catch (error) {
+            console.error('Failed to fetch projects:', error);
+        }
+    };
+
     // Initial Load
     useEffect(() => {
-        console.log('🚀 StudioContext: Initial load, fetching workspaces...');
+        console.log('🚀 StudioContext: Initial load, fetching workspaces and projects...');
         fetchWorkspaces();
+        fetchProjects();
     }, []);
 
     // Fetch workspace media
@@ -841,23 +867,59 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    // Debounced auto-save for project updates
+    const [autoSaveTimeout, setAutoSaveTimeout] = useState<NodeJS.Timeout | null>(null);
+
     const updateProject = async (projectId: string, updates: Partial<VideoProject>): Promise<void> => {
         const updatedProject = { ...updates, updatedAt: Date.now() };
         
+        // Optimistic update
         setProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updatedProject } : p));
         if (currentProject?.id === projectId) {
             setCurrentProject(prev => prev ? { ...prev, ...updatedProject } : null);
         }
 
-        try {
-            await fetch(`/api/video-projects/${projectId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedProject),
-            });
-        } catch (error) {
-            console.error('Failed to update project:', error);
+        // Clear existing timeout
+        if (autoSaveTimeout) {
+            clearTimeout(autoSaveTimeout);
         }
+
+        // Debounce the API call
+        const timeout = setTimeout(async () => {
+            let retries = 0;
+            const maxRetries = 3;
+            
+            while (retries < maxRetries) {
+                try {
+                    const response = await fetch(`/api/video-projects/${projectId}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(updatedProject),
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Auto-save failed with status: ${response.status}`);
+                    }
+                    
+                    console.log('✅ Project auto-saved:', projectId);
+                    break; // Success, exit retry loop
+                } catch (error) {
+                    retries++;
+                    console.error(`❌ Failed to auto-save project (attempt ${retries}/${maxRetries}):`, error);
+                    
+                    if (retries >= maxRetries) {
+                        // All retries failed - could show a toast notification to user
+                        console.error('❌ Auto-save failed after all retries. Changes may not be saved.');
+                        // TODO: Show user notification about save failure
+                    } else {
+                        // Wait before retrying (exponential backoff)
+                        await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+                    }
+                }
+            }
+        }, 500); // 500ms debounce delay
+
+        setAutoSaveTimeout(timeout);
     };
 
     const deleteProject = async (projectId: string): Promise<void> => {
@@ -902,6 +964,20 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         }
 
         return newTrack.id;
+    };
+
+    const updateTrack = async (trackId: string, updates: Partial<Pick<VideoTrack, 'volume' | 'muted'>>): Promise<void> => {
+        setTracks(prev => prev.map(t => t.id === trackId ? { ...t, ...updates } : t));
+
+        try {
+            await fetch(`/api/video-tracks/${trackId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updates),
+            });
+        } catch (error) {
+            console.error('Failed to update track:', error);
+        }
     };
 
     const removeTrack = async (trackId: string): Promise<void> => {
@@ -979,10 +1055,26 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         });
 
         try {
+            // Transform updates for API - extract data fields to top level
+            const apiUpdates: any = {};
+            
+            if (updates.timestamp !== undefined) apiUpdates.timestamp = updates.timestamp;
+            if (updates.duration !== undefined) apiUpdates.duration = updates.duration;
+            
+            // Extract data fields to top level for API
+            if (updates.data) {
+                if (updates.data.type !== undefined) apiUpdates.dataType = updates.data.type;
+                if (updates.data.mediaId !== undefined) apiUpdates.mediaId = updates.data.mediaId;
+                if (updates.data.url !== undefined) apiUpdates.url = updates.data.url;
+                if (updates.data.prompt !== undefined) apiUpdates.prompt = updates.data.prompt;
+                if (updates.data.fitMode !== undefined) apiUpdates.fitMode = updates.data.fitMode;
+                if (updates.data.volume !== undefined) apiUpdates.volume = updates.data.volume;
+            }
+            
             await fetch(`/api/video-keyframes/${keyframeId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updates),
+                body: JSON.stringify(apiUpdates),
             });
         } catch (error) {
             console.error('Failed to update keyframe:', error);
@@ -1008,7 +1100,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     };
 
     const selectKeyframe = (keyframeId: string) => {
-        setSelectedKeyframeIds(prev => [...prev, keyframeId]);
+        // Single selection mode - replace existing selection
+        setSelectedKeyframeIds([keyframeId]);
     };
 
     const deselectKeyframe = (keyframeId: string) => {
@@ -1063,6 +1156,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             updateProject,
             deleteProject,
             addTrack,
+            updateTrack,
             removeTrack,
             addKeyframe,
             updateKeyframe,

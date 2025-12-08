@@ -113,25 +113,67 @@ export async function POST(request: NextRequest) {
     console.log('📝 Input props tracks:', tracks?.length);
     console.log('📝 Input props keyframes:', Object.keys(keyframes || {}).length);
 
-    // Select composition
+    // Get resolution from project settings
+    // Use project's width and height if available, otherwise calculate from aspect ratio
+    let outputWidth = project.width;
+    let outputHeight = project.height;
+    
+    if (!outputWidth || !outputHeight) {
+      // Fallback to aspect ratio calculation
+      switch (project.aspectRatio) {
+        case '16:9':
+          outputWidth = 1920;
+          outputHeight = 1080;
+          break;
+        case '9:16':
+          outputWidth = 1080;
+          outputHeight = 1920;
+          break;
+        case '1:1':
+          outputWidth = 1080;
+          outputHeight = 1080;
+          break;
+        default:
+          outputWidth = 1920;
+          outputHeight = 1080;
+      }
+    }
+    
+    console.log(`📐 Output resolution: ${outputWidth}x${outputHeight} (${project.aspectRatio})`);
+
+    // Select composition with explicit dimensions
     const composition = await selectComposition({
       serveUrl: bundleLocation,
       id: 'MainComposition',
       inputProps,
     });
+    
+    // Override composition dimensions with project settings
+    composition.width = outputWidth;
+    composition.height = outputHeight;
 
     console.log('🎥 Rendering video...');
 
-    // Collect audio files for later merging
-    const audioFiles: { url: string; startTime: number }[] = [];
+    // Collect audio files for later merging with volume info
+    const audioFiles: { url: string; startTime: number; volume: number }[] = [];
     for (const [trackId, kfs] of Object.entries(processedKeyframes)) {
       const track = tracks.find((t: any) => t.id === trackId);
       if (track?.type === 'music' || track?.type === 'voiceover') {
+        // Skip if track is muted
+        if (track.muted) continue;
+        
+        const trackVolume = track.volume ?? 100;
+        
         for (const kf of kfs as any[]) {
           if (kf.data?.url) {
+            // Use keyframe volume if set, otherwise use track volume
+            const keyframeVolume = kf.data.volume ?? null;
+            const finalVolume = keyframeVolume !== null ? keyframeVolume : trackVolume;
+            
             audioFiles.push({
               url: kf.data.url,
               startTime: kf.timestamp / 1000, // Convert to seconds
+              volume: finalVolume / 100, // Convert to 0-2 range (100% = 1.0)
             });
           }
         }
@@ -168,23 +210,28 @@ export async function POST(request: NextRequest) {
           const audioPath = af.url.startsWith('http://localhost:3000/')
             ? path.join(publicDir, af.url.replace('http://localhost:3000/', ''))
             : af.url;
-          return { path: audioPath, startTime: af.startTime };
+          return { path: audioPath, startTime: af.startTime, volume: af.volume };
         });
         
         console.log(`🎵 Audio paths:`, audioPaths);
         
         if (audioPaths.length === 1) {
-          // Single audio file - simple merge
-          const ffmpegCmd = `ffmpeg -y -i "${tempVideoPath}" -i "${audioPaths[0].path}" -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 -shortest "${outputPath}"`;
+          // Single audio file - simple merge with volume
+          const vol = audioPaths[0].volume;
+          const volumeFilter = vol !== 1.0 ? `-af "volume=${vol}"` : '';
+          const ffmpegCmd = `ffmpeg -y -i "${tempVideoPath}" -i "${audioPaths[0].path}" ${volumeFilter} -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 -shortest "${outputPath}"`;
           console.log(`🎵 FFmpeg command: ${ffmpegCmd}`);
           execSync(ffmpegCmd, { stdio: 'pipe' });
         } else {
-          // Multiple audio files - mix them together
-          // Build FFmpeg filter complex to mix all audio tracks
+          // Multiple audio files - mix them together with individual volumes
+          // Build FFmpeg filter complex to mix all audio tracks with volume control
           const inputs = audioPaths.map((ap, i) => `-i "${ap.path}"`).join(' ');
-          const delays = audioPaths.map((ap, i) => `[${i + 1}:a]adelay=${Math.round(ap.startTime * 1000)}|${Math.round(ap.startTime * 1000)}[a${i}]`).join(';');
+          // Apply volume and delay to each audio track
+          const volumeAndDelays = audioPaths.map((ap, i) => 
+            `[${i + 1}:a]volume=${ap.volume},adelay=${Math.round(ap.startTime * 1000)}|${Math.round(ap.startTime * 1000)}[a${i}]`
+          ).join(';');
           const mixInputs = audioPaths.map((_, i) => `[a${i}]`).join('');
-          const filterComplex = `${delays};${mixInputs}amix=inputs=${audioPaths.length}:duration=longest[aout]`;
+          const filterComplex = `${volumeAndDelays};${mixInputs}amix=inputs=${audioPaths.length}:duration=longest[aout]`;
           
           const ffmpegCmd = `ffmpeg -y -i "${tempVideoPath}" ${inputs} -filter_complex "${filterComplex}" -map 0:v:0 -map "[aout]" -c:v copy -c:a aac "${outputPath}"`;
           console.log(`🎵 FFmpeg command: ${ffmpegCmd}`);

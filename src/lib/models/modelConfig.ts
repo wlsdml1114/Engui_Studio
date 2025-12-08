@@ -233,6 +233,30 @@ export const MODELS: ModelConfig[] = [
     },
 
     // --- Audio Models ---
+
+    // --- Upscale Models ---
+    {
+        id: 'upscale',
+        name: 'Upscale',
+        provider: 'RunPod',
+        type: 'image',
+        inputs: ['image', 'video'],
+        api: {
+            type: 'runpod',
+            endpoint: 'upscale'
+        },
+        capabilities: {},
+        imageInputKey: 'image_path',
+        videoInputKey: 'video_path',
+        conditionalInputs: [
+            { type: 'image', dependsOn: { parameter: 'media_type', value: 'image' } },
+            { type: 'video', dependsOn: { parameter: 'media_type', value: 'video' } }
+        ],
+        parameters: [
+            { name: 'media_type', label: 'Media Type', type: 'select', options: ['image', 'video'], default: 'image', group: 'hidden' },
+            { name: 'frame_interpolation', label: 'Frame Interpolation', type: 'boolean', default: false, group: 'advanced', dependsOn: { parameter: 'media_type', value: 'video' } }
+        ]
+    }
 ];
 
 export const getModelsByType = (type: ModelType) => MODELS.filter(m => m.type === type);

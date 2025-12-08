@@ -148,15 +148,21 @@ model WorkspaceMedia {
 }
 
 model VideoProject {
-  id          String   @id @default(uuid())
-  title       String
-  description String   @default("")
-  aspectRatio String   @default("16:9")
-  duration    Int      @default(30000)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(uuid())
+  title         String
+  description   String   @default("")
   
-  tracks      VideoTrack[]
+  // Resolution settings
+  aspectRatio   String   @default("16:9")
+  qualityPreset String   @default("720p")
+  width         Int      @default(1280)
+  height        Int      @default(720)
+  
+  duration      Int      @default(30000)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  tracks        VideoTrack[]
   
   @@map("video_projects")
 }
@@ -168,6 +174,11 @@ model VideoTrack {
   label     String
   locked    Boolean  @default(true)
   order     Int      @default(0)
+  
+  // Audio settings
+  volume    Int      @default(100) // 0-200
+  muted     Boolean  @default(false)
+  
   createdAt DateTime @default(now())
   
   project   VideoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -185,6 +196,13 @@ model VideoKeyFrame {
   mediaId   String
   url       String
   prompt    String?
+  
+  // Media fitting (for image/video)
+  fitMode   String?  @default("contain") // 'contain' | 'cover' | 'fill'
+  
+  // Audio settings (for music/voiceover)
+  volume    Int?     // 0-200, null means use track volume
+  
   createdAt DateTime @default(now())
   
   track     VideoTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)

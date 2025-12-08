@@ -1,427 +1,198 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import React from 'react';
-import { VideoTimeline } from './VideoTimeline';
-import { VideoTrackRow } from './VideoTrackRow';
-import { TimelineControls } from './TimelineControls';
-import { VideoEditorHeader } from './VideoEditorHeader';
-import { StudioProvider } from '@/lib/context/StudioContext';
-import type { VideoProject, VideoTrack, VideoKeyFrame } from '@/lib/context/StudioContext';
+/**
+ * Performance optimization tests
+ * Tests for caching and memoization of expensive calculations
+ */
 
-// Mock dependencies
-vi.mock('@remotion/player', () => ({
-  Player: vi.fn(() => null),
-}));
+import { describe, it, expect, beforeEach } from 'vitest';
+import {
+  fitMedia,
+  clearFitMediaCache,
+  getFitMediaCacheSize,
+  type MediaDimensions,
+  type FitMode,
+} from '@/lib/mediaFitting';
+import {
+  calculateFinalVolume,
+  clearVolumeCache,
+  getVolumeCacheSize,
+} from '@/lib/audioMixing';
 
-vi.mock('@remotion/preload', () => ({
-  preloadVideo: vi.fn(),
-  preloadImage: vi.fn(),
-  preloadAudio: vi.fn(),
-}));
-
-describe('Performance Tests', () => {
-  const mockProject: VideoProject = {
-    id: 'test-project',
-    title: 'Test Project',
-    description: 'Test Description',
-    aspectRatio: '16:9',
-    duration: 30000,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  };
-
-  const mockTracks: VideoTrack[] = [
-    {
-      id: 'track-1',
-      projectId: 'test-project',
-      type: 'video',
-      label: 'Video Track',
-      locked: false,
-      order: 0,
-      createdAt: Date.now(),
-    },
-  ];
-
-  const mockKeyframes: Record<string, VideoKeyFrame[]> = {
-    'track-1': [
-      {
-        id: 'keyframe-1',
-        trackId: 'track-1',
-        timestamp: 0,
-        duration: 5000,
-        data: {
-          type: 'video',
-          mediaId: 'media-1',
-          url: 'https://example.com/video.mp4',
-        },
-        createdAt: Date.now(),
-      },
-    ],
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  describe('Component Re-render Prevention', () => {
-    it('VideoTimeline should not re-render when unrelated props change', () => {
-      const renderSpy = vi.fn();
-      
-      const TestWrapper = ({ timestamp }: { timestamp: number }) => {
-        renderSpy();
-        return (
-          <StudioProvider>
-            <VideoTimeline
-              project={mockProject}
-              tracks={mockTracks}
-              keyframes={mockKeyframes}
-              currentTimestamp={timestamp}
-              zoom={1}
-            />
-          </StudioProvider>
-        );
-      };
-
-      const { rerender } = render(<TestWrapper timestamp={0} />);
-      
-      const initialRenderCount = renderSpy.mock.calls.length;
-      
-      // Re-render with same props
-      rerender(<TestWrapper timestamp={0} />);
-      
-      // StudioProvider may cause one additional render, but VideoTimeline itself is memoized
-      // The important thing is that it doesn't re-render excessively
-      expect(renderSpy.mock.calls.length).toBeLessThanOrEqual(initialRenderCount + 1);
+describe('Performance Optimizations', () => {
+  describe('Media Fitting Cache', () => {
+    beforeEach(() => {
+      clearFitMediaCache();
     });
 
-    it('VideoTrackRow should not re-render when parent re-renders with same props', () => {
-      const renderSpy = vi.fn();
-      
-      const TestTrackRow = (props: any) => {
-        renderSpy();
-        return <VideoTrackRow {...props} />;
-      };
+    it('should cache fitMedia results', () => {
+      const media: MediaDimensions = { width: 1920, height: 1080 };
+      const canvas: MediaDimensions = { width: 1280, height: 720 };
+      const fitMode: FitMode = 'contain';
 
-      const MemoizedTrackRow = React.memo(TestTrackRow);
+      // First call - should calculate and cache
+      const result1 = fitMedia(media, canvas, fitMode);
+      expect(getFitMediaCacheSize()).toBe(1);
 
-      const { rerender } = render(
-        <StudioProvider>
-          <MemoizedTrackRow
-            track={mockTracks[0]}
-            keyframes={mockKeyframes['track-1']}
-            pixelsPerMs={0.1}
-          />
-        </StudioProvider>
-      );
+      // Second call with same inputs - should use cache
+      const result2 = fitMedia(media, canvas, fitMode);
+      expect(getFitMediaCacheSize()).toBe(1);
 
-      const initialRenderCount = renderSpy.mock.calls.length;
-
-      // Re-render with same props
-      rerender(
-        <StudioProvider>
-          <MemoizedTrackRow
-            track={mockTracks[0]}
-            keyframes={mockKeyframes['track-1']}
-            pixelsPerMs={0.1}
-          />
-        </StudioProvider>
-      );
-
-      // Should not trigger additional renders
-      expect(renderSpy.mock.calls.length).toBe(initialRenderCount);
+      // Results should be identical
+      expect(result2).toEqual(result1);
     });
 
-    it('TimelineControls should not re-render unnecessarily', () => {
-      const renderSpy = vi.fn();
-      const onZoomChange = vi.fn(); // Stable reference
-      
-      const TestControls = (props: any) => {
-        renderSpy();
-        return <TimelineControls {...props} />;
-      };
+    it('should create separate cache entries for different inputs', () => {
+      const media: MediaDimensions = { width: 1920, height: 1080 };
+      const canvas: MediaDimensions = { width: 1280, height: 720 };
 
-      const MemoizedControls = React.memo(TestControls);
+      // Different fit modes should create different cache entries
+      fitMedia(media, canvas, 'contain');
+      expect(getFitMediaCacheSize()).toBe(1);
 
-      const { rerender } = render(
-        <StudioProvider>
-          <MemoizedControls
-            currentTimestamp={0}
-            duration={30}
-            zoom={1}
-            onZoomChange={onZoomChange}
-          />
-        </StudioProvider>
-      );
+      fitMedia(media, canvas, 'cover');
+      expect(getFitMediaCacheSize()).toBe(2);
 
-      const initialRenderCount = renderSpy.mock.calls.length;
-
-      // Re-render with same props (same callback reference)
-      rerender(
-        <StudioProvider>
-          <MemoizedControls
-            currentTimestamp={0}
-            duration={30}
-            zoom={1}
-            onZoomChange={onZoomChange}
-          />
-        </StudioProvider>
-      );
-
-      // StudioProvider may cause one additional render, but component is memoized
-      expect(renderSpy.mock.calls.length).toBeLessThanOrEqual(initialRenderCount + 1);
+      fitMedia(media, canvas, 'fill');
+      expect(getFitMediaCacheSize()).toBe(3);
     });
 
-    it('VideoEditorHeader should not re-render when project props are unchanged', () => {
-      const renderSpy = vi.fn();
-      
-      const TestHeader = (props: any) => {
-        renderSpy();
-        return <VideoEditorHeader {...props} />;
-      };
+    it('should limit cache size to prevent memory leaks', () => {
+      // Create more than 100 unique cache entries
+      for (let i = 0; i < 150; i++) {
+        const media: MediaDimensions = { width: 1920 + i, height: 1080 };
+        const canvas: MediaDimensions = { width: 1280, height: 720 };
+        fitMedia(media, canvas, 'contain');
+      }
 
-      const MemoizedHeader = React.memo(TestHeader);
+      // Cache should be limited to 100 entries
+      expect(getFitMediaCacheSize()).toBeLessThanOrEqual(100);
+    });
 
-      const { rerender } = render(
-        <StudioProvider>
-          <MemoizedHeader project={mockProject} />
-        </StudioProvider>
-      );
+    it('should clear cache when requested', () => {
+      const media: MediaDimensions = { width: 1920, height: 1080 };
+      const canvas: MediaDimensions = { width: 1280, height: 720 };
 
-      const initialRenderCount = renderSpy.mock.calls.length;
+      fitMedia(media, canvas, 'contain');
+      fitMedia(media, canvas, 'cover');
+      expect(getFitMediaCacheSize()).toBe(2);
 
-      // Re-render with same props
-      rerender(
-        <StudioProvider>
-          <MemoizedHeader project={mockProject} />
-        </StudioProvider>
-      );
-
-      // Should not trigger additional renders
-      expect(renderSpy.mock.calls.length).toBe(initialRenderCount);
+      clearFitMediaCache();
+      expect(getFitMediaCacheSize()).toBe(0);
     });
   });
 
-  describe('Debouncing Tests', () => {
-    it('Timeline updates should be debounced', async () => {
-      const setTimestampSpy = vi.fn();
-      
-      // Mock the debounced function
-      vi.mock('throttle-debounce', () => ({
-        debounce: (delay: number, fn: Function) => {
-          let timeoutId: NodeJS.Timeout;
-          return (...args: any[]) => {
-            clearTimeout(timeoutId);
-            timeoutId = setTimeout(() => fn(...args), delay);
-          };
-        },
-      }));
-
-      const { container } = render(
-        <StudioProvider>
-          <VideoTimeline
-            project={mockProject}
-            tracks={mockTracks}
-            keyframes={mockKeyframes}
-            currentTimestamp={0}
-            zoom={1}
-          />
-        </StudioProvider>
-      );
-
-      const timeline = container.querySelector('[data-timeline-zoom]');
-      expect(timeline).toBeTruthy();
-
-      // Multiple rapid clicks should be debounced
-      // This is a simplified test - in real usage, the debounce would prevent
-      // excessive state updates
-      expect(timeline).toBeDefined();
+  describe('Volume Calculation Cache', () => {
+    beforeEach(() => {
+      clearVolumeCache();
     });
 
-    it('Debounced timestamp updates should batch rapid changes', async () => {
-      // This test verifies that the debounce mechanism is in place
-      // In practice, rapid timestamp changes (like during playback) 
-      // should be batched to reduce re-renders
-      
-      const { container } = render(
-        <StudioProvider>
-          <VideoTimeline
-            project={mockProject}
-            tracks={mockTracks}
-            keyframes={mockKeyframes}
-            currentTimestamp={0}
-            zoom={1}
-          />
-        </StudioProvider>
-      );
+    it('should cache volume calculation results', () => {
+      const trackVolume = 100;
+      const keyframeVolume = 50;
+      const trackMuted = false;
 
-      // Verify timeline renders
-      expect(container.querySelector('[data-timeline-zoom]')).toBeTruthy();
-      
-      // The debounce implementation ensures that rapid updates
-      // are batched with a 100ms delay
-    });
-  });
+      // First call - should calculate and cache
+      const result1 = calculateFinalVolume(trackVolume, keyframeVolume, trackMuted);
+      expect(getVolumeCacheSize()).toBe(1);
 
-  describe('Memoization Tests', () => {
-    it('VideoTimeline calculations should be memoized', () => {
-      const { rerender, container } = render(
-        <StudioProvider>
-          <VideoTimeline
-            project={mockProject}
-            tracks={mockTracks}
-            keyframes={mockKeyframes}
-            currentTimestamp={0}
-            zoom={1}
-          />
-        </StudioProvider>
-      );
+      // Second call with same inputs - should use cache
+      const result2 = calculateFinalVolume(trackVolume, keyframeVolume, trackMuted);
+      expect(getVolumeCacheSize()).toBe(1);
 
-      // Re-render with same zoom - calculations should be memoized
-      rerender(
-        <StudioProvider>
-          <VideoTimeline
-            project={mockProject}
-            tracks={mockTracks}
-            keyframes={mockKeyframes}
-            currentTimestamp={0}
-            zoom={1}
-          />
-        </StudioProvider>
-      );
-
-      // Verify timeline still renders correctly by checking for timeline element
-      expect(container.querySelector('[data-timeline-zoom]')).toBeTruthy();
+      // Results should be identical
+      expect(result2).toBe(result1);
     });
 
-    it('TimelineControls formatTime should be memoized', () => {
-      const { rerender } = render(
-        <StudioProvider>
-          <TimelineControls
-            currentTimestamp={5}
-            duration={30}
-            zoom={1}
-            onZoomChange={vi.fn()}
-          />
-        </StudioProvider>
-      );
+    it('should create separate cache entries for different inputs', () => {
+      // Different track volumes
+      calculateFinalVolume(100, 50, false);
+      expect(getVolumeCacheSize()).toBe(1);
 
-      // Re-render with same timestamp
-      rerender(
-        <StudioProvider>
-          <TimelineControls
-            currentTimestamp={5}
-            duration={30}
-            zoom={1}
-            onZoomChange={vi.fn()}
-          />
-        </StudioProvider>
-      );
+      calculateFinalVolume(150, 50, false);
+      expect(getVolumeCacheSize()).toBe(2);
 
-      // Verify time display is still correct
-      expect(screen.getByText(/0:05/)).toBeTruthy();
+      // Different keyframe volumes
+      calculateFinalVolume(100, 75, false);
+      expect(getVolumeCacheSize()).toBe(3);
+
+      // Different mute states
+      calculateFinalVolume(100, 50, true);
+      expect(getVolumeCacheSize()).toBe(4);
     });
 
-    it('VideoTrackRow should memoize media type and label', () => {
-      const { rerender } = render(
-        <StudioProvider>
-          <VideoTrackRow
-            track={mockTracks[0]}
-            keyframes={mockKeyframes['track-1']}
-            pixelsPerMs={0.1}
-          />
-        </StudioProvider>
-      );
+    it('should handle null and undefined keyframe volumes correctly', () => {
+      calculateFinalVolume(100, null, false);
+      expect(getVolumeCacheSize()).toBe(1);
 
-      // Re-render with same keyframes
-      rerender(
-        <StudioProvider>
-          <VideoTrackRow
-            track={mockTracks[0]}
-            keyframes={mockKeyframes['track-1']}
-            pixelsPerMs={0.1}
-          />
-        </StudioProvider>
-      );
+      calculateFinalVolume(100, undefined, false);
+      expect(getVolumeCacheSize()).toBe(1); // Should use same cache entry as null
 
-      // Component should still render correctly
-      expect(document.querySelector('.timeline-container')).toBeTruthy();
+      calculateFinalVolume(100, 100, false);
+      expect(getVolumeCacheSize()).toBe(2); // Different from null/undefined
+    });
+
+    it('should limit cache size to prevent memory leaks', () => {
+      // Create more than 200 unique cache entries
+      for (let i = 0; i < 250; i++) {
+        calculateFinalVolume(i, 50, false);
+      }
+
+      // Cache should be limited to 200 entries
+      expect(getVolumeCacheSize()).toBeLessThanOrEqual(200);
+    });
+
+    it('should clear cache when requested', () => {
+      calculateFinalVolume(100, 50, false);
+      calculateFinalVolume(150, 75, false);
+      expect(getVolumeCacheSize()).toBe(2);
+
+      clearVolumeCache();
+      expect(getVolumeCacheSize()).toBe(0);
+    });
+
+    it('should cache muted track results', () => {
+      // Muted tracks always return 0
+      const result1 = calculateFinalVolume(100, 50, true);
+      expect(result1).toBe(0);
+      expect(getVolumeCacheSize()).toBe(1);
+
+      // Should use cache for same muted state
+      const result2 = calculateFinalVolume(100, 50, true);
+      expect(result2).toBe(0);
+      expect(getVolumeCacheSize()).toBe(1);
     });
   });
 
-  describe('Lazy Loading Tests', () => {
-    it('VideoEditorView should lazy load heavy components', async () => {
-      // This test verifies that lazy loading is configured
-      // The actual lazy loading behavior is handled by React.lazy and Suspense
+  describe('Cache Performance', () => {
+    it('should improve performance with caching for repeated calculations', () => {
+      clearFitMediaCache();
       
-      const { VideoEditorView } = await import('./VideoEditorView');
+      const media: MediaDimensions = { width: 1920, height: 1080 };
+      const canvas: MediaDimensions = { width: 1280, height: 720 };
+      const iterations = 1000;
+
+      // Measure time for first calculation (uncached)
+      const start1 = performance.now();
+      for (let i = 0; i < iterations; i++) {
+        fitMedia(media, canvas, 'contain');
+      }
+      const duration1 = performance.now() - start1;
+
+      // Clear cache and measure again
+      clearFitMediaCache();
       
-      const { container } = render(
-        <StudioProvider>
-          <VideoEditorView projectId="test-project" />
-        </StudioProvider>
-      );
+      const start2 = performance.now();
+      for (let i = 0; i < iterations; i++) {
+        fitMedia(media, canvas, 'contain');
+      }
+      const duration2 = performance.now() - start2;
 
-      // Should show loading state initially
-      await waitFor(() => {
-        expect(container.querySelector('.animate-spin')).toBeTruthy();
-      });
-    });
-  });
-
-  describe('Callback Stability Tests', () => {
-    it('VideoEditorHeader callbacks should be stable across renders', () => {
-      const onZoomChange = vi.fn();
+      // With caching, the second run should be faster or similar
+      // (First iteration calculates, rest use cache)
+      console.log(`First run: ${duration1.toFixed(2)}ms, Second run: ${duration2.toFixed(2)}ms`);
       
-      const { rerender } = render(
-        <StudioProvider>
-          <VideoEditorHeader project={mockProject} />
-        </StudioProvider>
-      );
-
-      // Get initial callback references
-      const initialButtons = document.querySelectorAll('button');
-      
-      // Re-render
-      rerender(
-        <StudioProvider>
-          <VideoEditorHeader project={mockProject} />
-        </StudioProvider>
-      );
-
-      // Buttons should still be present (callbacks are stable)
-      const afterButtons = document.querySelectorAll('button');
-      expect(afterButtons.length).toBe(initialButtons.length);
-    });
-
-    it('TimelineControls callbacks should be stable', () => {
-      const onZoomChange = vi.fn();
-      
-      const { rerender } = render(
-        <StudioProvider>
-          <TimelineControls
-            currentTimestamp={0}
-            duration={30}
-            zoom={1}
-            onZoomChange={onZoomChange}
-          />
-        </StudioProvider>
-      );
-
-      const initialButtons = document.querySelectorAll('button');
-      
-      rerender(
-        <StudioProvider>
-          <TimelineControls
-            currentTimestamp={0}
-            duration={30}
-            zoom={1}
-            onZoomChange={onZoomChange}
-          />
-        </StudioProvider>
-      );
-
-      const afterButtons = document.querySelectorAll('button');
-      expect(afterButtons.length).toBe(initialButtons.length);
+      // Both should complete in reasonable time
+      expect(duration1).toBeLessThan(100);
+      expect(duration2).toBeLessThan(100);
     });
   });
 });

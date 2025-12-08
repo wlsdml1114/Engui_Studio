@@ -14,12 +14,33 @@ vi.mock('lucide-react', () => ({
   Download: () => React.createElement('svg', { 'data-testid': 'download-icon' }),
   AspectRatio: () => React.createElement('svg', { 'data-testid': 'aspect-ratio-icon' }),
   Maximize2: () => React.createElement('svg', { 'data-testid': 'maximize2-icon' }),
+  Plus: () => React.createElement('svg', { 'data-testid': 'plus-icon' }),
+  Settings: () => React.createElement('svg', { 'data-testid': 'settings-icon' }),
+  FolderIcon: () => React.createElement('svg', { 'data-testid': 'folder-icon' }),
+  ChevronDownIcon: () => React.createElement('svg', { 'data-testid': 'chevron-down-icon' }),
+  PlusIcon: () => React.createElement('svg', { 'data-testid': 'plus-icon' }),
+  TrashIcon: () => React.createElement('svg', { 'data-testid': 'trash-icon' }),
+}));
+
+// Mock ProjectSelector and ProjectSettingsDialog
+vi.mock('./ProjectSelector', () => ({
+  ProjectSelector: ({ currentProjectId, onProjectSelect, onNewProject }: any) => 
+    React.createElement('div', { 'data-testid': 'project-selector' }, 'Project Selector'),
+}));
+
+vi.mock('./ProjectSettingsDialog', () => ({
+  ProjectSettingsDialog: ({ project, open, onOpenChange, onSave }: any) => 
+    open ? React.createElement('div', { 'data-testid': 'project-settings-dialog' }, 'Project Settings Dialog') : null,
 }));
 
 // Mock the StudioContext
 const mockUpdateProject = vi.fn().mockResolvedValue(undefined);
 const mockSetExportDialogOpen = vi.fn();
 const mockSetPlayerState = vi.fn();
+const mockLoadProject = vi.fn().mockResolvedValue(undefined);
+const mockCreateProject = vi.fn().mockResolvedValue('new-project-id');
+const mockAddTrack = vi.fn().mockResolvedValue('new-track-id');
+const mockAddKeyframe = vi.fn().mockResolvedValue(undefined);
 
 const mockPlayer = {
   play: vi.fn(),
@@ -28,6 +49,7 @@ const mockPlayer = {
 };
 
 let mockTracks: any[] = [];
+let mockProjects: any[] = [];
 
 vi.mock('@/lib/context/StudioContext', async () => {
   const actual = await vi.importActual('@/lib/context/StudioContext');
@@ -40,6 +62,11 @@ vi.mock('@/lib/context/StudioContext', async () => {
       updateProject: mockUpdateProject,
       setExportDialogOpen: mockSetExportDialogOpen,
       tracks: mockTracks,
+      projects: mockProjects,
+      loadProject: mockLoadProject,
+      createProject: mockCreateProject,
+      addTrack: mockAddTrack,
+      addKeyframe: mockAddKeyframe,
     }),
   };
 });

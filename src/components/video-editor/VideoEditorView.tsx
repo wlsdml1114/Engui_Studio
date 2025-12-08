@@ -155,9 +155,9 @@ const VideoEditorViewInternal = React.memo(function VideoEditorViewInternal({ pr
       {/* Header */}
       <VideoEditorHeader project={currentProject} />
 
-      {/* Main content area - Preview and Timeline */}
+      {/* Main content area - Preview, Timeline, and Properties (vertical layout) */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        {/* Preview - Lazy loaded - takes remaining space minus timeline */}
+        {/* Preview - Lazy loaded - takes remaining space */}
         <div className="flex-1 min-h-[200px] overflow-hidden">
           <Suspense fallback={
             <div 

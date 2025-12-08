@@ -626,6 +626,250 @@ describe('StudioContext - Workspace Job Filtering Unit Tests', () => {
   });
 });
 
+describe('StudioContext - Video Project Management', () => {
+  beforeEach(() => {
+    // Mock fetch for all tests
+    global.fetch = vi.fn();
+  });
+
+  // Feature: video-resolution-audio-controls, Property 21: Project creation persistence
+  // Validates: Requirements 10.1
+  it('should persist created projects to database and retrieve them', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.record({
+          title: fc.string({ minLength: 1, maxLength: 100 }),
+          description: fc.string({ maxLength: 500 }),
+          aspectRatio: fc.constantFrom('16:9' as const, '9:16' as const, '1:1' as const),
+          qualityPreset: fc.constantFrom('480p', '720p', '1080p'),
+          duration: fc.integer({ min: 1000, max: 3600000 }), // 1 second to 1 hour
+        }),
+        async (projectData) => {
+          // Track the project that was sent to the API
+          let capturedProject: any = null;
+          let savedProjectId: string = '';
+
+          // Mock fetch to capture the project being sent and simulate retrieval
+          (global.fetch as any).mockImplementation(async (url: string, options?: any) => {
+            if (url.includes('/api/video-projects') && options?.method === 'POST') {
+              // Capture the project being sent to the API
+              capturedProject = JSON.parse(options.body);
+              savedProjectId = capturedProject.id;
+              return {
+                ok: true,
+                json: async () => ({ 
+                  success: true, 
+                  project: capturedProject
+                }),
+              };
+            }
+            if (url.includes(`/api/video-projects/${savedProjectId}`) && !options?.method) {
+              // Simulate retrieving the project from database
+              return {
+                ok: true,
+                json: async () => ({ 
+                  success: true, 
+                  project: capturedProject,
+                  tracks: [],
+                  keyframes: []
+                }),
+              };
+            }
+            return {
+              ok: true,
+              json: async () => ({ success: true, projects: [], workspaces: [], settings: {} }),
+            };
+          });
+
+          const { result } = renderHook(() => useStudio(), { wrapper });
+
+          // Create a project
+          let projectId: string = '';
+          await act(async () => {
+            projectId = await result.current.createProject(projectData);
+          });
+
+          // Verify the project was sent to the API with all properties
+          expect(capturedProject).not.toBeNull();
+          expect(capturedProject.title).toBe(projectData.title);
+          expect(capturedProject.description).toBe(projectData.description);
+          expect(capturedProject.aspectRatio).toBe(projectData.aspectRatio);
+          expect(capturedProject.duration).toBe(projectData.duration);
+          expect(capturedProject.id).toBeTruthy();
+          expect(capturedProject.createdAt).toBeTruthy();
+          expect(capturedProject.updatedAt).toBeTruthy();
+
+          // Now simulate loading the project from database
+          await act(async () => {
+            await result.current.loadProject(projectId);
+          });
+
+          // Wait for state to update
+          await waitFor(() => {
+            expect(result.current.currentProject).not.toBeNull();
+          });
+
+          // Verify the loaded project has all the same properties
+          expect(result.current.currentProject).toBeDefined();
+          expect(result.current.currentProject?.id).toBe(projectId);
+          expect(result.current.currentProject?.title).toBe(projectData.title);
+          expect(result.current.currentProject?.description).toBe(projectData.description);
+          expect(result.current.currentProject?.aspectRatio).toBe(projectData.aspectRatio);
+          expect(result.current.currentProject?.duration).toBe(projectData.duration);
+          expect(result.current.currentProject?.createdAt).toBe(capturedProject.createdAt);
+          expect(result.current.currentProject?.updatedAt).toBe(capturedProject.updatedAt);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  // Feature: video-resolution-audio-controls, Property 23: Project load restoration
+  // Validates: Requirements 10.3, 10.4
+  it('should restore all project settings when loading a project', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.record({
+          title: fc.string({ minLength: 1, maxLength: 100 }),
+          description: fc.string({ maxLength: 500 }),
+          aspectRatio: fc.constantFrom('16:9' as const, '9:16' as const, '1:1' as const),
+          qualityPreset: fc.constantFrom('480p', '720p', '1080p'),
+          width: fc.integer({ min: 480, max: 1920 }),
+          height: fc.integer({ min: 480, max: 1920 }),
+          duration: fc.integer({ min: 1000, max: 3600000 }),
+        }),
+        async (projectData) => {
+          const projectId = `project-${Date.now()}-${Math.random()}`;
+          const fullProject = {
+            ...projectData,
+            id: projectId,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+
+          // Mock fetch to simulate database storage and retrieval
+          (global.fetch as any).mockImplementation(async (url: string, options?: any) => {
+            if (url.includes(`/api/video-projects/${projectId}`) && !options?.method) {
+              // Simulate loading the project from database
+              return {
+                ok: true,
+                json: async () => ({ 
+                  success: true, 
+                  project: fullProject,
+                  tracks: [],
+                  keyframes: []
+                }),
+              };
+            }
+            return {
+              ok: true,
+              json: async () => ({ success: true, projects: [], workspaces: [], settings: {} }),
+            };
+          });
+
+          const { result } = renderHook(() => useStudio(), { wrapper });
+
+          // Load the project
+          await act(async () => {
+            await result.current.loadProject(projectId);
+          });
+
+          // Wait for state to update
+          await waitFor(() => {
+            expect(result.current.currentProject).not.toBeNull();
+          });
+
+          // Verify all settings are restored
+          expect(result.current.currentProject).toBeDefined();
+          expect(result.current.currentProject?.id).toBe(projectId);
+          expect(result.current.currentProject?.title).toBe(projectData.title);
+          expect(result.current.currentProject?.description).toBe(projectData.description);
+          expect(result.current.currentProject?.aspectRatio).toBe(projectData.aspectRatio);
+          expect(result.current.currentProject?.qualityPreset).toBe(projectData.qualityPreset);
+          expect(result.current.currentProject?.width).toBe(projectData.width);
+          expect(result.current.currentProject?.height).toBe(projectData.height);
+          expect(result.current.currentProject?.duration).toBe(projectData.duration);
+          expect(result.current.currentProject?.createdAt).toBe(fullProject.createdAt);
+          expect(result.current.currentProject?.updatedAt).toBe(fullProject.updatedAt);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  // Feature: video-resolution-audio-controls, Property 24: Project auto-save
+  // Validates: Requirements 10.5
+  it('should automatically save project changes after debounce delay', { timeout: 30000 }, async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.record({
+          projectId: fc.string({ minLength: 10 }),
+          updatedTitle: fc.string({ minLength: 1, maxLength: 100 }),
+        }),
+        async ({ projectId, updatedTitle }) => {
+          let apiCallCount = 0;
+          let lastSavedTitle: string | null = null;
+
+          // Mock fetch to track API calls
+          (global.fetch as any).mockImplementation(async (url: string, options?: any) => {
+            if (url.includes(`/api/video-projects/${projectId}`) && options?.method === 'PATCH') {
+              apiCallCount++;
+              const body = JSON.parse(options.body);
+              lastSavedTitle = body.title;
+              return {
+                ok: true,
+                json: async () => ({ success: true }),
+              };
+            }
+            if (url.includes('/api/video-projects') && options?.method === 'POST') {
+              return {
+                ok: true,
+                json: async () => ({ 
+                  success: true, 
+                  project: { id: projectId, ...JSON.parse(options.body) }
+                }),
+              };
+            }
+            return {
+              ok: true,
+              json: async () => ({ success: true, projects: [], workspaces: [], settings: {} }),
+            };
+          });
+
+          const { result } = renderHook(() => useStudio(), { wrapper });
+
+          // Create a project first
+          await act(async () => {
+            await result.current.createProject({
+              title: 'Initial Title',
+              description: '',
+              aspectRatio: '16:9',
+              duration: 30000,
+            });
+          });
+
+          // Reset API call count after creation
+          apiCallCount = 0;
+          lastSavedTitle = null;
+
+          // Update the project
+          await act(async () => {
+            await result.current.updateProject(projectId, { title: updatedTitle });
+          });
+
+          // Wait for debounced auto-save (500ms + buffer)
+          await new Promise(resolve => setTimeout(resolve, 600));
+
+          // Verify API was called exactly once after debounce
+          expect(apiCallCount).toBe(1);
+          expect(lastSavedTitle).toBe(updatedTitle);
+        }
+      ),
+      { numRuns: 20 } // Reduced runs due to setTimeout delays
+    );
+  });
+});
+
 describe('StudioContext - Video Editor State', () => {
   // Feature: video-editor-center-panel, Property 24: Editor initialization stores project state
   // Validates: Requirements 7.1

@@ -222,6 +222,87 @@ describe.sequential('Video Keyframes API Routes - PATCH and DELETE', () => {
       expect(response.status).toBe(200);
       expect(data.keyframe.timestamp).toBe(0);
     });
+
+    it('should update fitMode', async () => {
+      const request = new NextRequest(`http://localhost:3000/api/video-keyframes/${testKeyframeId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ fitMode: 'cover' }),
+      });
+      const response = await PATCH(request, { params: Promise.resolve({ id: testKeyframeId }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.keyframe.fitMode).toBe('cover');
+    });
+
+    it('should update volume', async () => {
+      const request = new NextRequest(`http://localhost:3000/api/video-keyframes/${testKeyframeId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ volume: 150 }),
+      });
+      const response = await PATCH(request, { params: Promise.resolve({ id: testKeyframeId }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.keyframe.volume).toBe(150);
+    });
+
+    it('should return 400 for invalid fitMode', async () => {
+      const request = new NextRequest(`http://localhost:3000/api/video-keyframes/${testKeyframeId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ fitMode: 'invalid' }),
+      });
+      const response = await PATCH(request, { params: Promise.resolve({ id: testKeyframeId }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('fitMode must be one of: contain, cover, fill');
+    });
+
+    it('should return 400 for invalid volume', async () => {
+      const request = new NextRequest(`http://localhost:3000/api/video-keyframes/${testKeyframeId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ volume: 250 }),
+      });
+      const response = await PATCH(request, { params: Promise.resolve({ id: testKeyframeId }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('volume must be a number between 0 and 200');
+    });
+
+    // Feature: video-resolution-audio-controls, Property 13: Keyframe volume isolation
+    it('should only update specified keyframe volume without affecting others', async () => {
+      // Create a second keyframe
+      const keyframe2 = await prisma.videoKeyFrame.create({
+        data: {
+          trackId: testTrackId,
+          timestamp: 5000,
+          duration: 3000,
+          dataType: 'video',
+          mediaId: 'media-2',
+          url: 'http://example.com/video2.mp4',
+          volume: 100,
+        },
+      });
+
+      // Update first keyframe volume
+      const request = new NextRequest(`http://localhost:3000/api/video-keyframes/${testKeyframeId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ volume: 75 }),
+      });
+      const response = await PATCH(request, { params: Promise.resolve({ id: testKeyframeId }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.keyframe.volume).toBe(75);
+
+      // Verify second keyframe is unchanged
+      const unchangedKeyframe = await prisma.videoKeyFrame.findUnique({
+        where: { id: keyframe2.id },
+      });
+      expect(unchangedKeyframe?.volume).toBe(100);
+    });
   });
 
   describe('DELETE /api/video-keyframes/[id]', () => {

@@ -56,13 +56,15 @@ export async function POST(request: NextRequest) {
             data: {
                 userId: originalJob.userId,
                 workspaceId: originalJob.workspaceId,
-                modelId: type === 'video-interpolation' ? 'upscale-fi' : 'upscale',
+                modelId: 'upscale',
                 type: jobType as any,
                 status: 'queued',
                 prompt: `Upscale of: ${originalJob.prompt}`,
                 options: JSON.stringify({
                     sourceUrl: originalJob.resultUrl,
-                    upscaleType: type
+                    upscaleType: type,
+                    media_type: type === 'image' ? 'image' : 'video',
+                    frame_interpolation: type === 'video-interpolation'
                 })
             }
         });
@@ -151,6 +153,10 @@ export async function POST(request: NextRequest) {
                 withInterpolation
             );
 
+            console.log('🔍 RunPod returned job ID:', runpodJobId);
+            console.log('🔍 Job ID type:', typeof runpodJobId);
+            console.log('🔍 Job ID length:', runpodJobId?.length);
+
             // Update job with RunPod job ID
             await prisma.job.update({
                 where: { id: newJob.id },
@@ -158,6 +164,8 @@ export async function POST(request: NextRequest) {
                     options: JSON.stringify({
                         sourceUrl: originalJob.resultUrl,
                         upscaleType: type,
+                        media_type: type === 'image' ? 'image' : 'video',
+                        frame_interpolation: type === 'video-interpolation',
                         runpodJobId
                     }),
                     status: 'processing'
@@ -166,11 +174,19 @@ export async function POST(request: NextRequest) {
 
             console.log('✅ Upscale job submitted to RunPod:', runpodJobId);
 
+            // Return the updated job with runpodJobId in options
             return NextResponse.json({
                 success: true,
                 job: {
                     ...newJob,
-                    status: 'processing'
+                    status: 'processing',
+                    options: JSON.stringify({
+                        sourceUrl: originalJob.resultUrl,
+                        upscaleType: type,
+                        media_type: type === 'image' ? 'image' : 'video',
+                        frame_interpolation: type === 'video-interpolation',
+                        runpodJobId
+                    })
                 },
                 runpodJobId
             });
@@ -185,6 +201,8 @@ export async function POST(request: NextRequest) {
                     options: JSON.stringify({
                         sourceUrl: originalJob.resultUrl,
                         upscaleType: type,
+                        media_type: type === 'image' ? 'image' : 'video',
+                        frame_interpolation: type === 'video-interpolation',
                         error: runpodError.message
                     })
                 }

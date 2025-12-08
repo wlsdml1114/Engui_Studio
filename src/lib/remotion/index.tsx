@@ -26,7 +26,10 @@ export const RemotionRoot: React.FC = () => {
           keyframes: {},
         }}
         calculateMetadata={async ({ props }) => {
-          const { width, height } = getAspectRatioDimensions(props.project.aspectRatio);
+          // Use project's width and height if available, otherwise fall back to aspect ratio calculation
+          const { width, height } = props.project.width && props.project.height
+            ? { width: props.project.width, height: props.project.height }
+            : getAspectRatioDimensions(props.project.aspectRatio);
           const durationInFrames = Math.ceil((props.project.duration / 1000) * FPS);
           return {
             width,

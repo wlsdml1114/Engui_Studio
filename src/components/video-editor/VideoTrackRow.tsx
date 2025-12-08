@@ -30,41 +30,43 @@ export const VideoTrackRow = React.memo(function VideoTrackRow({
   className,
   ...props
 }: VideoTrackRowProps) {
-  const mediaType = useMemo(() => keyframes[0]?.data.type, [keyframes]);
   const trackRowRef = useRef<HTMLDivElement>(null);
 
   // Check if this track can accept audio drops (for visual styling)
   const canAcceptAudioDrop = track.type === 'music' || track.type === 'voiceover';
 
   return (
-    <div
-      ref={trackRowRef}
-      className={cn(
-        'relative w-full timeline-container h-16',
-        'flex flex-col select-none rounded overflow-hidden shrink-0',
-        // Add subtle background for audio tracks to show drop zone
-        canAcceptAudioDrop ? 'bg-white/5' : 'bg-transparent',
-        className
-      )}
-      data-track-id={track.id}
-      data-track-type={track.type}
-      {...props}
-    >
-      {(keyframes || []).map((frame) => (
-        <VideoTrackView
-          key={frame.id}
-          className="absolute top-0 bottom-0"
-          style={{
-            left: `${frame.timestamp * pixelsPerMs}px`,
-            width: `${frame.duration * pixelsPerMs}px`,
-          }}
-          track={track}
-          frame={frame}
-          allKeyframes={allKeyframes}
-          pixelsPerMs={pixelsPerMs}
-          onMoveToTrack={onMoveKeyframeToTrack}
-        />
-      ))}
+    <div className="flex flex-col">
+      {/* Track Row with Keyframes */}
+      <div
+        ref={trackRowRef}
+        className={cn(
+          'relative w-full timeline-container h-16',
+          'flex flex-col select-none rounded shrink-0',
+          // Add subtle background for audio tracks to show drop zone
+          canAcceptAudioDrop ? 'bg-white/5' : 'bg-transparent',
+          className
+        )}
+        data-track-id={track.id}
+        data-track-type={track.type}
+        {...props}
+      >
+        {(keyframes || []).map((frame) => (
+          <VideoTrackView
+            key={frame.id}
+            className="absolute top-0 bottom-0"
+            style={{
+              left: `${frame.timestamp * pixelsPerMs}px`,
+              width: `${frame.duration * pixelsPerMs}px`,
+            }}
+            track={track}
+            frame={frame}
+            allKeyframes={allKeyframes}
+            pixelsPerMs={pixelsPerMs}
+            onMoveToTrack={onMoveKeyframeToTrack}
+          />
+        ))}
+      </div>
     </div>
   );
 });
@@ -97,12 +99,18 @@ export const VideoTrackView = React.memo(function VideoTrackView({
   const trackRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
   const isResizingRef = useRef(false);
+  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const handleOnClick: MouseEventHandler = useCallback((e) => {
+    // Ignore double clicks
     if (e.detail > 1) {
       return;
     }
-    selectKeyframe(frame.id);
+    
+    // Only select if we didn't drag (click without movement)
+    if (!isDraggingRef.current) {
+      selectKeyframe(frame.id);
+    }
   }, [selectKeyframe, frame.id]);
 
   const handleOnDelete = useCallback(async () => {
@@ -143,12 +151,16 @@ export const VideoTrackView = React.memo(function VideoTrackView({
     const trackElement = trackRef.current;
     if (!trackElement) return;
 
-    isDraggingRef.current = true;
+    // Reset drag state
+    isDraggingRef.current = false;
+    dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+    
     const startX = e.clientX;
     const startY = e.clientY;
     const startLeft = trackElement.offsetLeft;
     const startTimestamp = frame.timestamp;
     const SNAP_THRESHOLD_MS = 100;
+    const DRAG_THRESHOLD = 5; // pixels - movement threshold to consider it a drag
     const TRACK_HEIGHT = 64; // Height of each track row
     let targetTrackId: string | null = null;
 
@@ -162,10 +174,19 @@ export const VideoTrackView = React.memo(function VideoTrackView({
     });
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (!isDraggingRef.current) return;
-      
       const deltaX = moveEvent.clientX - startX;
       const deltaY = moveEvent.clientY - startY;
+      
+      // Check if we've moved enough to consider it a drag
+      if (!isDraggingRef.current && dragStartPosRef.current) {
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        if (distance > DRAG_THRESHOLD) {
+          isDraggingRef.current = true;
+        }
+      }
+      
+      if (!isDraggingRef.current) return;
+      
       const newLeft = startLeft + deltaX;
       let newTimestamp = Math.max(0, newLeft / pixelsPerMs);
       const clipEnd = newTimestamp + frame.duration;
@@ -221,8 +242,13 @@ export const VideoTrackView = React.memo(function VideoTrackView({
         el.classList.remove('ring-2', 'ring-blue-500');
       });
       
-      if (!isDraggingRef.current) return;
+      const wasDragging = isDraggingRef.current;
+      
+      // Reset drag state
       isDraggingRef.current = false;
+      dragStartPosRef.current = null;
+      
+      if (!wasDragging) return;
 
       const finalLeft = trackElement.offsetLeft;
       const finalTimestamp = Math.max(0, Math.round(finalLeft / pixelsPerMs));
@@ -342,7 +368,8 @@ export const VideoTrackView = React.memo(function VideoTrackView({
       aria-checked={isSelected}
       onClick={handleOnClick}
       className={cn(
-        'flex flex-col border border-white/10 rounded-lg cursor-grab active:cursor-grabbing',
+        'flex flex-col border border-white/10 rounded-lg cursor-grab active:cursor-grabbing relative',
+        isSelected && 'ring-2 ring-blue-500',
         className,
       )}
       {...props}
@@ -405,6 +432,7 @@ export const VideoTrackView = React.memo(function VideoTrackView({
                 color={track.type === 'music' ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.6)'}
                 clipDuration={frame.duration}
                 originalDuration={frame.data.originalDuration}
+                volume={frame.data.volume ?? track.volume ?? 100}
               />
             </div>
           )}

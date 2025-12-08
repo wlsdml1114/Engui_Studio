@@ -142,11 +142,14 @@ export const VideoPreview = React.memo(function VideoPreview({
     isInitializedRef.current = false;
   }, []);
 
-  // Get aspect ratio dimensions - memoized
-  const { width, height } = useMemo(
-    () => getAspectRatioDimensions(project.aspectRatio),
-    [project.aspectRatio]
-  );
+  // Get resolution from project settings - memoized
+  const { width, height } = useMemo(() => {
+    // Use project's width and height if available, otherwise fall back to aspect ratio calculation
+    if (project.width && project.height) {
+      return { width: project.width, height: project.height };
+    }
+    return getAspectRatioDimensions(project.aspectRatio);
+  }, [project.width, project.height, project.aspectRatio]);
   
   // Calculate duration in frames - memoized
   const durationInFrames = useMemo(
@@ -181,14 +184,17 @@ export const VideoPreview = React.memo(function VideoPreview({
     );
   }
 
+  // Calculate aspect ratio for CSS
+  const aspectRatio = width / height;
+
   return (
     <div 
-      className="flex-1 flex items-center justify-center bg-black/20 p-4"
+      className="h-full w-full flex items-center justify-center bg-black/20 p-4 overflow-hidden"
       role="region"
       aria-label="Video preview"
     >
       <div 
-        className="w-full h-full flex items-center justify-center"
+        className="relative flex items-center justify-center w-full h-full"
         role="img"
         aria-label={`Video preview for ${project.title}`}
       >
@@ -202,11 +208,12 @@ export const VideoPreview = React.memo(function VideoPreview({
           compositionWidth={width}
           compositionHeight={height}
           style={{
-            width: '100%',
-            height: '100%',
+            width: aspectRatio >= 1 ? '100%' : 'auto',
+            height: aspectRatio >= 1 ? 'auto' : '100%',
             maxWidth: '100%',
             maxHeight: '100%',
             aspectRatio: `${width}/${height}`,
+            objectFit: 'contain',
           }}
           controls={false}
           clickToPlay={false}

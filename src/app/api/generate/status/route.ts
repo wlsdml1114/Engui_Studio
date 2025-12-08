@@ -46,7 +46,14 @@ export async function GET(request: Request) {
         }
 
         const endpoints = settings.runpod.endpoints as Record<string, string> | undefined;
-        const endpointId = endpoints?.[model.id] || model.api.endpoint;
+        
+        // For upscale models, use the dedicated upscale endpoint
+        let endpointId: string | undefined;
+        if (model.id === 'upscale') {
+            endpointId = settings.upscale?.endpoint;
+        } else {
+            endpointId = endpoints?.[model.id] || model.api.endpoint;
+        }
         
         if (!endpointId) {
             return NextResponse.json({ success: false, error: 'Endpoint not configured' }, { status: 400 });
@@ -61,18 +68,29 @@ export async function GET(request: Request) {
 
         const status = await runpodService.getJobStatus(runpodJobId);
 
-        // Job이 취소되었거나 실패한 경우 DB 업데이트
-        if (status.status === 'FAILED') {
-            await prisma.job.update({
-                where: { id: jobId },
-                data: {
-                    status: 'failed',
-                    options: JSON.stringify({
-                        ...options,
-                        error: status.error || 'Job failed or was cancelled'
-                    })
-                }
-            });
+        // Job이 실패한 경우에만 DB 업데이트
+        // IN_QUEUE는 job이 아직 준비 중일 수 있으므로 failed로 처리하지 않음
+        if (status.status === 'FAILED' && status.error && !status.error.includes('initializing')) {
+            // Check if job was created recently (within last 30 seconds)
+            const jobCreatedAt = new Date(job.createdAt).getTime();
+            const now = Date.now();
+            const timeSinceCreation = now - jobCreatedAt;
+            const thirtySeconds = 30 * 1000;
+
+            // Only mark as failed if job is older than 30 seconds
+            // This prevents marking newly created jobs as failed when RunPod hasn't registered them yet
+            if (timeSinceCreation > thirtySeconds) {
+                await prisma.job.update({
+                    where: { id: jobId },
+                    data: {
+                        status: 'failed',
+                        options: JSON.stringify({
+                            ...options,
+                            error: status.error || 'Job failed or was cancelled'
+                        })
+                    }
+                });
+            }
         }
 
         return NextResponse.json({

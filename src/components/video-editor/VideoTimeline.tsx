@@ -34,7 +34,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
   className,
   ...props
 }: VideoTimelineProps) {
-  const { setCurrentTimestamp, addKeyframe, addTrack, updateKeyframe, removeKeyframe, player, setZoom } = useStudio();
+  const { setCurrentTimestamp, addKeyframe, addTrack, updateKeyframe, removeKeyframe, player, setZoom, clearSelection } = useStudio();
   const timelineRef = useRef<HTMLDivElement>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'warning' | 'error' } | null>(null);
@@ -67,6 +67,15 @@ export const VideoTimeline = React.memo(function VideoTimeline({
     const rect = timelineRef.current?.getBoundingClientRect();
     if (!rect) return;
 
+    // Check if click was on empty space (not on a keyframe)
+    const target = event.target as HTMLElement;
+    const isKeyframeClick = target.closest('[aria-checked]');
+    
+    // Clear selection when clicking on empty space
+    if (!isKeyframeClick) {
+      clearSelection();
+    }
+
     const relativeX = event.clientX - rect.left;
     // Convert pixels to seconds
     const timestamp = relativeX / pixelsPerSecond;
@@ -79,7 +88,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
     if (player && typeof player.seekTo === 'function') {
       player.seekTo(Math.floor(clampedTimestamp * 30)); // Assuming 30 FPS
     }
-  }, [pixelsPerSecond, durationSeconds, setCurrentTimestamp, player]);
+  }, [pixelsPerSecond, durationSeconds, setCurrentTimestamp, player, clearSelection]);
 
   const getTrackIdForMediaType = useCallback(async (mediaType: string): Promise<string> => {
     // Map media type to track type
@@ -105,6 +114,8 @@ export const VideoTimeline = React.memo(function VideoTimeline({
       label: `${trackType.charAt(0).toUpperCase() + trackType.slice(1)} Track`,
       locked: false,
       order: tracks.length,
+      volume: 100, // Default volume
+      muted: false, // Default not muted
     });
 
     return trackId;

@@ -13,6 +13,8 @@ interface AudioWaveformProps {
   originalDuration?: number;
   // Current clip duration in ms
   clipDuration?: number;
+  // Volume level (0-200, default 100) - affects waveform amplitude display
+  volume?: number;
   // Callback to report the detected audio duration
   onDurationDetected?: (durationMs: number) => void;
 }
@@ -28,6 +30,7 @@ export const AudioWaveform = React.memo(function AudioWaveform({
   className,
   originalDuration,
   clipDuration,
+  volume = 100,
   onDurationDetected,
 }: AudioWaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -123,6 +126,7 @@ export const AudioWaveform = React.memo(function AudioWaveform({
   // The waveform represents the actual audio content at 1:1 time scale
   // - If clip is shorter than original audio: show only the portion that will play
   // - If clip is longer than original audio: show full waveform, rest is empty (audio ends)
+  // - Volume affects the amplitude of the waveform display
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !waveformData) return;
@@ -138,6 +142,9 @@ export const AudioWaveform = React.memo(function AudioWaveform({
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = color;
 
+    // Volume multiplier (0-200% -> 0-2x amplitude, capped at 1.5x for visual clarity)
+    const volumeMultiplier = Math.min(1.5, Math.max(0.1, volume / 100));
+
     // Use the actual audio duration from analysis
     const actualOriginalDuration = originalDuration || audioDuration;
     const actualClipDuration = clipDuration || audioDuration;
@@ -150,7 +157,8 @@ export const AudioWaveform = React.memo(function AudioWaveform({
       for (let i = 0; i < waveformData.length; i++) {
         const value = waveformData[i] || 0;
         const x = i * barWidth;
-        const barHeight = Math.max(2, value * (height * 0.8));
+        // Apply volume multiplier to bar height
+        const barHeight = Math.max(2, value * volumeMultiplier * (height * 0.8));
         ctx.fillRect(x, centerY - barHeight / 2, Math.max(1, barWidth - 0.5), barHeight);
       }
       return;
@@ -173,12 +181,13 @@ export const AudioWaveform = React.memo(function AudioWaveform({
     for (let i = 0; i < samplesToShow; i++) {
       const value = waveformData[i] || 0;
       const x = i * barWidth;
-      const barHeight = Math.max(2, value * (height * 0.8));
+      // Apply volume multiplier to bar height
+      const barHeight = Math.max(2, value * volumeMultiplier * (height * 0.8));
       
       // Draw mirrored bars (top and bottom)
       ctx.fillRect(x, centerY - barHeight / 2, Math.max(1, barWidth - 0.5), barHeight);
     }
-  }, [waveformData, width, height, color, originalDuration, clipDuration, audioDuration]);
+  }, [waveformData, width, height, color, originalDuration, clipDuration, audioDuration, volume]);
 
   if (error) {
     return (

@@ -308,14 +308,15 @@ class RunPodService {
     if (!response.ok) {
       const errorText = await response.text();
       
-      // 404 에러는 job이 취소되었거나 존재하지 않는 경우
+      // 404 에러는 job이 아직 준비 중이거나 취소/만료된 경우
       if (response.status === 404) {
-        console.log(`⚠️ Job ${jobId} not found (404) - likely cancelled or expired`);
-        // CANCELLED 상태로 반환하여 UI가 적절히 처리할 수 있도록 함
+        console.log(`🔄 Job ${jobId} not yet registered in RunPod (404) - waiting for initialization...`);
+        // IN_QUEUE 상태로 반환하여 계속 polling하도록 함
+        // RunPod는 job을 막 생성한 직후에는 404를 반환할 수 있음
         return {
           id: jobId,
-          status: 'FAILED',
-          error: 'Job was cancelled or does not exist'
+          status: 'IN_QUEUE',
+          error: undefined
         };
       }
       

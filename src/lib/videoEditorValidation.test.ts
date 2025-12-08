@@ -5,6 +5,16 @@ import {
   validateKeyframeData,
   validatePlayerInit,
   getMediaType,
+  validateAspectRatio,
+  validateQualityPreset,
+  validateResolutionConfig,
+  validateVolume,
+  validateFitMode,
+  validateMediaDimensions,
+  validateTrackVolumeSettings,
+  validateKeyframeSettings,
+  validateProjectData,
+  clampVolume,
   SUPPORTED_VIDEO_FORMATS,
   SUPPORTED_IMAGE_FORMATS,
   SUPPORTED_AUDIO_FORMATS,
@@ -268,6 +278,281 @@ describe('videoEditorValidation', () => {
     it('returns unknown for unsupported types', () => {
       expect(getMediaType({ type: 'application/pdf', name: 'test.pdf' })).toBe('unknown');
       expect(getMediaType({ type: 'text/plain', name: 'test.txt' })).toBe('unknown');
+    });
+  });
+
+  describe('validateAspectRatio', () => {
+    it('accepts valid aspect ratios', () => {
+      expect(validateAspectRatio('16:9').valid).toBe(true);
+      expect(validateAspectRatio('9:16').valid).toBe(true);
+    });
+
+    it('rejects invalid aspect ratios', () => {
+      const result = validateAspectRatio('4:3');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Invalid aspect ratio');
+    });
+
+    it('rejects non-string values', () => {
+      const result = validateAspectRatio(123);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('must be a string');
+    });
+  });
+
+  describe('validateQualityPreset', () => {
+    it('accepts valid quality presets', () => {
+      expect(validateQualityPreset('480p').valid).toBe(true);
+      expect(validateQualityPreset('720p').valid).toBe(true);
+      expect(validateQualityPreset('1080p').valid).toBe(true);
+    });
+
+    it('rejects invalid quality presets', () => {
+      const result = validateQualityPreset('4K');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Invalid quality preset');
+    });
+
+    it('rejects non-string values', () => {
+      const result = validateQualityPreset(720);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('must be a string');
+    });
+  });
+
+  describe('validateResolutionConfig', () => {
+    it('accepts valid resolution config', () => {
+      const result = validateResolutionConfig({
+        aspectRatio: '16:9',
+        qualityPreset: '1080p',
+        width: 1920,
+        height: 1080,
+      });
+      expect(result.valid).toBe(true);
+    });
+
+    it('rejects invalid aspect ratio', () => {
+      const result = validateResolutionConfig({
+        aspectRatio: '4:3',
+        qualityPreset: '1080p',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Invalid aspect ratio');
+    });
+
+    it('rejects invalid quality preset', () => {
+      const result = validateResolutionConfig({
+        aspectRatio: '16:9',
+        qualityPreset: '2160p',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Invalid quality preset');
+    });
+
+    it('rejects negative width', () => {
+      const result = validateResolutionConfig({
+        width: -1920,
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Width must be a positive number');
+    });
+
+    it('rejects zero height', () => {
+      const result = validateResolutionConfig({
+        height: 0,
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Height must be a positive number');
+    });
+  });
+
+  describe('validateVolume', () => {
+    it('accepts valid volume values', () => {
+      expect(validateVolume(0).valid).toBe(true);
+      expect(validateVolume(100).valid).toBe(true);
+      expect(validateVolume(200).valid).toBe(true);
+      expect(validateVolume(50).valid).toBe(true);
+    });
+
+    it('rejects volume below 0', () => {
+      const result = validateVolume(-1);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('between 0 and 200');
+    });
+
+    it('rejects volume above 200', () => {
+      const result = validateVolume(201);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('between 0 and 200');
+    });
+
+    it('rejects non-number values', () => {
+      const result = validateVolume('100');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('must be a number');
+    });
+  });
+
+  describe('validateFitMode', () => {
+    it('accepts valid fit modes', () => {
+      expect(validateFitMode('contain').valid).toBe(true);
+      expect(validateFitMode('cover').valid).toBe(true);
+      expect(validateFitMode('fill').valid).toBe(true);
+    });
+
+    it('rejects invalid fit modes', () => {
+      const result = validateFitMode('stretch');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Invalid fit mode');
+    });
+
+    it('rejects non-string values', () => {
+      const result = validateFitMode(123);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('must be a string');
+    });
+  });
+
+  describe('validateMediaDimensions', () => {
+    it('accepts valid dimensions', () => {
+      const result = validateMediaDimensions({
+        width: 1920,
+        height: 1080,
+      });
+      expect(result.valid).toBe(true);
+    });
+
+    it('rejects negative width', () => {
+      const result = validateMediaDimensions({
+        width: -100,
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Media width must be a positive number');
+    });
+
+    it('rejects zero height', () => {
+      const result = validateMediaDimensions({
+        height: 0,
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Media height must be a positive number');
+    });
+  });
+
+  describe('validateTrackVolumeSettings', () => {
+    it('accepts valid track volume settings', () => {
+      const result = validateTrackVolumeSettings({
+        volume: 100,
+        muted: false,
+      });
+      expect(result.valid).toBe(true);
+    });
+
+    it('rejects invalid volume', () => {
+      const result = validateTrackVolumeSettings({
+        volume: 300,
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('between 0 and 200');
+    });
+
+    it('rejects non-boolean muted value', () => {
+      const result = validateTrackVolumeSettings({
+        muted: 'false',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('must be a boolean');
+    });
+  });
+
+  describe('validateKeyframeSettings', () => {
+    it('accepts valid keyframe settings', () => {
+      const result = validateKeyframeSettings({
+        fitMode: 'contain',
+        volume: 150,
+      });
+      expect(result.valid).toBe(true);
+    });
+
+    it('accepts null values', () => {
+      const result = validateKeyframeSettings({
+        fitMode: null,
+        volume: null,
+      });
+      expect(result.valid).toBe(true);
+    });
+
+    it('rejects invalid fit mode', () => {
+      const result = validateKeyframeSettings({
+        fitMode: 'invalid',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Invalid fit mode');
+    });
+
+    it('rejects invalid volume', () => {
+      const result = validateKeyframeSettings({
+        volume: -50,
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('between 0 and 200');
+    });
+  });
+
+  describe('validateProjectData', () => {
+    it('accepts valid project data', () => {
+      const result = validateProjectData({
+        title: 'My Project',
+        description: 'A test project',
+        aspectRatio: '16:9',
+        qualityPreset: '1080p',
+        width: 1920,
+        height: 1080,
+        duration: 30000,
+      });
+      expect(result.valid).toBe(true);
+    });
+
+    it('rejects title that is too long', () => {
+      const result = validateProjectData({
+        title: 'a'.repeat(201),
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('200 characters or less');
+    });
+
+    it('rejects description that is too long', () => {
+      const result = validateProjectData({
+        description: 'a'.repeat(1001),
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('1000 characters or less');
+    });
+
+    it('rejects invalid aspect ratio', () => {
+      const result = validateProjectData({
+        aspectRatio: '21:9',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Invalid aspect ratio');
+    });
+
+    it('rejects negative duration', () => {
+      const result = validateProjectData({
+        duration: -1000,
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('must be a positive number');
+    });
+  });
+
+  describe('clampVolume', () => {
+    it('clamps volume to 0-200 range', () => {
+      expect(clampVolume(-50)).toBe(0);
+      expect(clampVolume(0)).toBe(0);
+      expect(clampVolume(100)).toBe(100);
+      expect(clampVolume(200)).toBe(200);
+      expect(clampVolume(300)).toBe(200);
     });
   });
 });
