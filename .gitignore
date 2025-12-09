@@ -50,6 +50,7 @@ next-env.d.ts
 # Generated results and uploads
 /public/results/
 /public/upload/
+/public/exports/
 /public/generations/
 
 # Log files
