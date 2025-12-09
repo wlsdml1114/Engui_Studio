@@ -240,14 +240,13 @@ export const MODELS: ModelConfig[] = [
         name: 'Upscale',
         provider: 'RunPod',
         type: 'image',
-        inputs: ['image', 'video'],
+        inputs: ['image'],
         api: {
             type: 'runpod',
             endpoint: 'upscale'
         },
         capabilities: {},
         imageInputKey: 'image_path',
-        videoInputKey: 'video_path',
         conditionalInputs: [
             { type: 'image', dependsOn: { parameter: 'media_type', value: 'image' } },
             { type: 'video', dependsOn: { parameter: 'media_type', value: 'video' } }
@@ -255,6 +254,23 @@ export const MODELS: ModelConfig[] = [
         parameters: [
             { name: 'media_type', label: 'Media Type', type: 'select', options: ['image', 'video'], default: 'image', group: 'hidden' },
             { name: 'frame_interpolation', label: 'Frame Interpolation', type: 'boolean', default: false, group: 'advanced', dependsOn: { parameter: 'media_type', value: 'video' } }
+        ]
+    },
+    {
+        id: 'video-upscale',
+        name: 'Video Upscale',
+        provider: 'RunPod',
+        type: 'video',
+        inputs: ['video'],
+        api: {
+            type: 'runpod',
+            endpoint: 'upscale'
+        },
+        capabilities: {},
+        videoInputKey: 'video_path',
+        parameters: [
+            { name: 'media_type', label: 'Media Type', type: 'select', options: ['video'], default: 'video', group: 'hidden' },
+            { name: 'frame_interpolation', label: 'Frame Interpolation', type: 'boolean', default: false, group: 'advanced' }
         ]
     }
 ];

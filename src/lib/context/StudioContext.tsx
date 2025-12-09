@@ -115,6 +115,7 @@ export type PlayerRef = any; // Will be properly typed when Remotion is installe
 const defaultSettings: StudioSettings = {
     apiKeys: {},
     runpod: { endpoints: {} },
+    upscale: {},
     storage: {}
 };
 
@@ -156,7 +157,7 @@ interface StudioContextType {
     exportDialogOpen: boolean;
 
     // Video Editor Actions
-    createProject: (project: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
+    createProject: (project: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt'>, options?: { skipDefaultTracks?: boolean }) => Promise<string>;
     loadProject: (projectId: string) => Promise<void>;
     updateProject: (projectId: string, updates: Partial<VideoProject>) => Promise<void>;
     deleteProject: (projectId: string) => Promise<void>;
@@ -328,10 +329,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                     } else {
                         // Prefer default workspace, otherwise first one
                         workspaceToSelect = data.workspaces.find((w: Workspace) => w.isDefault) || data.workspaces[0];
-                        console.log('✅ Setting default workspace:', workspaceToSelect.id, workspaceToSelect.name);
+                        if (workspaceToSelect) {
+                            console.log('✅ Setting default workspace:', workspaceToSelect.id, workspaceToSelect.name);
+                        }
                     }
                     
-                    setActiveWorkspaceId(workspaceToSelect!.id);
+                    if (workspaceToSelect) {
+                        setActiveWorkspaceId(workspaceToSelect.id);
+                    }
                 } else if (data.workspaces.length === 0) {
                     console.warn('⚠️ No workspaces found! Creating default workspace...');
                     // Create default workspace
@@ -754,7 +759,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
     // --- Video Editor Actions ---
 
-    const createProject = async (project: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+    const createProject = async (
+        project: Omit<VideoProject, 'id' | 'createdAt' | 'updatedAt'>,
+        options?: { skipDefaultTracks?: boolean }
+    ): Promise<string> => {
         const newProject: VideoProject = {
             ...project,
             id: `project-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -764,6 +772,20 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
         setProjects(prev => [...prev, newProject]);
         setCurrentProject(newProject);
+
+        // Only create default tracks if not skipped (e.g., for JSON import)
+        if (!options?.skipDefaultTracks) {
+            const defaultTracks = createDefaultTracks(newProject.id);
+            const defaultKeyframes: Record<string, VideoKeyFrame[]> = {};
+            defaultTracks.forEach(track => {
+                defaultKeyframes[track.id] = [];
+            });
+            setTracks(defaultTracks);
+            setKeyframes(defaultKeyframes);
+        } else {
+            setTracks([]);
+            setKeyframes({});
+        }
 
         try {
             const response = await fetch('/api/video-projects', {
@@ -776,6 +798,23 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                 // Update with server-generated ID if different
                 setProjects(prev => prev.map(p => p.id === newProject.id ? data.project : p));
                 setCurrentProject(data.project);
+                
+                // Save default tracks to API only if not skipped
+                if (!options?.skipDefaultTracks) {
+                    const defaultTracks = createDefaultTracks(data.project.id);
+                    for (const track of defaultTracks) {
+                        try {
+                            await fetch('/api/video-tracks', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(track),
+                            });
+                        } catch (err) {
+                            console.error('Failed to save default track:', err);
+                        }
+                    }
+                }
+                
                 return data.project.id;
             }
         } catch (error) {
@@ -785,15 +824,52 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         return newProject.id;
     };
 
+    // Helper function to create default tracks for a new project
+    const createDefaultTracks = (projectId: string): VideoTrack[] => {
+        const timestamp = Date.now();
+        return [
+            {
+                id: `track-${timestamp}-video`,
+                projectId,
+                type: 'video',
+                label: 'Video Track',
+                locked: false,
+                order: 0,
+                volume: 100,
+                muted: false,
+            },
+            {
+                id: `track-${timestamp}-music`,
+                projectId,
+                type: 'music',
+                label: 'Music Track',
+                locked: false,
+                order: 1,
+                volume: 100,
+                muted: false,
+            },
+            {
+                id: `track-${timestamp}-voiceover`,
+                projectId,
+                type: 'voiceover',
+                label: 'Voiceover Track',
+                locked: false,
+                order: 2,
+                volume: 100,
+                muted: false,
+            },
+        ];
+    };
+
     const loadProject = async (projectId: string): Promise<void> => {
         try {
             const response = await fetch(`/api/video-projects/${projectId}`);
             
-            // If project doesn't exist (404), create a new default project locally
+            // If project doesn't exist (404), create a new default project and save to DB
             if (response.status === 404) {
-                console.log('Project not found, creating new default project locally...');
+                console.log('Project not found, creating new default project...');
                 
-                // Create a default project directly in state without API call
+                // Create a default project
                 const defaultProject: VideoProject = {
                     id: `project-${Date.now()}`,
                     title: 'My Video Project',
@@ -804,66 +880,183 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                     updatedAt: Date.now(),
                 };
                 
+                // Create default tracks
+                const defaultTracks = createDefaultTracks(defaultProject.id);
+                const defaultKeyframes: Record<string, VideoKeyFrame[]> = {};
+                defaultTracks.forEach(track => {
+                    defaultKeyframes[track.id] = [];
+                });
+                
+                // Update state first
                 setCurrentProject(defaultProject);
                 setProjects(prev => [...prev, defaultProject]);
-                setTracks([]);
-                setKeyframes({});
+                setTracks(defaultTracks);
+                setKeyframes(defaultKeyframes);
                 
-                console.log('✅ Default project created locally:', defaultProject.id);
+                // Save project to DB
+                try {
+                    const createResponse = await fetch('/api/video-projects', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(defaultProject),
+                    });
+                    const createData = await createResponse.json();
+                    if (createData.success && createData.project) {
+                        // Update with server-generated data if needed
+                        setCurrentProject(createData.project);
+                        setProjects(prev => prev.map(p => p.id === defaultProject.id ? createData.project : p));
+                        
+                        // Save default tracks to DB
+                        for (const track of defaultTracks) {
+                            await fetch('/api/video-tracks', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ ...track, projectId: createData.project.id }),
+                            });
+                        }
+                        console.log('✅ Default project saved to DB:', createData.project.id);
+                    }
+                } catch (err) {
+                    console.error('Failed to save default project to DB:', err);
+                }
+                
                 return;
             }
             
             const data = await response.json();
             if (data.success && data.project) {
                 setCurrentProject(data.project);
-                setTracks(data.tracks || []);
                 
-                // Organize keyframes by trackId
-                const keyframesByTrack: Record<string, VideoKeyFrame[]> = {};
-                if (data.keyframes) {
-                    data.keyframes.forEach((kf: VideoKeyFrame) => {
-                        if (!keyframesByTrack[kf.trackId]) {
-                            keyframesByTrack[kf.trackId] = [];
-                        }
-                        keyframesByTrack[kf.trackId].push(kf);
+                // If no tracks exist, create default tracks
+                const loadedTracks = data.tracks || [];
+                if (loadedTracks.length === 0) {
+                    console.log('No tracks found, creating default tracks...');
+                    const defaultTracks = createDefaultTracks(data.project.id);
+                    setTracks(defaultTracks);
+                    
+                    // Initialize empty keyframes for default tracks
+                    const defaultKeyframes: Record<string, VideoKeyFrame[]> = {};
+                    defaultTracks.forEach(track => {
+                        defaultKeyframes[track.id] = [];
                     });
+                    setKeyframes(defaultKeyframes);
+                    
+                    // Save default tracks to API
+                    for (const track of defaultTracks) {
+                        try {
+                            await fetch('/api/video-tracks', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(track),
+                            });
+                        } catch (err) {
+                            console.error('Failed to save default track:', err);
+                        }
+                    }
+                } else {
+                    // Deduplicate tracks by type - keep only the first track of each type
+                    const seenTypes = new Set<string>();
+                    const deduplicatedTracks: VideoTrack[] = [];
+                    const duplicateTrackIds: string[] = [];
+                    
+                    for (const track of loadedTracks) {
+                        if (!seenTypes.has(track.type)) {
+                            seenTypes.add(track.type);
+                            deduplicatedTracks.push(track);
+                        } else {
+                            duplicateTrackIds.push(track.id);
+                        }
+                    }
+                    
+                    // Delete duplicate tracks from DB
+                    if (duplicateTrackIds.length > 0) {
+                        console.log('🧹 Cleaning up duplicate tracks:', duplicateTrackIds);
+                        for (const trackId of duplicateTrackIds) {
+                            try {
+                                await fetch(`/api/video-tracks/${trackId}`, { method: 'DELETE' });
+                            } catch (err) {
+                                console.error('Failed to delete duplicate track:', err);
+                            }
+                        }
+                    }
+                    
+                    setTracks(deduplicatedTracks);
+                    
+                    // Organize keyframes by trackId (only for non-duplicate tracks)
+                    const keyframesByTrack: Record<string, VideoKeyFrame[]> = {};
+                    if (data.keyframes) {
+                        data.keyframes.forEach((kf: VideoKeyFrame) => {
+                            // Only include keyframes for tracks that weren't duplicates
+                            if (!duplicateTrackIds.includes(kf.trackId)) {
+                                if (!keyframesByTrack[kf.trackId]) {
+                                    keyframesByTrack[kf.trackId] = [];
+                                }
+                                keyframesByTrack[kf.trackId].push(kf);
+                            }
+                        });
+                    }
+                    setKeyframes(keyframesByTrack);
                 }
-                setKeyframes(keyframesByTrack);
             } else {
-                // If the API returns success: false, create default project
-                console.log('API returned error, creating default project locally...');
-                const defaultProject: VideoProject = {
-                    id: `project-${Date.now()}`,
-                    title: 'My Video Project',
-                    description: 'A new video project',
-                    aspectRatio: '16:9',
-                    duration: 30000,
-                    createdAt: Date.now(),
-                    updatedAt: Date.now(),
-                };
-                
-                setCurrentProject(defaultProject);
-                setProjects(prev => [...prev, defaultProject]);
-                setTracks([]);
-                setKeyframes({});
+                // If the API returns success: false, create and save default project
+                console.log('API returned error, creating default project...');
+                await createAndSaveDefaultProject();
             }
         } catch (error) {
-            // For any error, create a default project locally
-            console.log('Error loading project, creating default project locally...', error);
-            const defaultProject: VideoProject = {
-                id: `project-${Date.now()}`,
-                title: 'My Video Project',
-                description: 'A new video project',
-                aspectRatio: '16:9',
-                duration: 30000,
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-            };
-            
-            setCurrentProject(defaultProject);
-            setProjects(prev => [...prev, defaultProject]);
-            setTracks([]);
-            setKeyframes({});
+            // For any error, create and save default project
+            console.log('Error loading project, creating default project...', error);
+            await createAndSaveDefaultProject();
+        }
+    };
+    
+    // Helper function to create and save a default project to DB
+    const createAndSaveDefaultProject = async () => {
+        const defaultProject: VideoProject = {
+            id: `project-${Date.now()}`,
+            title: 'My Video Project',
+            description: 'A new video project',
+            aspectRatio: '16:9',
+            duration: 30000,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+        };
+        
+        const defaultTracks = createDefaultTracks(defaultProject.id);
+        const defaultKeyframes: Record<string, VideoKeyFrame[]> = {};
+        defaultTracks.forEach(track => {
+            defaultKeyframes[track.id] = [];
+        });
+        
+        // Update state first
+        setCurrentProject(defaultProject);
+        setProjects(prev => [...prev, defaultProject]);
+        setTracks(defaultTracks);
+        setKeyframes(defaultKeyframes);
+        
+        // Save to DB
+        try {
+            const createResponse = await fetch('/api/video-projects', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(defaultProject),
+            });
+            const createData = await createResponse.json();
+            if (createData.success && createData.project) {
+                setCurrentProject(createData.project);
+                setProjects(prev => prev.map(p => p.id === defaultProject.id ? createData.project : p));
+                
+                // Save default tracks to DB
+                for (const track of defaultTracks) {
+                    await fetch('/api/video-tracks', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ...track, projectId: createData.project.id }),
+                    });
+                }
+                console.log('✅ Default project saved to DB:', createData.project.id);
+            }
+        } catch (err) {
+            console.error('Failed to save default project to DB:', err);
         }
     };
 
@@ -886,36 +1079,56 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
         // Debounce the API call
         const timeout = setTimeout(async () => {
-            let retries = 0;
-            const maxRetries = 3;
-            
-            while (retries < maxRetries) {
-                try {
-                    const response = await fetch(`/api/video-projects/${projectId}`, {
-                        method: 'PATCH',
+            try {
+                const response = await fetch(`/api/video-projects/${projectId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updatedProject),
+                });
+                
+                // If project doesn't exist (404), create it first
+                if (response.status === 404) {
+                    console.log('Project not found in DB, creating it...');
+                    const projectToCreate = currentProject ? { ...currentProject, ...updatedProject } : {
+                        id: projectId,
+                        title: 'My Video Project',
+                        description: '',
+                        aspectRatio: '16:9' as const,
+                        duration: 30000,
+                        createdAt: Date.now(),
+                        ...updatedProject,
+                    };
+                    
+                    const createResponse = await fetch('/api/video-projects', {
+                        method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(updatedProject),
+                        body: JSON.stringify(projectToCreate),
                     });
                     
-                    if (!response.ok) {
-                        throw new Error(`Auto-save failed with status: ${response.status}`);
+                    if (createResponse.ok) {
+                        console.log('✅ Project created and saved:', projectId);
+                        
+                        // Also save tracks if they exist
+                        for (const track of tracks) {
+                            if (track.projectId === projectId) {
+                                await fetch('/api/video-tracks', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(track),
+                                }).catch(() => {}); // Ignore errors for tracks
+                            }
+                        }
                     }
-                    
-                    console.log('✅ Project auto-saved:', projectId);
-                    break; // Success, exit retry loop
-                } catch (error) {
-                    retries++;
-                    console.error(`❌ Failed to auto-save project (attempt ${retries}/${maxRetries}):`, error);
-                    
-                    if (retries >= maxRetries) {
-                        // All retries failed - could show a toast notification to user
-                        console.error('❌ Auto-save failed after all retries. Changes may not be saved.');
-                        // TODO: Show user notification about save failure
-                    } else {
-                        // Wait before retrying (exponential backoff)
-                        await new Promise(resolve => setTimeout(resolve, 1000 * retries));
-                    }
+                    return;
                 }
+                
+                if (!response.ok) {
+                    throw new Error(`Auto-save failed with status: ${response.status}`);
+                }
+                
+                console.log('✅ Project auto-saved:', projectId);
+            } catch (error) {
+                console.error('❌ Failed to auto-save project:', error);
             }
         }, 500); // 500ms debounce delay
 

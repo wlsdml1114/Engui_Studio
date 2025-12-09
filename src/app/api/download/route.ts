@@ -58,6 +58,45 @@ export async function POST(request: Request) {
             });
         }
 
+        // Handle RunPod volume paths - download from S3 with authentication
+        if (url.startsWith('/runpod-volume/')) {
+            const SettingsService = (await import('@/lib/settingsService')).default;
+            const S3Service = (await import('@/lib/s3Service')).default;
+            const settingsService = new SettingsService();
+            const { settings } = await settingsService.getSettings('user-with-settings');
+            
+            if (!settings.s3?.endpointUrl || !settings.s3?.accessKeyId || !settings.s3?.secretAccessKey || !settings.s3?.bucketName) {
+                throw new Error('S3 settings not configured');
+            }
+            
+            const s3Service = new S3Service({
+                endpointUrl: settings.s3.endpointUrl,
+                accessKeyId: settings.s3.accessKeyId,
+                secretAccessKey: settings.s3.secretAccessKey,
+                bucketName: settings.s3.bucketName,
+                region: settings.s3.region || 'us-east-1',
+            });
+            
+            // Extract the file path after /runpod-volume/
+            const s3Key = url.replace('/runpod-volume/', '');
+            console.log(`📁 Downloading from S3: ${s3Key}`);
+            
+            try {
+                const fileBuffer = await s3Service.downloadFile(s3Key);
+                fs.writeFileSync(filePath, fileBuffer);
+                console.log(`✅ Downloaded from S3 to: ${filePath}`);
+                
+                return NextResponse.json({
+                    success: true,
+                    path: relativePath,
+                    fullPath: filePath
+                });
+            } catch (s3Error: any) {
+                console.error('S3 download error:', s3Error);
+                throw new Error(`Failed to download from S3: ${s3Error.message}`);
+            }
+        }
+
         // Handle Remote URLs
         const response = await fetch(url);
         if (!response.ok) {

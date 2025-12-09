@@ -12,25 +12,33 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { VideoProject } from '@/lib/context/StudioContext';
+import { VideoProject, VideoTrack, VideoKeyFrame } from '@/lib/context/StudioContext';
 import {
   AspectRatio,
   QualityPreset,
   getResolutionConfig,
 } from '@/lib/resolutionConfig';
+import { downloadProjectAsJSON, parseProjectFile } from '@/lib/videoProjectIO';
+import { Upload, Download, FolderOpen } from 'lucide-react';
 
 interface ProjectSettingsDialogProps {
   project: VideoProject;
+  tracks: VideoTrack[];
+  keyframes: Record<string, VideoKeyFrame[]>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (updates: Partial<VideoProject>) => Promise<void>;
+  onImport: (file: File) => Promise<void>;
 }
 
 export function ProjectSettingsDialog({
   project,
+  tracks,
+  keyframes,
   open,
   onOpenChange,
   onSave,
+  onImport,
 }: ProjectSettingsDialogProps) {
   const [title, setTitle] = useState(project.title);
   const [description, setDescription] = useState(project.description);
@@ -40,6 +48,32 @@ export function ProjectSettingsDialog({
   const [qualityPreset, setQualityPreset] = useState<QualityPreset>('720p');
   const [confirmResolutionChange, setConfirmResolutionChange] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Handle export project as JSON
+  const handleExportJSON = () => {
+    downloadProjectAsJSON(project, tracks, keyframes);
+  };
+
+  // Handle import project from JSON
+  const handleImportJSON = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      
+      try {
+        await onImport(file);
+        onOpenChange(false);
+      } catch (error) {
+        alert(`Failed to import project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    };
+    
+    input.click();
+  };
 
   // Reset form when project changes or dialog opens
   useEffect(() => {
@@ -126,6 +160,26 @@ export function ProjectSettingsDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Save/Load Section */}
+          <div className="flex gap-2 pb-4 border-b">
+            <Button
+              variant="outline"
+              onClick={handleExportJSON}
+              className="flex-1 gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Save Project
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleImportJSON}
+              className="flex-1 gap-2"
+            >
+              <Upload className="h-4 w-4" />
+              Load Project
+            </Button>
+          </div>
+
           {/* Project Info */}
           <div>
             <Label htmlFor="title">Project Name</Label>

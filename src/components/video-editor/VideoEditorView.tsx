@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, lazy, Suspense } from 'react';
+import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { useStudio } from '@/lib/context/StudioContext';
 import { VideoEditorHeader } from './VideoEditorHeader';
 import { ExportDialog } from './ExportDialog';
@@ -21,12 +21,9 @@ const VideoEditorViewInternal = React.memo(function VideoEditorViewInternal({ pr
     currentProject,
     tracks,
     keyframes,
-    player,
-    playerState,
     currentTimestamp,
     zoom,
     loadProject,
-    addTrack,
     setPlayer,
     setPlayerState,
     setCurrentTimestamp,
@@ -54,36 +51,7 @@ const VideoEditorViewInternal = React.memo(function VideoEditorViewInternal({ pr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]); // Only re-run when projectId changes, not when loadProject reference changes
 
-  // Create default tracks after project is loaded (video, music, voiceover)
-  useEffect(() => {
-    const createDefaultTracks = async () => {
-      if (!currentProject || isLoading) return;
-      
-      const defaultTrackTypes: Array<{ type: 'video' | 'music' | 'voiceover'; label: string }> = [
-        { type: 'video', label: 'Video Track' },
-        { type: 'music', label: 'Music Track' },
-        { type: 'voiceover', label: 'Voiceover Track' },
-      ];
-      
-      for (let i = 0; i < defaultTrackTypes.length; i++) {
-        const { type, label } = defaultTrackTypes[i];
-        const existingTrack = tracks.find(t => t.type === type);
-        
-        if (!existingTrack) {
-          await addTrack({
-            projectId: currentProject.id,
-            type,
-            label,
-            locked: false,
-            order: i,
-          });
-        }
-      }
-    };
-    
-    createDefaultTracks();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentProject?.id, isLoading]); // Only run when project loads
+  // Note: Tracks are no longer auto-created. Use Import or Add Media to create tracks.
 
   // Loading state - show first
   if (isLoading) {

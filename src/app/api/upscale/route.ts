@@ -31,20 +31,35 @@ export async function POST(request: NextRequest) {
         // Get settings from database
         const { settings } = await settingsService.getSettings(originalJob.userId);
 
-        if (!settings?.upscale) {
+        if (!settings?.runpod?.apiKey) {
             return NextResponse.json({
                 success: false,
-                error: 'Upscale endpoints not configured'
+                error: 'RunPod API key not configured'
             }, { status: 400 });
         }
 
-        // Get the unified upscale endpoint
-        const endpointId = settings.upscale.endpoint;
+        // Get upscale endpoint from modelConfig based on type
+        const { getModelById } = await import('@/lib/models/modelConfig');
+        const modelId = type === 'image' ? 'upscale' : 'video-upscale';
+        const upscaleModel = getModelById(modelId);
+        
+        if (!upscaleModel) {
+            return NextResponse.json({
+                success: false,
+                error: `Upscale model '${modelId}' not found in configuration`
+            }, { status: 400 });
+        }
+
+        // Get the endpoint key from modelConfig (e.g., 'upscale')
+        const endpointKey = upscaleModel.api.endpoint;
+        
+        // Get the endpoint ID from runpod endpoints settings using the key from modelConfig
+        const endpointId = settings.runpod.endpoints?.[endpointKey as keyof typeof settings.runpod.endpoints];
         
         if (!endpointId) {
             return NextResponse.json({
                 success: false,
-                error: 'Upscale endpoint not configured'
+                error: `Upscale endpoint '${endpointKey}' not configured in RunPod settings`
             }, { status: 400 });
         }
 
@@ -107,7 +122,7 @@ export async function POST(request: NextRequest) {
                     endpointUrl: settings.s3.endpointUrl,
                     accessKeyId: settings.s3.accessKeyId,
                     secretAccessKey: settings.s3.secretAccessKey,
-                    bucketName: settings.s3.bucketName || settings.s3.bucket || 'my-bucket',
+                    bucketName: settings.s3.bucketName || 'my-bucket',
                     region: settings.s3.region || 'us-east-1',
                 });
                 

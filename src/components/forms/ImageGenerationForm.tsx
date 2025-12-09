@@ -265,7 +265,8 @@ export default function ImageGenerationForm() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setMessage(null);
-        if (!prompt) return;
+        // Only require prompt if model accepts text input
+        if (currentModel.inputs.includes('text') && !prompt) return;
 
         // 모델이 이미지 입력을 요구하는 경우 이미지 필수 체크
         if (currentModel.inputs.includes('image') && !imageFile) {
@@ -452,15 +453,17 @@ export default function ImageGenerationForm() {
                     </div>
                 )}
 
-                {/* Prompt */}
-                <div className="relative">
-                    <textarea
-                        className="w-full min-h-[120px] p-3 rounded-lg border border-border bg-secondary/50 text-sm resize-none focus:ring-1 focus:ring-primary focus:border-primary transition-all placeholder:text-muted-foreground/50"
-                        placeholder="Describe your image..."
-                        value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
-                    />
-                </div>
+                {/* Prompt - only show if model accepts text input */}
+                {currentModel.inputs.includes('text') && (
+                    <div className="relative">
+                        <textarea
+                            className="w-full min-h-[120px] p-3 rounded-lg border border-border bg-secondary/50 text-sm resize-none focus:ring-1 focus:ring-primary focus:border-primary transition-all placeholder:text-muted-foreground/50"
+                            placeholder="Describe your image..."
+                            value={prompt}
+                            onChange={(e) => setPrompt(e.target.value)}
+                        />
+                    </div>
+                )}
 
                 {/* Basic Parameters */}
                 {currentModel.parameters.filter(p => p.group === 'basic' && isParameterVisible(p)).map(param => (

@@ -5,6 +5,7 @@ import { useStudio, Job, Workspace } from '@/lib/context/StudioContext';
 import { getModelById } from '@/lib/models/modelConfig';
 import { JobDetailsDialog } from '@/components/workspace/JobDetailsDialog';
 import { Search, Filter, CloudUpload, Info, ChevronDown, Plus, Trash2, FolderPlus, Check, X } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -30,6 +31,7 @@ export default function RightPanel() {
     const inputRef = useRef<HTMLInputElement>(null);
 
     const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId);
+    const { showToast } = useToast();
 
     useEffect(() => {
         setIsMounted(true);
@@ -291,6 +293,7 @@ export default function RightPanel() {
                                             <button
                                                 onClick={async (e) => {
                                                     e.stopPropagation();
+                                                    showToast(`Starting upscale for ${job.type}...`, 'info');
                                                     try {
                                                         const response = await fetch('/api/upscale', {
                                                             method: 'POST',
@@ -303,14 +306,14 @@ export default function RightPanel() {
                                                         const data = await response.json();
                                                         if (data.success && data.job) {
                                                             console.log('Upscale job created:', data.job.id);
-                                                            // Add the new job to context (will start polling automatically)
                                                             addJob(data.job);
+                                                            showToast('Upscale job created and processing', 'success');
                                                         } else {
-                                                            alert(`Failed to create upscale job: ${data.error}`);
+                                                            showToast(data.error || 'Failed to create upscale job', 'error');
                                                         }
                                                     } catch (error) {
                                                         console.error('Error creating upscale job:', error);
-                                                        alert('Failed to create upscale job');
+                                                        showToast('Failed to create upscale job', 'error');
                                                     }
                                                 }}
                                                 className="p-1.5 text-muted-foreground/70 hover:text-green-500 hover:bg-green-500/10 rounded-md transition-colors shadow-sm bg-background/80 backdrop-blur-sm border border-border/50"
@@ -333,6 +336,7 @@ export default function RightPanel() {
                                                 <button
                                                     onClick={async (e) => {
                                                         e.stopPropagation();
+                                                        showToast('Starting upscale with frame interpolation...', 'info');
                                                         try {
                                                             const response = await fetch('/api/upscale', {
                                                                 method: 'POST',
@@ -345,14 +349,14 @@ export default function RightPanel() {
                                                             const data = await response.json();
                                                             if (data.success && data.job) {
                                                                 console.log('Upscale + FI job created:', data.job.id);
-                                                                // Add the new job to context (will start polling automatically)
                                                                 addJob(data.job);
+                                                                showToast('Upscale + FI job created and processing', 'success');
                                                             } else {
-                                                                alert(`Failed to create upscale job: ${data.error}`);
+                                                                showToast(data.error || 'Failed to create upscale job', 'error');
                                                             }
                                                         } catch (error) {
                                                             console.error('Error creating upscale job:', error);
-                                                            alert('Failed to create upscale job');
+                                                            showToast('Failed to create upscale job', 'error');
                                                         }
                                                     }}
                                                     className="p-1.5 text-muted-foreground/70 hover:text-purple-500 hover:bg-purple-500/10 rounded-md transition-colors shadow-sm bg-background/80 backdrop-blur-sm border border-border/50"

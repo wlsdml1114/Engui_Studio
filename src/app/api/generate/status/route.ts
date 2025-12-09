@@ -47,16 +47,12 @@ export async function GET(request: Request) {
 
         const endpoints = settings.runpod.endpoints as Record<string, string> | undefined;
         
-        // For upscale models, use the dedicated upscale endpoint
-        let endpointId: string | undefined;
-        if (model.id === 'upscale') {
-            endpointId = settings.upscale?.endpoint;
-        } else {
-            endpointId = endpoints?.[model.id] || model.api.endpoint;
-        }
+        // Get endpoint ID from settings using the model's endpoint key
+        const endpointKey = model.api.endpoint;
+        const endpointId = endpoints?.[endpointKey] || endpoints?.[model.id];
         
         if (!endpointId) {
-            return NextResponse.json({ success: false, error: 'Endpoint not configured' }, { status: 400 });
+            return NextResponse.json({ success: false, error: `Endpoint '${endpointKey}' not configured` }, { status: 400 });
         }
 
         // Create RunPod service and check status

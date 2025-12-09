@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useStudio, VideoProject, VideoTrack, VideoKeyFrame } from '@/lib/context/StudioContext';
+import React, { useState, useEffect } from 'react';
+import { useStudio, VideoProject } from '@/lib/context/StudioContext';
 import {
   Dialog,
   DialogContent,
@@ -11,22 +11,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
 import { Download, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 interface ExportDialogProps {
   project: VideoProject;
-}
-
-type ExportFormat = 'mp4' | 'webm';
-type ExportQuality = 'low' | 'medium' | 'high';
-
-interface ExportOptions {
-  format: ExportFormat;
-  quality: ExportQuality;
-  resolution: number; // percentage of original resolution
 }
 
 type ExportState = 'idle' | 'rendering' | 'completed' | 'error';
@@ -34,16 +22,17 @@ type ExportState = 'idle' | 'rendering' | 'completed' | 'error';
 export function ExportDialog({ project }: ExportDialogProps) {
   const { exportDialogOpen, setExportDialogOpen, tracks, keyframes } = useStudio();
   
-  const [exportOptions, setExportOptions] = useState<ExportOptions>({
-    format: 'mp4',
-    quality: 'high',
-    resolution: 100,
-  });
-  
   const [exportState, setExportState] = useState<ExportState>('idle');
   const [progress, setProgress] = useState<number>(0);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Auto-start export when dialog opens
+  useEffect(() => {
+    if (exportDialogOpen && exportState === 'idle') {
+      handleExport();
+    }
+  }, [exportDialogOpen]);
 
   const handleExport = async () => {
     setExportState('rendering');
@@ -53,7 +42,6 @@ export function ExportDialog({ project }: ExportDialogProps) {
 
     try {
       // Simulate export progress
-      // In a real implementation, this would call the /api/video-export endpoint
       const progressInterval = setInterval(() => {
         setProgress(prev => {
           if (prev >= 95) {
@@ -64,7 +52,7 @@ export function ExportDialog({ project }: ExportDialogProps) {
         });
       }, 200);
 
-      // Send project data directly to API
+      // Send project data directly to API with default options (mp4, high quality)
       const response = await fetch('/api/video-export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -83,7 +71,11 @@ export function ExportDialog({ project }: ExportDialogProps) {
           },
           tracks: tracks,
           keyframes: keyframes,
-          options: exportOptions,
+          options: {
+            format: 'mp4',
+            quality: 'high',
+            resolution: 100,
+          },
         }),
       });
 
@@ -99,13 +91,12 @@ export function ExportDialog({ project }: ExportDialogProps) {
         setProgress(100);
         setExportState('completed');
         
-        // Check if there's content to download
         if (data.downloadUrl) {
           setDownloadUrl(data.downloadUrl);
           // Trigger automatic download
           const link = document.createElement('a');
           link.href = data.downloadUrl;
-          link.download = `${project.title}.${exportOptions.format}`;
+          link.download = `${project.title}.mp4`;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
@@ -115,7 +106,6 @@ export function ExportDialog({ project }: ExportDialogProps) {
             handleClose();
           }, 1500);
         } else if (data.note) {
-          // Show note (e.g., "Add media to timeline before exporting")
           setErrorMessage(data.note);
         } else {
           setErrorMessage('Export completed but no download available');
@@ -133,7 +123,7 @@ export function ExportDialog({ project }: ExportDialogProps) {
     if (downloadUrl) {
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = `${project.title}.${exportOptions.format}`;
+      link.download = `${project.title}.mp4`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -151,97 +141,17 @@ export function ExportDialog({ project }: ExportDialogProps) {
     }, 300);
   };
 
-  const getQualityLabel = (quality: ExportQuality): string => {
-    switch (quality) {
-      case 'low':
-        return 'Low (Fast)';
-      case 'medium':
-        return 'Medium (Balanced)';
-      case 'high':
-        return 'High (Best Quality)';
-    }
-  };
-
   return (
     <Dialog open={exportDialogOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle>Export Video</DialogTitle>
           <DialogDescription>
-            Configure export settings for your video project
+            Exporting "{project.title}" as MP4
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          {/* Format Selection */}
-          <div className="space-y-2">
-            <Label>Format</Label>
-            <div className="flex gap-2">
-              <Button
-                variant={exportOptions.format === 'mp4' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setExportOptions(prev => ({ ...prev, format: 'mp4' }))}
-                disabled={exportState === 'rendering'}
-                className="flex-1"
-              >
-                MP4
-              </Button>
-              <Button
-                variant={exportOptions.format === 'webm' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setExportOptions(prev => ({ ...prev, format: 'webm' }))}
-                disabled={exportState === 'rendering'}
-                className="flex-1"
-              >
-                WebM
-              </Button>
-            </div>
-          </div>
-
-          {/* Quality Selection */}
-          <div className="space-y-2">
-            <Label>Quality</Label>
-            <div className="flex gap-2">
-              {(['low', 'medium', 'high'] as ExportQuality[]).map((quality) => (
-                <Button
-                  key={quality}
-                  variant={exportOptions.quality === quality ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setExportOptions(prev => ({ ...prev, quality }))}
-                  disabled={exportState === 'rendering'}
-                  className="flex-1"
-                >
-                  {getQualityLabel(quality)}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* Resolution Slider */}
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <Label>Resolution</Label>
-              <span className="text-sm text-muted-foreground">
-                {exportOptions.resolution}%
-              </span>
-            </div>
-            <Slider
-              value={[exportOptions.resolution]}
-              onValueChange={([value]) => setExportOptions(prev => ({ ...prev, resolution: value }))}
-              min={25}
-              max={100}
-              step={25}
-              disabled={exportState === 'rendering'}
-              className="w-full"
-            />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>25%</span>
-              <span>50%</span>
-              <span>75%</span>
-              <span>100%</span>
-            </div>
-          </div>
-
+        <div className="space-y-4 py-4">
           {/* Progress Bar */}
           {exportState === 'rendering' && (
             <div className="space-y-2">
@@ -262,35 +172,22 @@ export function ExportDialog({ project }: ExportDialogProps) {
           {exportState === 'completed' && (
             <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-md">
               <CheckCircle2 className="h-5 w-5 text-green-500" />
-              <span className="text-sm text-green-500">Export completed successfully!</span>
+              <span className="text-sm text-green-500">Export completed!</span>
             </div>
           )}
 
           {/* Error Message */}
-          {exportState === 'error' && errorMessage && (
+          {(exportState === 'error' || (exportState === 'completed' && errorMessage)) && errorMessage && (
             <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
               <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
               <div className="flex-1">
-                <p className="text-sm font-medium text-destructive">Export Failed</p>
-                <p className="text-sm text-destructive/80 mt-1">{errorMessage}</p>
+                <p className="text-sm text-destructive/80">{errorMessage}</p>
               </div>
             </div>
           )}
         </div>
 
         <DialogFooter>
-          {exportState === 'idle' && (
-            <>
-              <Button variant="outline" onClick={handleClose}>
-                Cancel
-              </Button>
-              <Button onClick={handleExport}>
-                <Download className="h-4 w-4 mr-2" />
-                Start Export
-              </Button>
-            </>
-          )}
-
           {exportState === 'rendering' && (
             <Button disabled>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -303,10 +200,12 @@ export function ExportDialog({ project }: ExportDialogProps) {
               <Button variant="outline" onClick={handleClose}>
                 Close
               </Button>
-              <Button onClick={handleDownload}>
-                <Download className="h-4 w-4 mr-2" />
-                Download
-              </Button>
+              {downloadUrl && (
+                <Button onClick={handleDownload}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </Button>
+              )}
             </>
           )}
 

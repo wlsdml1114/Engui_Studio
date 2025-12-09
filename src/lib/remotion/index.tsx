@@ -30,7 +30,28 @@ export const RemotionRoot: React.FC = () => {
           const { width, height } = props.project.width && props.project.height
             ? { width: props.project.width, height: props.project.height }
             : getAspectRatioDimensions(props.project.aspectRatio);
-          const durationInFrames = Math.ceil((props.project.duration / 1000) * FPS);
+          
+          // Calculate actual duration from keyframes (find the latest end time)
+          let maxEndTimeMs = 0;
+          
+          for (const trackKeyframes of Object.values(props.keyframes || {})) {
+            for (const kf of trackKeyframes as any[]) {
+              // For audio, use originalDuration if available (actual audio length)
+              const keyframeDuration = kf.data?.originalDuration || kf.duration || 0;
+              const endTime = (kf.timestamp || 0) + keyframeDuration;
+              if (endTime > maxEndTimeMs) {
+                maxEndTimeMs = endTime;
+              }
+            }
+          }
+          
+          // If keyframes exist, use keyframe-based duration; otherwise fall back to project.duration
+          // This ensures the video ends when the last keyframe ends, not at an arbitrary project duration
+          const effectiveDurationMs = maxEndTimeMs > 0 ? maxEndTimeMs : (props.project.duration || 30000);
+          const durationInFrames = Math.ceil((effectiveDurationMs / 1000) * FPS);
+          
+          console.log(`📐 Remotion calculateMetadata: maxEndTime=${maxEndTimeMs}ms, projectDuration=${props.project.duration}ms, effective=${effectiveDurationMs}ms, frames=${durationInFrames}`);
+          
           return {
             width,
             height,

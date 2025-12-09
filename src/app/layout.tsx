@@ -5,6 +5,7 @@ import Sidebar from "@/components/Sidebar";
 import Library from "@/components/Library";
 import { I18nProvider } from "@/lib/i18n/context";
 import LayoutWrapper from "@/components/LayoutWrapper";
+import { ToastProvider } from "@/components/ui/toast";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,7 +33,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased custom-scrollbar`}
       >
         <I18nProvider>
-          {children}
+          <ToastProvider>
+            {children}
+          </ToastProvider>
         </I18nProvider>
       </body>
     </html>

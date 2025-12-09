@@ -3,85 +3,29 @@
 import React, { useCallback, useMemo } from 'react';
 import { useStudio, VideoProject } from '@/lib/context/StudioContext';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Play, Pause, Download, Maximize2, Plus, Settings } from 'lucide-react';
+import { Download, Plus, FolderOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ProjectSelector } from './ProjectSelector';
-import { ProjectSettingsDialog } from './ProjectSettingsDialog';
 
 interface VideoEditorHeaderProps {
   project: VideoProject;
   className?: string;
 }
 
-const ASPECT_RATIOS = [
-  { value: '16:9' as const, label: '16:9 (Landscape)' },
-  { value: '9:16' as const, label: '9:16 (Portrait)' },
-  { value: '1:1' as const, label: '1:1 (Square)' },
-];
-
 export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project, className }: VideoEditorHeaderProps) {
   const {
-    playerState,
-    player,
-    setPlayerState,
-    updateProject,
     setExportDialogOpen,
     tracks,
     addTrack,
     addKeyframe,
-    loadProject,
-    createProject,
   } = useStudio();
-
-  const [settingsDialogOpen, setSettingsDialogOpen] = React.useState(false);
-
-  const handleAspectRatioChange = useCallback(async (aspectRatio: '16:9' | '9:16' | '1:1') => {
-    await updateProject(project.id, { aspectRatio });
-  }, [updateProject, project.id]);
-
-  const handleProjectSelect = useCallback(async (projectId: string) => {
-    await loadProject(projectId);
-  }, [loadProject]);
-
-  const handleNewProject = useCallback(async () => {
-    const projectId = await createProject({
-      title: `Project ${new Date().toLocaleDateString()}`,
-      description: '',
-      aspectRatio: '16:9',
-      duration: 30000,
-    });
-    await loadProject(projectId);
-  }, [createProject, loadProject]);
-
-  const handlePlayPause = useCallback(() => {
-    if (!player) return;
-
-    if (playerState === 'playing') {
-      player.pause();
-      setPlayerState('paused');
-    } else {
-      player.play();
-      setPlayerState('playing');
-    }
-  }, [player, playerState, setPlayerState]);
 
   const handleExport = useCallback(() => {
     setExportDialogOpen(true);
   }, [setExportDialogOpen]);
 
-  const handleOpenSettings = useCallback(() => {
-    setSettingsDialogOpen(true);
-  }, []);
 
-  const handleSaveSettings = useCallback(async (updates: Partial<VideoProject>) => {
-    await updateProject(project.id, updates);
-  }, [updateProject, project.id]);
+
+
 
   // Helper to get media duration from URL - uses multiple detection methods for reliability
   const getMediaDuration = useCallback(async (url: string, type: 'audio' | 'video'): Promise<number> => {
@@ -417,16 +361,13 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
         className
       )}
     >
-      {/* Left: Project Selector */}
-      <div className="flex items-center gap-4">
-        <ProjectSelector
-          currentProjectId={project.id}
-          onProjectSelect={handleProjectSelect}
-          onNewProject={handleNewProject}
-        />
+      {/* Left: Project Title */}
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <FolderOpen className="h-4 w-4" />
+        <span className="font-medium">{project.title}</span>
       </div>
 
-      {/* Center: Playback Controls */}
+      {/* Center: Add Media */}
       <div className="flex items-center gap-2">
         <Button
           variant="outline"
@@ -438,37 +379,11 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
           <Plus className="h-4 w-4" />
           Add Media
         </Button>
-        
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={handlePlayPause}
-          disabled={!player || !hasContent}
-          aria-label={playerState === 'playing' ? 'Pause' : 'Play'}
-        >
-          {playerState === 'playing' ? (
-            <Pause className="h-4 w-4" />
-          ) : (
-            <Play className="h-4 w-4" />
-          )}
-        </Button>
       </div>
 
-      {/* Right: Settings & Export */}
+      {/* Right: Export */}
       <div className="flex items-center gap-2">
-        {/* Settings Button */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleOpenSettings}
-          className="gap-2"
-          aria-label="Project Settings"
-        >
-          <Settings className="h-4 w-4" />
-          Settings
-        </Button>
-
-        {/* Export Button */}
+        {/* Export Video Button */}
         <Button
           variant="default"
           size="sm"
@@ -480,14 +395,6 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
           Export
         </Button>
       </div>
-
-      {/* Project Settings Dialog */}
-      <ProjectSettingsDialog
-        project={project}
-        open={settingsDialogOpen}
-        onOpenChange={setSettingsDialogOpen}
-        onSave={handleSaveSettings}
-      />
     </div>
   );
 });

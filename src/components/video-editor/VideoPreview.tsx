@@ -151,10 +151,30 @@ export const VideoPreview = React.memo(function VideoPreview({
     return getAspectRatioDimensions(project.aspectRatio);
   }, [project.width, project.height, project.aspectRatio]);
   
+  // Calculate actual duration from keyframes (find the latest end time)
+  const actualDurationMs = useMemo(() => {
+    let maxEndTimeMs = 0;
+    
+    for (const trackKeyframes of Object.values(keyframes || {})) {
+      for (const kf of trackKeyframes) {
+        // For audio, use originalDuration if available (actual audio length)
+        const keyframeDuration = kf.data?.originalDuration || kf.duration || 0;
+        const endTime = (kf.timestamp || 0) + keyframeDuration;
+        if (endTime > maxEndTimeMs) {
+          maxEndTimeMs = endTime;
+        }
+      }
+    }
+    
+    // If keyframes exist, use keyframe-based duration; otherwise fall back to project.duration
+    // This ensures the video ends when the last keyframe ends
+    return maxEndTimeMs > 0 ? maxEndTimeMs : (project.duration || 30000);
+  }, [keyframes, project.duration]);
+  
   // Calculate duration in frames - memoized
   const durationInFrames = useMemo(
-    () => Math.ceil((project.duration / 1000) * FPS),
-    [project.duration]
+    () => Math.max(Math.ceil((actualDurationMs / 1000) * FPS), 1),
+    [actualDurationMs]
   );
 
   // Memoize input props to prevent unnecessary re-renders

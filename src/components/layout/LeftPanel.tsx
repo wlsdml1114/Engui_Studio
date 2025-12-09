@@ -95,7 +95,7 @@ export default function LeftPanel() {
                         <a href="https://github.com/wlsdml1114/Engui_Studio" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors" title="GitHub">
                             <GithubIcon className="w-5 h-5" />
                         </a>
-                        <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors" title="YouTube">
+                        <a href="https://www.youtube.com/@enguistudio" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors" title="YouTube">
                             <YoutubeIcon className="w-5 h-5" />
                         </a>
                         <div className="w-px h-4 bg-border mx-1"></div>
