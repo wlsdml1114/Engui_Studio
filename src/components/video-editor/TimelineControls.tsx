@@ -3,6 +3,7 @@
 import React, { HTMLAttributes, useEffect, useCallback, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { useStudio } from '@/lib/context/StudioContext';
+import { useI18n } from '@/lib/i18n/context';
 import { Button } from '@/components/ui/button';
 import {
   Play,
@@ -33,6 +34,7 @@ export const TimelineControls = React.memo(function TimelineControls({
   ...props
 }: TimelineControlsProps) {
   const { player, playerState, setPlayerState, setCurrentTimestamp } = useStudio();
+  const { t } = useI18n();
 
   // Format time as MM:SS.ms - memoized
   const formatTime = useCallback((seconds: number): string => {
@@ -178,7 +180,7 @@ export const TimelineControls = React.memo(function TimelineControls({
         className
       )}
       role="toolbar"
-      aria-label="Timeline controls"
+      aria-label={t('videoEditor.controls.timelineControls')}
       {...props}
     >
       {/* Time Display */}
@@ -193,14 +195,14 @@ export const TimelineControls = React.memo(function TimelineControls({
       </div>
 
       {/* Playback Controls */}
-      <div className="flex items-center gap-1" role="group" aria-label="Playback controls">
+      <div className="flex items-center gap-1" role="group" aria-label={t('videoEditor.controls.playbackControls')}>
         <Button
           variant="ghost"
           size="icon"
           onClick={handleGoToStart}
           disabled={!player}
           className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-zinc-800"
-          aria-label="Go to start (Home)"
+          aria-label={t('videoEditor.controls.goToStart')}
         >
           <ChevronsLeft className="h-5 w-5" aria-hidden="true" />
         </Button>
@@ -210,7 +212,7 @@ export const TimelineControls = React.memo(function TimelineControls({
           onClick={handleStepBackward}
           disabled={!player}
           className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-zinc-800"
-          aria-label="Step backward 1 second (Left arrow)"
+          aria-label={t('videoEditor.controls.stepBackward')}
         >
           <SkipBack className="h-4 w-4" aria-hidden="true" />
         </Button>
@@ -220,7 +222,7 @@ export const TimelineControls = React.memo(function TimelineControls({
           onClick={handlePlayPause}
           disabled={!player}
           className="h-10 w-10 text-white hover:bg-zinc-800"
-          aria-label={playerState === 'playing' ? 'Pause (Space)' : 'Play (Space)'}
+          aria-label={playerState === 'playing' ? t('videoEditor.controls.pause') : t('videoEditor.controls.play')}
           aria-pressed={playerState === 'playing'}
         >
           {playerState === 'playing' ? (
@@ -235,7 +237,7 @@ export const TimelineControls = React.memo(function TimelineControls({
           onClick={handleStepForward}
           disabled={!player}
           className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-zinc-800"
-          aria-label="Step forward 1 second (Right arrow)"
+          aria-label={t('videoEditor.controls.stepForward')}
         >
           <SkipForward className="h-4 w-4" aria-hidden="true" />
         </Button>
@@ -245,7 +247,7 @@ export const TimelineControls = React.memo(function TimelineControls({
           onClick={handleGoToEnd}
           disabled={!player}
           className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-zinc-800"
-          aria-label="Go to end (End)"
+          aria-label={t('videoEditor.controls.goToEnd')}
         >
           <ChevronsRight className="h-5 w-5" aria-hidden="true" />
         </Button>

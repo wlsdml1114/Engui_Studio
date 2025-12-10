@@ -5,6 +5,7 @@ import { useStudio, VideoProject } from '@/lib/context/StudioContext';
 import { Button } from '@/components/ui/button';
 import { Download, Plus, FolderOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/lib/i18n/context';
 
 interface VideoEditorHeaderProps {
   project: VideoProject;
@@ -12,6 +13,7 @@ interface VideoEditorHeaderProps {
 }
 
 export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project, className }: VideoEditorHeaderProps) {
+  const { t } = useI18n();
   const {
     setExportDialogOpen,
     tracks,
@@ -374,10 +376,10 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
           size="sm"
           onClick={handleAddMedia}
           className="gap-2"
-          aria-label="Add Media"
+          aria-label={t('videoEditor.header.addMedia')}
         >
           <Plus className="h-4 w-4" />
-          Add Media
+          {t('videoEditor.header.addMedia')}
         </Button>
       </div>
 
@@ -392,7 +394,7 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
           className="gap-2"
         >
           <Download className="h-4 w-4" />
-          Export
+          {t('videoEditor.export.exportButton')}
         </Button>
       </div>
     </div>

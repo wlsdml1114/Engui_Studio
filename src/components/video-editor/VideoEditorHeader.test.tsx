@@ -6,6 +6,7 @@ import { VideoProject } from '@/lib/context/StudioContext';
 import { getAspectRatioDimensions } from './VideoComposition';
 import * as fc from 'fast-check';
 import React from 'react';
+import { I18nProvider } from '@/lib/i18n/context';
 
 // Mock lucide-react icons
 vi.mock('lucide-react', () => ({
@@ -17,6 +18,7 @@ vi.mock('lucide-react', () => ({
   Plus: () => React.createElement('svg', { 'data-testid': 'plus-icon' }),
   Settings: () => React.createElement('svg', { 'data-testid': 'settings-icon' }),
   FolderIcon: () => React.createElement('svg', { 'data-testid': 'folder-icon' }),
+  FolderOpen: () => React.createElement('svg', { 'data-testid': 'folder-open-icon' }),
   ChevronDownIcon: () => React.createElement('svg', { 'data-testid': 'chevron-down-icon' }),
   PlusIcon: () => React.createElement('svg', { 'data-testid': 'plus-icon' }),
   TrashIcon: () => React.createElement('svg', { 'data-testid': 'trash-icon' }),
@@ -114,7 +116,11 @@ describe('VideoEditorHeader Component', () => {
 
           mockUpdateProject.mockClear();
 
-          const { unmount } = render(<VideoEditorHeader project={project} />);
+          const { unmount } = render(
+            <I18nProvider>
+              <VideoEditorHeader project={project} />
+            </I18nProvider>
+          );
 
           try {
             // Simulate aspect ratio change by calling the handler directly
@@ -173,7 +179,11 @@ describe('VideoEditorHeader Component', () => {
           mockUpdateProject.mockClear();
           mockSetExportDialogOpen.mockClear();
 
-          const { unmount, container } = render(<VideoEditorHeader project={project} />);
+          const { unmount, container } = render(
+            <I18nProvider>
+              <VideoEditorHeader project={project} />
+            </I18nProvider>
+          );
 
           try {
             // Find the export button using container

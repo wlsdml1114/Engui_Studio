@@ -8,8 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PhotoIcon } from '@heroicons/react/24/outline';
 import { loadFileFromPath } from '@/lib/fileUtils';
+import { useI18n } from '@/lib/i18n/context';
 
 export default function ImageGenerationForm() {
+    const { t } = useI18n();
     const { selectedModel, setSelectedModel, settings, addJob, activeWorkspaceId } = useStudio();
     const [prompt, setPrompt] = useState('');
     const [showAdvanced, setShowAdvanced] = useState(false);
@@ -362,7 +364,7 @@ export default function ImageGenerationForm() {
         }
     };
 
-    if (!currentModel) return <div>Loading...</div>;
+    if (!currentModel) return <div>{t('generationForm.loading')}</div>;
 
     return (
         <div ref={formRef} className="space-y-4 pb-20">
@@ -373,14 +375,14 @@ export default function ImageGenerationForm() {
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
                         </svg>
-                        <span className="text-sm font-medium">Input reused successfully</span>
+                        <span className="text-sm font-medium">{t('generationForm.inputReusedSuccess')}</span>
                     </div>
                 </div>
             )}
             
             {/* Model Selector Card */}
             <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Using</Label>
+                <Label className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{t('generationForm.using')}</Label>
                 <div className="bg-muted/30 border border-border rounded-lg p-3 flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                         <select
@@ -458,7 +460,7 @@ export default function ImageGenerationForm() {
                     <div className="relative">
                         <textarea
                             className="w-full min-h-[120px] p-3 rounded-lg border border-border bg-secondary/50 text-sm resize-none focus:ring-1 focus:ring-primary focus:border-primary transition-all placeholder:text-muted-foreground/50"
-                            placeholder="Describe your image..."
+                            placeholder={t('generationForm.describeYourImage')}
                             value={prompt}
                             onChange={(e) => setPrompt(e.target.value)}
                         />
@@ -479,7 +481,7 @@ export default function ImageGenerationForm() {
                                     checked={parameterValues[param.name] ?? param.default}
                                     onChange={(e) => handleParameterChange(param.name, e.target.checked)}
                                 />
-                                <label htmlFor={param.name} className="text-xs text-muted-foreground">Enable</label>
+                                <label htmlFor={param.name} className="text-xs text-muted-foreground">{t('generationForm.enable')}</label>
                             </div>
                         ) : param.type === 'select' ? (
                             <select
@@ -537,7 +539,7 @@ export default function ImageGenerationForm() {
                         onClick={() => setShowAdvanced(!showAdvanced)}
                         className="flex items-center justify-between w-full text-xs font-medium text-muted-foreground hover:text-foreground transition-colors mb-4"
                     >
-                        <span>Advanced Settings</span>
+                        <span>{t('generationForm.advancedSettings')}</span>
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
                             viewBox="0 0 20 20"
@@ -562,7 +564,7 @@ export default function ImageGenerationForm() {
                                             checked={parameterValues[param.name] ?? param.default}
                                             onChange={(e) => handleParameterChange(param.name, e.target.checked)}
                                         />
-                                        <label htmlFor={param.name} className="text-xs text-muted-foreground">Enable</label>
+                                        <label htmlFor={param.name} className="text-xs text-muted-foreground">{t('generationForm.enable')}</label>
                                     </div>
                                 ) : param.type === 'select' ? (
                                     <select
@@ -611,7 +613,7 @@ export default function ImageGenerationForm() {
                         disabled={isGenerating || isLoadingMedia}
                         className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold py-2.5"
                     >
-                        {isLoadingMedia ? 'Loading media...' : isGenerating ? 'Generating...' : 'Generate'}
+                        {isLoadingMedia ? t('generationForm.loadingMedia') : isGenerating ? t('generationForm.generating') : t('generationForm.generate')}
                     </Button>
                 </div>
             </form >

@@ -10,6 +10,7 @@ import { validateKeyframeData } from '@/lib/videoEditorValidation';
 import { AlertCircle } from 'lucide-react';
 import { hasAudioTrack } from '@/lib/audioDetectionService';
 import { findAvailableAudioTrack } from '@/lib/trackSelectionService';
+import { useI18n } from '@/lib/i18n/context';
 
 const BASE_PIXELS_PER_SECOND = 100;
 const TRACK_TYPE_ORDER = ['video', 'music', 'voiceover'] as const;
@@ -35,6 +36,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
   ...props
 }: VideoTimelineProps) {
   const { setCurrentTimestamp, addKeyframe, addTrack, updateKeyframe, removeKeyframe, player, setZoom, clearSelection } = useStudio();
+  const { t } = useI18n();
   const timelineRef = useRef<HTMLDivElement>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'warning' | 'error' } | null>(null);
@@ -627,7 +629,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
     <div
       className={cn('border-t border-border bg-background flex flex-col h-full', className)}
       role="region"
-      aria-label="Video timeline"
+      aria-label={t('videoEditor.messages.videoTimeline')}
       {...props}
     >
       {/* Validation Error Display */}
@@ -639,15 +641,15 @@ export const VideoTimeline = React.memo(function VideoTimeline({
         >
           <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" aria-hidden="true" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-destructive">Validation Error</p>
+            <p className="text-sm font-medium text-destructive">{t('videoEditor.messages.validationError')}</p>
             <p className="text-sm text-destructive/90">{validationError}</p>
           </div>
           <button
             onClick={() => setValidationError(null)}
             className="text-destructive hover:text-destructive/80 text-sm font-medium"
-            aria-label="Dismiss validation error"
+            aria-label={t('videoEditor.messages.dismissValidationError')}
           >
-            Dismiss
+            {t('videoEditor.messages.dismiss')}
           </button>
         </div>
       )}
@@ -691,9 +693,9 @@ export const VideoTimeline = React.memo(function VideoTimeline({
               notification.type === 'warning' && "text-yellow-500 hover:text-yellow-500/80",
               notification.type === 'error' && "text-destructive hover:text-destructive/80"
             )}
-            aria-label="Dismiss notification"
+            aria-label={t('videoEditor.messages.dismissNotification')}
           >
-            Dismiss
+            {t('videoEditor.messages.dismiss')}
           </button>
         </div>
       )}
@@ -714,7 +716,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
         onDragOver={handleDragOver}
         data-timeline-zoom={zoom}
         role="group"
-        aria-label="Timeline tracks"
+        aria-label={t('videoEditor.messages.timelineTracks')}
         tabIndex={0}
         aria-describedby="timeline-instructions"
       >
@@ -734,7 +736,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
             className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-30 pointer-events-none"
             style={{ left: `${playheadPosition}px` }}
             role="presentation"
-            aria-label={`Playhead at ${formatTime(currentTimestamp)}`}
+            aria-label={t('videoEditor.messages.playheadAt', { time: formatTime(currentTimestamp) })}
           >
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3 h-3 bg-red-500 rounded-full" aria-hidden="true" />
           </div>
@@ -760,7 +762,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
               className="absolute inset-0 flex items-center justify-center text-muted-foreground pt-8"
               role="status"
             >
-              <p>Drag and drop media here to start editing</p>
+              <p>{t('videoEditor.messages.dragAndDropMedia')}</p>
             </div>
           )}
         </div>
@@ -768,7 +770,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
 
       {/* Hidden instructions for screen readers */}
       <div id="timeline-instructions" className="sr-only">
-        Timeline keyboard shortcuts: Home to go to start, End to go to end, Page Up to skip back 5 seconds, Page Down to skip forward 5 seconds. Click on timeline to seek to position. Drag and drop media to add to timeline. Use Alt+Scroll or Ctrl+Scroll to zoom, or pinch on trackpad.
+        {t('videoEditor.messages.timelineKeyboardShortcuts')}
       </div>
     </div>
   );

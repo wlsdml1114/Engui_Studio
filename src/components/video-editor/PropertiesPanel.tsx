@@ -7,9 +7,11 @@ import { KeyframeFitSelector } from './KeyframeFitSelector';
 import { SettingsIcon, Volume2Icon, ImageIcon, XIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FitMode } from '@/lib/mediaFitting';
+import { useI18n } from '@/lib/i18n/context';
 
 export function PropertiesPanel() {
   const { selectedKeyframeIds, tracks, keyframes, updateKeyframe, clearSelection } = useStudio();
+  const { t } = useI18n();
   
   // Get the first selected keyframe
   const selectedKeyframeId = selectedKeyframeIds[0];
@@ -65,7 +67,7 @@ export function PropertiesPanel() {
       <div className="p-3 border-b border-border/50 flex items-center justify-between">
         <div className="flex items-center gap-2 text-foreground">
           <SettingsIcon className="w-4 h-4" />
-          <span className="font-medium text-sm">Properties</span>
+          <span className="font-medium text-sm">{t('videoEditor.properties.title')}</span>
         </div>
         <Button
           variant="ghost"
@@ -95,7 +97,7 @@ export function PropertiesPanel() {
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-foreground">
               <Volume2Icon className="w-4 h-4 text-blue-400" />
-              <span className="text-xs font-medium">Audio Settings</span>
+              <span className="text-xs font-medium">{t('videoEditor.properties.audioSettings')}</span>
             </div>
             <KeyframeVolumeControl
               keyframe={selectedKeyframe}
@@ -108,7 +110,7 @@ export function PropertiesPanel() {
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-foreground">
               <ImageIcon className="w-4 h-4 text-green-400" />
-              <span className="text-xs font-medium">Visual Settings</span>
+              <span className="text-xs font-medium">{t('videoEditor.properties.visualSettings')}</span>
             </div>
             <KeyframeFitSelector
               keyframe={selectedKeyframe}
@@ -121,11 +123,11 @@ export function PropertiesPanel() {
       {/* Time Info */}
       <div className="px-3 py-2 border-t border-border/30 text-xs text-muted-foreground">
         <div className="flex justify-between">
-          <span>Start</span>
+          <span>{t('videoEditor.properties.start')}</span>
           <span className="text-foreground">{(selectedKeyframe.timestamp / 1000).toFixed(2)}s</span>
         </div>
         <div className="flex justify-between mt-1">
-          <span>Duration</span>
+          <span>{t('videoEditor.properties.duration')}</span>
           <span className="text-foreground">{(selectedKeyframe.duration / 1000).toFixed(2)}s</span>
         </div>
       </div>

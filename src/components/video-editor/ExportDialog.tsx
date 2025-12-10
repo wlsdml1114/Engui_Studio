@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useStudio, VideoProject } from '@/lib/context/StudioContext';
+import { useI18n } from '@/lib/i18n/context';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,7 @@ type ExportState = 'idle' | 'rendering' | 'completed' | 'error';
 
 export function ExportDialog({ project }: ExportDialogProps) {
   const { exportDialogOpen, setExportDialogOpen, tracks, keyframes } = useStudio();
+  const { t } = useI18n();
   
   const [exportState, setExportState] = useState<ExportState>('idle');
   const [progress, setProgress] = useState<number>(0);
@@ -145,9 +147,9 @@ export function ExportDialog({ project }: ExportDialogProps) {
     <Dialog open={exportDialogOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
-          <DialogTitle>Export Video</DialogTitle>
+          <DialogTitle>{t('videoEditor.export.title')}</DialogTitle>
           <DialogDescription>
-            Exporting "{project.title}" as MP4
+            {t('videoEditor.export.exportingAs', { title: project.title })}
           </DialogDescription>
         </DialogHeader>
 
@@ -156,7 +158,7 @@ export function ExportDialog({ project }: ExportDialogProps) {
           {exportState === 'rendering' && (
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Rendering...</span>
+                <span className="text-muted-foreground">{t('videoEditor.export.rendering')}</span>
                 <span className="font-medium">{progress}%</span>
               </div>
               <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
@@ -172,7 +174,7 @@ export function ExportDialog({ project }: ExportDialogProps) {
           {exportState === 'completed' && (
             <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-md">
               <CheckCircle2 className="h-5 w-5 text-green-500" />
-              <span className="text-sm text-green-500">Export completed!</span>
+              <span className="text-sm text-green-500">{t('videoEditor.export.success')}</span>
             </div>
           )}
 
@@ -191,19 +193,19 @@ export function ExportDialog({ project }: ExportDialogProps) {
           {exportState === 'rendering' && (
             <Button disabled>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Rendering...
+              {t('videoEditor.export.rendering')}
             </Button>
           )}
 
           {exportState === 'completed' && (
             <>
               <Button variant="outline" onClick={handleClose}>
-                Close
+                {t('videoEditor.export.close')}
               </Button>
               {downloadUrl && (
                 <Button onClick={handleDownload}>
                   <Download className="h-4 w-4 mr-2" />
-                  Download
+                  {t('videoEditor.export.download')}
                 </Button>
               )}
             </>
@@ -212,10 +214,10 @@ export function ExportDialog({ project }: ExportDialogProps) {
           {exportState === 'error' && (
             <>
               <Button variant="outline" onClick={handleClose}>
-                Close
+                {t('videoEditor.export.close')}
               </Button>
               <Button onClick={handleExport}>
-                Try Again
+                {t('videoEditor.export.tryAgain')}
               </Button>
             </>
           )}

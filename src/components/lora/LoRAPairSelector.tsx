@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/lib/i18n/context';
 
 export interface LoRAFile {
   id: string;
@@ -55,6 +56,7 @@ export function LoRAPairSelector({
   availableLoras,
   onManageClick,
 }: LoRAPairSelectorProps) {
+  const { t } = useI18n();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -177,8 +179,8 @@ export function LoRAPairSelector({
   return (
     <div className="space-y-2 relative">
       <div className="flex items-center justify-between">
-        <Label>LoRA Pair</Label>
-        <span className="text-xs text-muted-foreground">High & Low LoRA with weights</span>
+        <Label>{t('loraManagement.selector.label')}</Label>
+        <span className="text-xs text-muted-foreground">{t('loraManagement.selector.description')}</span>
       </div>
 
       {selectedPair ? (
@@ -188,7 +190,7 @@ export function LoRAPairSelector({
             <Package className="h-5 w-5 text-primary" />
             <h4 className="font-medium text-sm">{selectedPair.baseName}</h4>
             {selectedPair.isComplete && (
-              <span className="text-xs bg-green-500/10 text-green-500 px-2 py-0.5 rounded">Complete</span>
+              <span className="text-xs bg-green-500/10 text-green-500 px-2 py-0.5 rounded">{t('loraManagement.status.complete')}</span>
             )}
           </div>
 
@@ -197,7 +199,7 @@ export function LoRAPairSelector({
             {/* High LoRA */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">HIGH</span>
+                <span className="text-xs font-medium text-muted-foreground">{t('loraManagement.status.high')}</span>
                 {selectedPair.high && (
                   <span className="text-xs text-muted-foreground">
                     {formatFileSize(selectedPair.high.fileSize)}
@@ -210,7 +212,7 @@ export function LoRAPairSelector({
                     {selectedPair.high.fileName}
                   </p>
                   <div className="space-y-1">
-                    <Label htmlFor="high-weight" className="text-xs">Weight</Label>
+                    <Label htmlFor="high-weight" className="text-xs">{t('loraManagement.selector.weight')}</Label>
                     <Input
                       id="high-weight"
                       type="number"
@@ -234,7 +236,7 @@ export function LoRAPairSelector({
             {/* Low LoRA */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">LOW</span>
+                <span className="text-xs font-medium text-muted-foreground">{t('loraManagement.status.low')}</span>
                 {selectedPair.low && (
                   <span className="text-xs text-muted-foreground">
                     {formatFileSize(selectedPair.low.fileSize)}
@@ -247,7 +249,7 @@ export function LoRAPairSelector({
                     {selectedPair.low.fileName}
                   </p>
                   <div className="space-y-1">
-                    <Label htmlFor="low-weight" className="text-xs">Weight</Label>
+                    <Label htmlFor="low-weight" className="text-xs">{t('loraManagement.selector.weight')}</Label>
                     <Input
                       id="low-weight"
                       type="number"
@@ -277,7 +279,7 @@ export function LoRAPairSelector({
               onClick={() => setIsDropdownOpen(true)}
               className="flex-1"
             >
-              Change
+              {t('loraManagement.actions.change')}
             </Button>
             <Button
               type="button"
@@ -286,7 +288,7 @@ export function LoRAPairSelector({
               onClick={handleClear}
               className="flex-1"
             >
-              Clear
+              {t('loraManagement.actions.clear')}
             </Button>
           </div>
         </div>
@@ -296,7 +298,7 @@ export function LoRAPairSelector({
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Package className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">No LoRA pair selected</span>
+              <span className="text-sm text-muted-foreground">{t('loraManagement.selector.noLoraSelected')}</span>
             </div>
             <Button
               type="button"
@@ -306,7 +308,7 @@ export function LoRAPairSelector({
               disabled={loraPairs.length === 0}
             >
               <ChevronDown className="h-4 w-4 mr-1" />
-              Select Pair
+              {t('loraManagement.selector.selectPair')}
             </Button>
           </div>
         </div>
@@ -325,7 +327,7 @@ export function LoRAPairSelector({
               <Input
                 ref={searchInputRef}
                 type="text"
-                placeholder="Search LoRA pairs..."
+                placeholder={t('loraManagement.selector.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -338,7 +340,7 @@ export function LoRAPairSelector({
             {filteredPairs.length === 0 ? (
               <div className="p-6 text-center text-sm text-muted-foreground">
                 <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>{searchQuery ? 'No pairs found' : 'No LoRA pairs available'}</p>
+                <p>{searchQuery ? t('loraManagement.selector.noPairsFound') : t('loraManagement.selector.noPairsAvailable')}</p>
               </div>
             ) : (
               <>
@@ -353,17 +355,17 @@ export function LoRAPairSelector({
                       <Package className={`h-4 w-4 ${pair.isComplete ? 'text-green-500' : 'text-yellow-500'}`} />
                       <span className="text-sm font-medium">{pair.baseName}</span>
                       {pair.isComplete ? (
-                        <span className="text-xs bg-green-500/10 text-green-500 px-1.5 py-0.5 rounded">Complete</span>
+                        <span className="text-xs bg-green-500/10 text-green-500 px-1.5 py-0.5 rounded">{t('loraManagement.status.complete')}</span>
                       ) : (
-                        <span className="text-xs bg-yellow-500/10 text-yellow-500 px-1.5 py-0.5 rounded">Incomplete</span>
+                        <span className="text-xs bg-yellow-500/10 text-yellow-500 px-1.5 py-0.5 rounded">{t('loraManagement.status.incomplete')}</span>
                       )}
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                       <div>
-                        <span className="font-medium">HIGH:</span> {pair.high ? '✓' : '✗'}
+                        <span className="font-medium">{t('loraManagement.status.high')}:</span> {pair.high ? '✓' : '✗'}
                       </div>
                       <div>
-                        <span className="font-medium">LOW:</span> {pair.low ? '✓' : '✗'}
+                        <span className="font-medium">{t('loraManagement.status.low')}:</span> {pair.low ? '✓' : '✗'}
                       </div>
                     </div>
                   </button>
@@ -384,7 +386,7 @@ export function LoRAPairSelector({
                 className="w-full justify-start"
               >
                 <Upload className="h-4 w-4 mr-2" />
-                Upload New LoRA
+                {t('loraManagement.selector.uploadNewLora')}
               </Button>
             </div>
           </div>

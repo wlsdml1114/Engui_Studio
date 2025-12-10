@@ -11,8 +11,10 @@ import { loadFileFromPath } from '@/lib/fileUtils';
 import { LoRASelector, type LoRAFile } from '@/components/lora/LoRASelector';
 import { LoRAPairSelector } from '@/components/lora/LoRAPairSelector';
 import { LoRAManagementDialog } from '@/components/lora/LoRAManagementDialog';
+import { useI18n } from '@/lib/i18n/context';
 
 export default function VideoGenerationForm() {
+    const { t } = useI18n();
     const { selectedModel, setSelectedModel, settings, addJob, activeWorkspaceId } = useStudio();
     const [prompt, setPrompt] = useState('');
     const [imageFile, setImageFile] = useState<File | null>(null);
@@ -582,7 +584,7 @@ export default function VideoGenerationForm() {
         }
     };
 
-    if (!currentModel) return <div>Loading...</div>;
+    if (!currentModel) return <div>{t('generationForm.loading')}</div>;
 
     return (
         <div ref={formRef} className="space-y-4 pb-20">
@@ -593,14 +595,14 @@ export default function VideoGenerationForm() {
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
                         </svg>
-                        <span className="text-sm font-medium">Input reused successfully</span>
+                        <span className="text-sm font-medium">{t('generationForm.inputReusedSuccess')}</span>
                     </div>
                 </div>
             )}
             
             {/* Model Selector Card */}
             <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Using</Label>
+                <Label className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{t('generationForm.using')}</Label>
                 <div className="bg-muted/30 border border-border rounded-lg p-3 flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                         <select
@@ -625,11 +627,11 @@ export default function VideoGenerationForm() {
                 {/* Image Input (Conditional) */}
                 {isInputVisible(currentModel, 'image', parameterValues) && (
                     <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground font-medium">Image Reference</Label>
+                        <Label className="text-xs text-muted-foreground font-medium">{t('generationForm.imageReference')}</Label>
                         {isLoadingMedia ? (
                             <div className="border border-dashed rounded-lg p-8 text-center">
                                 <div className="w-8 h-8 mx-auto mb-2 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                                <span className="text-xs text-muted-foreground">Loading media files...</span>
+                                <span className="text-xs text-muted-foreground">{t('generationForm.loadingMedia')}</span>
                             </div>
                         ) : imagePreviewUrl ? (
                             <div className="relative group rounded-lg overflow-hidden border border-border">
@@ -662,7 +664,7 @@ export default function VideoGenerationForm() {
                                 />
                                 <PhotoIcon className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                                 <span className="text-xs text-muted-foreground">
-                                    {isDragOverImage ? 'Drop image here' : 'Click or drop image'}
+                                    {isDragOverImage ? t('generationForm.dropImageHere') : t('generationForm.clickOrDropImage')}
                                 </span>
                             </div>
                         )}
@@ -672,7 +674,7 @@ export default function VideoGenerationForm() {
                 {/* Video Input (Conditional) */}
                 {isInputVisible(currentModel, 'video', parameterValues) && (
                     <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground font-medium">Video Reference</Label>
+                        <Label className="text-xs text-muted-foreground font-medium">{t('generationForm.videoReference')}</Label>
                         {videoPreviewUrl ? (
                             <div className="relative group rounded-lg overflow-hidden border border-border">
                                 <video src={videoPreviewUrl} className="w-full h-40 object-cover" controls />
@@ -705,7 +707,7 @@ export default function VideoGenerationForm() {
                                     <path strokeLinecap="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
                                 </svg>
                                 <span className="text-xs text-muted-foreground">
-                                    {isDragOverVideo ? 'Drop video here' : 'Click or drop video'}
+                                    {isDragOverVideo ? t('generationForm.dropVideoHere') : t('generationForm.clickOrDropVideo')}
                                 </span>
                             </div>
                         )}
@@ -715,7 +717,7 @@ export default function VideoGenerationForm() {
                 {/* Audio Input (Conditional) */}
                 {isInputVisible(currentModel, 'audio', parameterValues) && (
                     <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground font-medium">Audio {parameterValues['person_count'] === 'multi' ? '1' : ''}</Label>
+                        <Label className="text-xs text-muted-foreground font-medium">{t('generationForm.audio')} {parameterValues['person_count'] === 'multi' ? '1' : ''}</Label>
                         {audioFile ? (
                             <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-muted/30">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-muted-foreground">
@@ -743,7 +745,7 @@ export default function VideoGenerationForm() {
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 mx-auto mb-2 text-muted-foreground">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
                                 </svg>
-                                <span className="text-xs text-muted-foreground">Click or drop audio</span>
+                                <span className="text-xs text-muted-foreground">{t('generationForm.clickOrDropAudio')}</span>
                             </div>
                         )}
                     </div>
@@ -752,7 +754,7 @@ export default function VideoGenerationForm() {
                 {/* Second Audio Input (Conditional - for multi-person) */}
                 {isInputVisible(currentModel, 'audio', parameterValues) && parameterValues['person_count'] === 'multi' && (
                     <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground font-medium">Audio 2</Label>
+                        <Label className="text-xs text-muted-foreground font-medium">{t('generationForm.audio2')}</Label>
                         {audioFile2 ? (
                             <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-muted/30">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-muted-foreground">
@@ -780,7 +782,7 @@ export default function VideoGenerationForm() {
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 mx-auto mb-2 text-muted-foreground">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
                                 </svg>
-                                <span className="text-xs text-muted-foreground">Click or drop audio</span>
+                                <span className="text-xs text-muted-foreground">{t('generationForm.clickOrDropAudio')}</span>
                             </div>
                         )}
                     </div>
@@ -791,7 +793,7 @@ export default function VideoGenerationForm() {
                     <div className="relative">
                         <textarea
                             className="w-full min-h-[120px] p-3 rounded-lg border border-border bg-secondary/50 text-sm resize-none focus:ring-1 focus:ring-primary focus:border-primary transition-all placeholder:text-muted-foreground/50"
-                            placeholder="Describe your video..."
+                            placeholder={t('generationForm.describeYourVideo')}
                             value={prompt}
                             onChange={(e) => setPrompt(e.target.value)}
                         />
@@ -812,7 +814,7 @@ export default function VideoGenerationForm() {
                                     defaultChecked={param.default}
                                     onChange={(e) => handleParameterChange(param.name, e.target.checked)}
                                 />
-                                <label htmlFor={param.name} className="text-xs text-muted-foreground">Enable</label>
+                                <label htmlFor={param.name} className="text-xs text-muted-foreground">{t('generationForm.enable')}</label>
                             </div>
                         ) : param.type === 'select' ? (
                             <select
@@ -851,7 +853,7 @@ export default function VideoGenerationForm() {
                 {/* Dimensions - Always Visible */}
                 {currentModel.capabilities.dimensions && currentModel.capabilities.dimensions.length > 0 && (
                     <div className="space-y-2">
-                        <Label className="text-xs">Size</Label>
+                        <Label className="text-xs">{t('generationForm.size')}</Label>
                         <select
                             name="dimensions"
                             className="w-full p-2 rounded-md border border-border bg-background text-sm"
@@ -870,7 +872,7 @@ export default function VideoGenerationForm() {
                         onClick={() => setShowAdvanced(!showAdvanced)}
                         className="flex items-center justify-between w-full text-xs font-medium text-muted-foreground hover:text-foreground transition-colors mb-4"
                     >
-                        <span>Advanced Settings</span>
+                        <span>{t('generationForm.advancedSettings')}</span>
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
                             viewBox="0 0 20 20"
@@ -885,7 +887,7 @@ export default function VideoGenerationForm() {
                         {/* Duration */}
                         {currentModel.capabilities.durations && currentModel.capabilities.durations.length > 0 && (
                             <div className="space-y-2">
-                                <Label className="text-xs">Duration</Label>
+                                <Label className="text-xs">{t('generationForm.duration')}</Label>
                                 <div className="flex gap-2">
                                     {currentModel.capabilities.durations.map(dur => (
                                         <button
@@ -990,7 +992,7 @@ export default function VideoGenerationForm() {
                                                     defaultChecked={param.default}
                                                     onChange={(e) => handleParameterChange(param.name, e.target.checked)}
                                                 />
-                                                <label htmlFor={param.name} className="text-xs text-muted-foreground">Enable</label>
+                                                <label htmlFor={param.name} className="text-xs text-muted-foreground">{t('generationForm.enable')}</label>
                                             </div>
                                         ) : param.type === 'select' ? (
                                             <select
@@ -1041,7 +1043,7 @@ export default function VideoGenerationForm() {
                         disabled={isGenerating || isLoadingMedia}
                         className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold py-2.5"
                     >
-                        {isLoadingMedia ? 'Loading media...' : isGenerating ? 'Generating...' : 'Generate'}
+                        {isLoadingMedia ? t('generationForm.loadingMedia') : isGenerating ? t('generationForm.generating') : t('generationForm.generate')}
                     </Button>
                 </div>
             </form>

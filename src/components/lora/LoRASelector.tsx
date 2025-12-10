@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/lib/i18n/context';
 
 export interface LoRAFile {
   id: string;
@@ -40,6 +41,7 @@ export function LoRASelector({
   availableLoras,
   onManageClick,
 }: LoRASelectorProps) {
+  const { t } = useI18n();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -174,7 +176,7 @@ export function LoRASelector({
                 {selectedLoRA.fileName}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {formatFileSize(selectedLoRA.fileSize)} • Uploaded{' '}
+                {formatFileSize(selectedLoRA.fileSize)} • {t('loraManagement.selector.uploaded')}{' '}
                 {formatDate(selectedLoRA.uploadedAt)}
               </p>
             </div>
@@ -187,7 +189,7 @@ export function LoRASelector({
               onClick={() => setIsDropdownOpen(true)}
               className="flex-1 hover:bg-primary/10 transition-colors"
             >
-              Change
+              {t('loraManagement.actions.change')}
             </Button>
             <Button
               type="button"
@@ -196,7 +198,7 @@ export function LoRASelector({
               onClick={handleClear}
               className="flex-1 hover:bg-destructive/10 hover:text-destructive transition-colors"
             >
-              Clear
+              {t('loraManagement.actions.clear')}
             </Button>
             <Button
               type="button"
@@ -205,7 +207,7 @@ export function LoRASelector({
               onClick={onManageClick}
               className="flex-1 hover:bg-primary/10 transition-colors"
             >
-              Manage
+              {t('loraManagement.actions.manage')}
             </Button>
           </div>
         </div>
@@ -215,7 +217,7 @@ export function LoRASelector({
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Package className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <span className="text-sm text-muted-foreground">No LoRA selected</span>
+              <span className="text-sm text-muted-foreground">{t('loraManagement.selector.noLoraSelected2')}</span>
             </div>
             <div className="flex gap-2 w-full sm:w-auto">
               <Button
@@ -227,7 +229,7 @@ export function LoRASelector({
                 className="flex-1 sm:flex-initial hover:bg-primary/10 transition-colors"
               >
                 <ChevronDown className="h-4 w-4 mr-1" />
-                Select LoRA
+                {t('loraManagement.selector.selectLora')}
               </Button>
               <Button
                 type="button"
@@ -236,7 +238,7 @@ export function LoRASelector({
                 onClick={onManageClick}
                 className="flex-1 sm:flex-initial hover:bg-primary/10 transition-colors"
               >
-                Manage
+                {t('loraManagement.actions.manage')}
               </Button>
             </div>
           </div>
@@ -257,7 +259,7 @@ export function LoRASelector({
               <Input
                 ref={searchInputRef}
                 type="text"
-                placeholder="Search LoRAs..."
+                placeholder={t('loraManagement.selector.searchLorasPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9 focus-visible:ring-primary"
@@ -270,7 +272,7 @@ export function LoRASelector({
             {filteredLoras.length === 0 ? (
               <div className="p-6 text-center text-sm text-muted-foreground">
                 <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>{searchQuery ? 'No LoRAs found' : 'No LoRAs available'}</p>
+                <p>{searchQuery ? t('loraManagement.selector.noLorasFound') : t('loraManagement.selector.noLorasAvailable')}</p>
               </div>
             ) : (
               <>
@@ -278,7 +280,7 @@ export function LoRASelector({
                 {recentLoras.length > 0 && (
                   <div>
                     <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Recent
+                      {t('loraManagement.selector.recent')}
                     </div>
                     {recentLoras.map((lora) => (
                       <button
@@ -313,7 +315,7 @@ export function LoRASelector({
                 {allLoras.length > 0 && (
                   <div>
                     <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      {recentLoras.length > 0 ? 'All LoRAs' : 'Available LoRAs'}
+                      {recentLoras.length > 0 ? t('loraManagement.selector.allLoras') : t('loraManagement.selector.availableLoras')}
                     </div>
                     {allLoras.map((lora) => (
                       <button
@@ -359,7 +361,7 @@ export function LoRASelector({
                 className="w-full justify-start hover:bg-primary/10 transition-colors"
               >
                 <Upload className="h-4 w-4 mr-2" />
-                Upload New LoRA
+                {t('loraManagement.selector.uploadNewLora')}
               </Button>
             </div>
           </div>

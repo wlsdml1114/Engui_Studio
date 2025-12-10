@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Download, Trash2, X, Copy, ExternalLink } from 'lucide-react';
 import { getModelById } from '@/lib/models/modelConfig';
+import { useI18n } from '@/lib/i18n/context';
 
 interface JobDetailsDialogProps {
     job: Job | null;
@@ -15,6 +16,7 @@ interface JobDetailsDialogProps {
 
 export function JobDetailsDialog({ job, open, onOpenChange }: JobDetailsDialogProps) {
     const { deleteJob } = useStudio();
+    const { t } = useI18n();
 
     // If no job, we still render the Dialog but with open=false to prevent unmounting issues
     // or we render empty content if it somehow opens without a job
@@ -42,7 +44,7 @@ export function JobDetailsDialog({ job, open, onOpenChange }: JobDetailsDialogPr
     };
 
     const handleDelete = () => {
-        if (job && confirm('Are you sure you want to delete this generation?')) {
+        if (job && confirm(t('jobDetails.deleteConfirm'))) {
             deleteJob(job.id);
             onOpenChange(false);
         }
@@ -78,7 +80,7 @@ export function JobDetailsDialog({ job, open, onOpenChange }: JobDetailsDialogPr
                         ) : (
                             <div className="text-muted-foreground flex flex-col items-center gap-2">
                                 <div className={`w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin ${job.status === 'processing' || job.status === 'queued' ? 'block' : 'hidden'}`} />
-                                <span>{job.status === 'failed' ? 'Generation Failed' : 'Processing...'}</span>
+                                <span>{job.status === 'failed' ? t('jobDetails.generationFailed') : t('jobDetails.processing')}</span>
                             </div>
                         )}
                     </div>
@@ -87,7 +89,7 @@ export function JobDetailsDialog({ job, open, onOpenChange }: JobDetailsDialogPr
                     <div className="w-full md:w-[350px] flex flex-col border-t md:border-t-0 md:border-l border-border bg-card">
                         <DialogHeader className="p-4 border-b border-border">
                             <div className="flex items-center justify-between">
-                                <DialogTitle className="text-lg font-semibold">Job Details</DialogTitle>
+                                <DialogTitle className="text-lg font-semibold">{t('jobDetails.title')}</DialogTitle>
                             </div>
                             <DialogDescription className="text-xs text-muted-foreground font-mono">
                                 ID: {job.id}
@@ -98,7 +100,7 @@ export function JobDetailsDialog({ job, open, onOpenChange }: JobDetailsDialogPr
                             {/* Prompt Section */}
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
-                                    <h3 className="text-sm font-medium text-foreground">Prompt</h3>
+                                    <h3 className="text-sm font-medium text-foreground">{t('jobDetails.prompt')}</h3>
                                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyPrompt}>
                                         <Copy className="w-3 h-3" />
                                     </Button>
@@ -111,7 +113,7 @@ export function JobDetailsDialog({ job, open, onOpenChange }: JobDetailsDialogPr
                             {/* Info Grid */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <span className="text-xs text-muted-foreground">Model</span>
+                                    <span className="text-xs text-muted-foreground">{t('jobDetails.model')}</span>
                                     <div className="text-sm font-medium">{model?.name || job.modelId}</div>
                                 </div>
                                 <div className="space-y-1">
@@ -119,7 +121,7 @@ export function JobDetailsDialog({ job, open, onOpenChange }: JobDetailsDialogPr
                                     <div className="text-sm font-medium">{model?.provider || 'Unknown'}</div>
                                 </div>
                                 <div className="space-y-1">
-                                    <span className="text-xs text-muted-foreground">Status</span>
+                                    <span className="text-xs text-muted-foreground">{t('jobDetails.status')}</span>
                                     <div className={`text-sm font-medium capitalize ${job.status === 'completed' ? 'text-green-500' :
                                         job.status === 'failed' ? 'text-red-500' : 'text-blue-500'
                                         }`}>
@@ -127,7 +129,7 @@ export function JobDetailsDialog({ job, open, onOpenChange }: JobDetailsDialogPr
                                     </div>
                                 </div>
                                 <div className="space-y-1">
-                                    <span className="text-xs text-muted-foreground">Created</span>
+                                    <span className="text-xs text-muted-foreground">{t('jobDetails.createdAt')}</span>
                                     <div className="text-sm font-medium">
                                         {new Date(job.createdAt).toLocaleTimeString()}
                                     </div>
@@ -146,7 +148,7 @@ export function JobDetailsDialog({ job, open, onOpenChange }: JobDetailsDialogPr
                         <div className="p-4 border-t border-border bg-muted/10 flex gap-2">
                             <Button className="flex-1" variant="outline" onClick={handleDownload} disabled={!job.resultUrl}>
                                 <Download className="w-4 h-4 mr-2" />
-                                Download
+                                {t('jobDetails.download')}
                             </Button>
                             <Button
                                 variant="ghost"

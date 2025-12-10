@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import * as fc from 'fast-check';
 import { ProjectSelector } from './ProjectSelector';
 import * as StudioContext from '@/lib/context/StudioContext';
+import { I18nProvider } from '@/lib/i18n/context';
 
 // Mock the useStudio hook
 vi.mock('@/lib/context/StudioContext', async () => {
@@ -13,6 +14,15 @@ vi.mock('@/lib/context/StudioContext', async () => {
     useStudio: vi.fn(),
   };
 });
+
+// Helper function to render with I18nProvider
+const renderWithI18n = (ui: React.ReactElement) => {
+  return render(
+    <I18nProvider defaultLanguage="en">
+      {ui}
+    </I18nProvider>
+  );
+};
 
 describe('ProjectSelector', () => {
   const mockOnProjectSelect = vi.fn();
@@ -74,7 +84,7 @@ describe('ProjectSelector', () => {
 
           const user = userEvent.setup();
           
-          const { container } = render(
+          const { container } = renderWithI18n(
             <ProjectSelector
               currentProjectId={currentProjectId}
               onProjectSelect={mockOnProjectSelect}
@@ -186,7 +196,7 @@ describe('ProjectSelector', () => {
 
     const user = userEvent.setup();
     
-    render(
+    renderWithI18n(
       <ProjectSelector
         currentProjectId={null}
         onProjectSelect={mockOnProjectSelect}
@@ -198,7 +208,7 @@ describe('ProjectSelector', () => {
     const trigger = screen.getByRole('button');
     await user.click(trigger);
 
-    // Wait for dropdown to appear
+    // Wait for dropdown to appear (using translated text)
     await waitFor(() => {
       expect(screen.getByText('New Project')).toBeInTheDocument();
     });
@@ -240,7 +250,7 @@ describe('ProjectSelector', () => {
       deleteProject: mockDeleteProject,
     } as any);
 
-    render(
+    renderWithI18n(
       <ProjectSelector
         currentProjectId="project-1"
         onProjectSelect={mockOnProjectSelect}
@@ -257,7 +267,7 @@ describe('ProjectSelector', () => {
       deleteProject: mockDeleteProject,
     } as any);
 
-    render(
+    renderWithI18n(
       <ProjectSelector
         currentProjectId={null}
         onProjectSelect={mockOnProjectSelect}
@@ -265,6 +275,7 @@ describe('ProjectSelector', () => {
       />
     );
 
+    // Using translated text
     expect(screen.getByText('Select Project')).toBeInTheDocument();
   });
 
@@ -276,7 +287,7 @@ describe('ProjectSelector', () => {
 
     const user = userEvent.setup();
     
-    render(
+    renderWithI18n(
       <ProjectSelector
         currentProjectId={null}
         onProjectSelect={mockOnProjectSelect}
@@ -287,6 +298,7 @@ describe('ProjectSelector', () => {
     const trigger = screen.getByRole('button');
     await user.click(trigger);
 
+    // Using translated text
     const newProjectButton = screen.getByText('New Project');
     await user.click(newProjectButton);
 
@@ -313,7 +325,7 @@ describe('ProjectSelector', () => {
 
     const user = userEvent.setup();
     
-    render(
+    renderWithI18n(
       <ProjectSelector
         currentProjectId={null}
         onProjectSelect={mockOnProjectSelect}
@@ -480,11 +492,13 @@ describe('ProjectSelector', () => {
           const user = userEvent.setup();
           
           const { container, rerender } = render(
-            <ProjectSelector
-              currentProjectId={null}
-              onProjectSelect={mockOnProjectSelect}
-              onNewProject={mockOnNewProject}
-            />
+            <I18nProvider defaultLanguage="en">
+              <ProjectSelector
+                currentProjectId={null}
+                onProjectSelect={mockOnProjectSelect}
+                onNewProject={mockOnNewProject}
+              />
+            </I18nProvider>
           );
 
           // Open dropdown and verify project exists
@@ -522,11 +536,13 @@ describe('ProjectSelector', () => {
           } as any);
 
           rerender(
-            <ProjectSelector
-              currentProjectId={null}
-              onProjectSelect={mockOnProjectSelect}
-              onNewProject={mockOnNewProject}
-            />
+            <I18nProvider defaultLanguage="en">
+              <ProjectSelector
+                currentProjectId={null}
+                onProjectSelect={mockOnProjectSelect}
+                onNewProject={mockOnNewProject}
+              />
+            </I18nProvider>
           );
 
           // Open dropdown again

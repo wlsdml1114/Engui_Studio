@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useStudio } from '@/lib/context/StudioContext';
+import { useI18n } from '@/lib/i18n/context';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -32,6 +33,7 @@ export function ProjectSelector({
   onNewProject,
 }: ProjectSelectorProps) {
   const { projects, deleteProject } = useStudio();
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
@@ -55,7 +57,7 @@ export function ProjectSelector({
       setDeleteError(
         error instanceof Error 
           ? error.message 
-          : 'Failed to delete project. Please try again.'
+          : t('videoEditor.projectSelector.deleteFailed')
       );
     } finally {
       setIsDeleting(false);
@@ -68,14 +70,14 @@ export function ProjectSelector({
         <DropdownMenuTrigger asChild>
           <Button variant="outline" className="gap-2">
             <FolderIcon className="w-4 h-4" />
-            {currentProject?.title || 'Select Project'}
+            {currentProject?.title || t('videoEditor.projectSelector.selectProject')}
             <ChevronDownIcon className="w-4 h-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-80">
           <DropdownMenuItem onClick={onNewProject}>
             <PlusIcon className="w-4 h-4 mr-2" />
-            New Project
+            {t('videoEditor.projectSelector.newProject')}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           {projects.map((project) => (
@@ -96,7 +98,7 @@ export function ProjectSelector({
                   {project.aspectRatio}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Updated {new Date(project.updatedAt).toLocaleDateString()}
+                  {t('videoEditor.projectSelector.updated')} {new Date(project.updatedAt).toLocaleDateString()}
                 </div>
               </div>
               <Button
@@ -118,9 +120,9 @@ export function ProjectSelector({
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Project</DialogTitle>
+            <DialogTitle>{t('videoEditor.projectSelector.deleteConfirmTitle')}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this project? This action cannot be undone.
+              {t('videoEditor.projectSelector.deleteConfirmMessage')}
             </DialogDescription>
           </DialogHeader>
           {deleteError && (
@@ -137,14 +139,14 @@ export function ProjectSelector({
               }}
               disabled={isDeleting}
             >
-              Cancel
+              {t('videoEditor.projectSelector.cancel')}
             </Button>
             <Button 
               variant="destructive" 
               onClick={handleDelete}
               disabled={isDeleting}
             >
-              {isDeleting ? 'Deleting...' : 'Delete'}
+              {isDeleting ? t('videoEditor.projectSelector.deleting') : t('videoEditor.projectSelector.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -26,6 +26,25 @@ vi.mock('@/lib/context/StudioContext', () => {
   };
 });
 
+// Mock the i18n context
+vi.mock('@/lib/i18n/context', () => ({
+  useI18n: () => ({
+    language: 'en',
+    setLanguage: vi.fn(),
+    t: (key: string, params?: Record<string, string | number>) => {
+      // Return the key as the translation for testing
+      if (params) {
+        let result = key;
+        Object.entries(params).forEach(([k, v]) => {
+          result = result.replace(`{${k}}`, String(v));
+        });
+        return result;
+      }
+      return key;
+    },
+  }),
+}));
+
 // Mock audio detection service
 vi.mock('@/lib/audioDetectionService', () => ({
   hasAudioTrack: vi.fn(),
@@ -1023,56 +1042,151 @@ describe('VideoTimeline Property Tests', () => {
 
   describe('Accessibility Tests', () => {
     it('should have region role with aria-label', async () => {
+      const { StudioContext } = await import('@/lib/context/StudioContext');
+      
       const { container } = render(
-        <VideoTimeline
-          project={mockProject}
-          tracks={[]}
-          keyframes={{}}
-          currentTimestamp={0}
-          zoom={1}
-        />,
-        {
-          wrapper: await createTestWrapper(vi.fn(), vi.fn()),
-        }
+        <StudioContext.Provider
+          value={{
+            currentProject: mockProject,
+            projects: [mockProject],
+            tracks: [],
+            keyframes: {},
+            player: null,
+            playerState: 'paused',
+            currentTimestamp: 0,
+            zoom: 1,
+            selectedKeyframeIds: [],
+            exportDialogOpen: false,
+            setCurrentTimestamp: vi.fn(),
+            addKeyframe: vi.fn(),
+            addTrack: vi.fn(),
+            setPlayer: vi.fn(),
+            setPlayerState: vi.fn(),
+            setZoom: vi.fn(),
+            selectKeyframe: vi.fn(),
+            deselectKeyframe: vi.fn(),
+            clearSelection: vi.fn(),
+            setExportDialogOpen: vi.fn(),
+            createProject: vi.fn(),
+            loadProject: vi.fn(),
+            updateProject: vi.fn(),
+            deleteProject: vi.fn(),
+            removeTrack: vi.fn(),
+            updateKeyframe: vi.fn(),
+            removeKeyframe: vi.fn(),
+          } as any}
+        >
+          <VideoTimeline
+            project={mockProject}
+            tracks={[]}
+            keyframes={{}}
+            currentTimestamp={0}
+            zoom={1}
+          />
+        </StudioContext.Provider>
       );
 
       const region = container.querySelector('[role="region"]');
       expect(region).toBeInTheDocument();
-      expect(region).toHaveAttribute('aria-label', 'Video timeline');
+      // Now uses translation key since useI18n is mocked to return the key
+      expect(region).toHaveAttribute('aria-label', 'videoEditor.messages.videoTimeline');
     });
 
     it('should have hidden instructions for screen readers', async () => {
+      const { StudioContext } = await import('@/lib/context/StudioContext');
+      
       const { container } = render(
-        <VideoTimeline
-          project={mockProject}
-          tracks={[]}
-          keyframes={{}}
-          currentTimestamp={0}
-          zoom={1}
-        />,
-        {
-          wrapper: await createTestWrapper(vi.fn(), vi.fn()),
-        }
+        <StudioContext.Provider
+          value={{
+            currentProject: mockProject,
+            projects: [mockProject],
+            tracks: [],
+            keyframes: {},
+            player: null,
+            playerState: 'paused',
+            currentTimestamp: 0,
+            zoom: 1,
+            selectedKeyframeIds: [],
+            exportDialogOpen: false,
+            setCurrentTimestamp: vi.fn(),
+            addKeyframe: vi.fn(),
+            addTrack: vi.fn(),
+            setPlayer: vi.fn(),
+            setPlayerState: vi.fn(),
+            setZoom: vi.fn(),
+            selectKeyframe: vi.fn(),
+            deselectKeyframe: vi.fn(),
+            clearSelection: vi.fn(),
+            setExportDialogOpen: vi.fn(),
+            createProject: vi.fn(),
+            loadProject: vi.fn(),
+            updateProject: vi.fn(),
+            deleteProject: vi.fn(),
+            removeTrack: vi.fn(),
+            updateKeyframe: vi.fn(),
+            removeKeyframe: vi.fn(),
+          } as any}
+        >
+          <VideoTimeline
+            project={mockProject}
+            tracks={[]}
+            keyframes={{}}
+            currentTimestamp={0}
+            zoom={1}
+          />
+        </StudioContext.Provider>
       );
 
       const instructions = container.querySelector('#timeline-instructions');
       expect(instructions).toBeInTheDocument();
       expect(instructions).toHaveClass('sr-only');
-      expect(instructions?.textContent).toContain('keyboard shortcuts');
+      // Now uses translation key since useI18n is mocked to return the key
+      expect(instructions?.textContent).toContain('videoEditor.messages.timelineKeyboardShortcuts');
     });
 
     it('should have keyboard navigation support', async () => {
+      const { StudioContext } = await import('@/lib/context/StudioContext');
+      
       const { container } = render(
-        <VideoTimeline
-          project={mockProject}
-          tracks={[]}
-          keyframes={{}}
-          currentTimestamp={0}
-          zoom={1}
-        />,
-        {
-          wrapper: await createTestWrapper(vi.fn(), vi.fn()),
-        }
+        <StudioContext.Provider
+          value={{
+            currentProject: mockProject,
+            projects: [mockProject],
+            tracks: [],
+            keyframes: {},
+            player: null,
+            playerState: 'paused',
+            currentTimestamp: 0,
+            zoom: 1,
+            selectedKeyframeIds: [],
+            exportDialogOpen: false,
+            setCurrentTimestamp: vi.fn(),
+            addKeyframe: vi.fn(),
+            addTrack: vi.fn(),
+            setPlayer: vi.fn(),
+            setPlayerState: vi.fn(),
+            setZoom: vi.fn(),
+            selectKeyframe: vi.fn(),
+            deselectKeyframe: vi.fn(),
+            clearSelection: vi.fn(),
+            setExportDialogOpen: vi.fn(),
+            createProject: vi.fn(),
+            loadProject: vi.fn(),
+            updateProject: vi.fn(),
+            deleteProject: vi.fn(),
+            removeTrack: vi.fn(),
+            updateKeyframe: vi.fn(),
+            removeKeyframe: vi.fn(),
+          } as any}
+        >
+          <VideoTimeline
+            project={mockProject}
+            tracks={[]}
+            keyframes={{}}
+            currentTimestamp={0}
+            zoom={1}
+          />
+        </StudioContext.Provider>
       );
 
       // Check that timeline has focusable elements
@@ -1081,17 +1195,48 @@ describe('VideoTimeline Property Tests', () => {
     });
 
     it('should have proper ARIA attributes on timeline container', async () => {
+      const { StudioContext } = await import('@/lib/context/StudioContext');
+      
       const { container } = render(
-        <VideoTimeline
-          project={mockProject}
-          tracks={[]}
-          keyframes={{}}
-          currentTimestamp={0}
-          zoom={1}
-        />,
-        {
-          wrapper: await createTestWrapper(vi.fn(), vi.fn()),
-        }
+        <StudioContext.Provider
+          value={{
+            currentProject: mockProject,
+            projects: [mockProject],
+            tracks: [],
+            keyframes: {},
+            player: null,
+            playerState: 'paused',
+            currentTimestamp: 0,
+            zoom: 1,
+            selectedKeyframeIds: [],
+            exportDialogOpen: false,
+            setCurrentTimestamp: vi.fn(),
+            addKeyframe: vi.fn(),
+            addTrack: vi.fn(),
+            setPlayer: vi.fn(),
+            setPlayerState: vi.fn(),
+            setZoom: vi.fn(),
+            selectKeyframe: vi.fn(),
+            deselectKeyframe: vi.fn(),
+            clearSelection: vi.fn(),
+            setExportDialogOpen: vi.fn(),
+            createProject: vi.fn(),
+            loadProject: vi.fn(),
+            updateProject: vi.fn(),
+            deleteProject: vi.fn(),
+            removeTrack: vi.fn(),
+            updateKeyframe: vi.fn(),
+            removeKeyframe: vi.fn(),
+          } as any}
+        >
+          <VideoTimeline
+            project={mockProject}
+            tracks={[]}
+            keyframes={{}}
+            currentTimestamp={0}
+            zoom={1}
+          />
+        </StudioContext.Provider>
       );
 
       // Check for ARIA attributes

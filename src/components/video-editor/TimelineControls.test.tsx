@@ -2,13 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TimelineControls, MIN_ZOOM, MAX_ZOOM, ZOOM_STEP } from './TimelineControls';
 import { StudioProvider } from '@/lib/context/StudioContext';
+import { I18nProvider } from '@/lib/i18n/context';
 
 // Mock lucide-react icons
 vi.mock('lucide-react', () => ({
   Play: () => <div data-testid="play-icon">Play</div>,
   Pause: () => <div data-testid="pause-icon">Pause</div>,
-  ZoomIn: () => <div data-testid="zoom-in-icon">ZoomIn</div>,
-  ZoomOut: () => <div data-testid="zoom-out-icon">ZoomOut</div>,
+  SkipBack: () => <div data-testid="skip-back-icon">SkipBack</div>,
+  SkipForward: () => <div data-testid="skip-forward-icon">SkipForward</div>,
+  ChevronsLeft: () => <div data-testid="chevrons-left-icon">ChevronsLeft</div>,
+  ChevronsRight: () => <div data-testid="chevrons-right-icon">ChevronsRight</div>,
 }));
 
 describe('TimelineControls', () => {
@@ -27,9 +30,11 @@ describe('TimelineControls', () => {
 
   const renderWithProvider = (props = defaultProps) => {
     return render(
-      <StudioProvider>
-        <TimelineControls {...props} />
-      </StudioProvider>
+      <I18nProvider defaultLanguage="en">
+        <StudioProvider>
+          <TimelineControls {...props} />
+        </StudioProvider>
+      </I18nProvider>
     );
   };
 
@@ -37,40 +42,20 @@ describe('TimelineControls', () => {
     it('should display current time and total duration', () => {
       renderWithProvider();
       
-      // Should show formatted time
-      expect(screen.getByText(/0:05/)).toBeInTheDocument();
-      expect(screen.getByText(/0:30/)).toBeInTheDocument();
+      // Should show formatted time in MM:SS.ms format
+      expect(screen.getByText('00:05.50')).toBeInTheDocument();
+      expect(screen.getByText('00:30.00')).toBeInTheDocument();
     });
 
-    it('should format time in milliseconds when less than 1 second', () => {
+    it('should format time correctly for different timestamps', () => {
       renderWithProvider({
         ...defaultProps,
-        currentTimestamp: 0.5,
-      });
-      
-      expect(screen.getByText(/500ms/)).toBeInTheDocument();
-    });
-
-    it('should format time in MM:SS when duration is less than an hour', () => {
-      renderWithProvider({
-        ...defaultProps,
-        currentTimestamp: 125,
+        currentTimestamp: 125.75,
         duration: 300,
       });
       
-      expect(screen.getByText(/2:05/)).toBeInTheDocument();
-      expect(screen.getByText(/5:00/)).toBeInTheDocument();
-    });
-
-    it('should format time in HH:MM:SS when duration is an hour or more', () => {
-      renderWithProvider({
-        ...defaultProps,
-        currentTimestamp: 3665,
-        duration: 7200,
-      });
-      
-      expect(screen.getByText(/1:01:05/)).toBeInTheDocument();
-      expect(screen.getByText(/2:00:00/)).toBeInTheDocument();
+      expect(screen.getByText('02:05.75')).toBeInTheDocument();
+      expect(screen.getByText('05:00.00')).toBeInTheDocument();
     });
   });
 
@@ -81,92 +66,20 @@ describe('TimelineControls', () => {
       expect(screen.getByTestId('play-icon')).toBeInTheDocument();
     });
 
-    it('should display pause button when player is playing', () => {
-      const { rerender } = renderWithProvider();
-      
-      // Simulate player state change by re-rendering with updated context
-      // Note: In a real scenario, this would be controlled by StudioContext
-      expect(screen.getByTestId('play-icon')).toBeInTheDocument();
-    });
-
     it('should have play/pause button disabled when player is not available', () => {
       renderWithProvider();
       
       const button = screen.getByRole('button', { name: /play/i });
       expect(button).toBeDisabled();
     });
-  });
 
-  describe('Zoom Controls', () => {
-    it('should display current zoom level', () => {
-      renderWithProvider({
-        ...defaultProps,
-        zoom: 1.5,
-      });
-      
-      expect(screen.getByText('1.50x')).toBeInTheDocument();
-    });
-
-    it('should call onZoomChange when zoom in button is clicked', () => {
+    it('should have navigation buttons', () => {
       renderWithProvider();
       
-      const zoomInButton = screen.getByRole('button', { name: /zoom in/i });
-      fireEvent.click(zoomInButton);
-      
-      expect(mockOnZoomChange).toHaveBeenCalledWith(1 + ZOOM_STEP);
-    });
-
-    it('should call onZoomChange when zoom out button is clicked', () => {
-      renderWithProvider();
-      
-      const zoomOutButton = screen.getByRole('button', { name: /zoom out/i });
-      fireEvent.click(zoomOutButton);
-      
-      expect(mockOnZoomChange).toHaveBeenCalledWith(1 - ZOOM_STEP);
-    });
-
-    it('should disable zoom out button when at minimum zoom', () => {
-      renderWithProvider({
-        ...defaultProps,
-        zoom: MIN_ZOOM,
-      });
-      
-      const zoomOutButton = screen.getByRole('button', { name: /zoom out/i });
-      expect(zoomOutButton).toBeDisabled();
-    });
-
-    it('should disable zoom in button when at maximum zoom', () => {
-      renderWithProvider({
-        ...defaultProps,
-        zoom: MAX_ZOOM,
-      });
-      
-      const zoomInButton = screen.getByRole('button', { name: /zoom in/i });
-      expect(zoomInButton).toBeDisabled();
-    });
-
-    it('should not zoom beyond minimum when clicking zoom out', () => {
-      renderWithProvider({
-        ...defaultProps,
-        zoom: MIN_ZOOM + 0.1,
-      });
-      
-      const zoomOutButton = screen.getByRole('button', { name: /zoom out/i });
-      fireEvent.click(zoomOutButton);
-      
-      expect(mockOnZoomChange).toHaveBeenCalledWith(MIN_ZOOM);
-    });
-
-    it('should not zoom beyond maximum when clicking zoom in', () => {
-      renderWithProvider({
-        ...defaultProps,
-        zoom: MAX_ZOOM - 0.1,
-      });
-      
-      const zoomInButton = screen.getByRole('button', { name: /zoom in/i });
-      fireEvent.click(zoomInButton);
-      
-      expect(mockOnZoomChange).toHaveBeenCalledWith(MAX_ZOOM);
+      expect(screen.getByRole('button', { name: /go to start/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /step backward/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /step forward/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /go to end/i })).toBeInTheDocument();
     });
   });
 
@@ -231,24 +144,14 @@ describe('TimelineControls', () => {
   });
 
   describe('Accessibility', () => {
-    it('should have proper ARIA labels for buttons', () => {
+    it('should have proper ARIA labels for playback buttons', () => {
       renderWithProvider();
       
       expect(screen.getByRole('button', { name: /play/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /zoom in/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /zoom out/i })).toBeInTheDocument();
-    });
-
-    it('should have ARIA label for zoom slider', () => {
-      renderWithProvider();
-      
-      // The slider role is on the thumb, but the aria-label is on the parent
-      const slider = screen.getByRole('slider');
-      expect(slider).toBeInTheDocument();
-      
-      // Verify the parent has the aria-label
-      const sliderContainer = slider.closest('[aria-label]');
-      expect(sliderContainer).toHaveAttribute('aria-label', 'Zoom level slider');
+      expect(screen.getByRole('button', { name: /go to start/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /step backward/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /step forward/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /go to end/i })).toBeInTheDocument();
     });
 
     it('should have toolbar role on controls container', () => {
@@ -256,6 +159,7 @@ describe('TimelineControls', () => {
       
       const toolbar = container.querySelector('[role="toolbar"]');
       expect(toolbar).toBeInTheDocument();
+      // The aria-label is translated via i18n
       expect(toolbar).toHaveAttribute('aria-label', 'Timeline controls');
     });
 
@@ -267,11 +171,11 @@ describe('TimelineControls', () => {
       expect(timeDisplay).toHaveAttribute('aria-live', 'polite');
     });
 
-    it('should have group roles for control sections', () => {
+    it('should have group role for playback controls', () => {
       const { container } = renderWithProvider();
       
       const groups = container.querySelectorAll('[role="group"]');
-      expect(groups.length).toBeGreaterThanOrEqual(2); // Playback and zoom controls
+      expect(groups.length).toBeGreaterThanOrEqual(1);
     });
 
     it('should have aria-pressed on play/pause button', () => {
@@ -281,57 +185,41 @@ describe('TimelineControls', () => {
       expect(playButton).toHaveAttribute('aria-pressed');
     });
 
-    it('should have aria-valuetext on zoom slider', () => {
-      renderWithProvider({
-        ...defaultProps,
-        zoom: 1.5,
-      });
-      
-      const slider = screen.getByRole('slider');
-      // The Radix UI Slider component manages aria-valuenow internally
-      // We verify the slider has proper aria attributes
-      expect(slider).toHaveAttribute('aria-valuenow', '1.5');
-      expect(slider).toHaveAttribute('aria-valuemin', '0.25');
-      expect(slider).toHaveAttribute('aria-valuemax', '4');
-    });
-
-    it('should hide decorative text from screen readers', () => {
-      const { container } = renderWithProvider();
-      
-      // Check that hint text has aria-hidden
-      const hintTexts = container.querySelectorAll('[aria-hidden="true"]');
-      expect(hintTexts.length).toBeGreaterThan(0);
-    });
-
     it('should have descriptive aria-labels with keyboard shortcuts', () => {
       renderWithProvider();
       
       const playButton = screen.getByRole('button', { name: /play.*space/i });
       expect(playButton).toBeInTheDocument();
       
-      const zoomInButton = screen.getByRole('button', { name: /zoom in.*plus/i });
-      expect(zoomInButton).toBeInTheDocument();
+      const goToStartButton = screen.getByRole('button', { name: /go to start.*home/i });
+      expect(goToStartButton).toBeInTheDocument();
       
-      const zoomOutButton = screen.getByRole('button', { name: /zoom out.*minus/i });
-      expect(zoomOutButton).toBeInTheDocument();
+      const goToEndButton = screen.getByRole('button', { name: /go to end.*end/i });
+      expect(goToEndButton).toBeInTheDocument();
     });
   });
 
-  describe('Integration', () => {
-    it('should update zoom state when slider is changed', () => {
+  describe('i18n Integration', () => {
+    it('should render with English translations', () => {
       renderWithProvider();
       
-      const slider = screen.getByRole('slider');
+      // Check that translated aria-labels are present
+      expect(screen.getByRole('button', { name: 'Play (Space)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Go to start (Home)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Go to end (End)' })).toBeInTheDocument();
+    });
+
+    it('should use t() function for all button labels', () => {
+      renderWithProvider();
       
-      // Verify the slider is present and has correct attributes
-      expect(slider).toBeInTheDocument();
-      expect(slider).toHaveAttribute('aria-valuemin', '0.25');
-      expect(slider).toHaveAttribute('aria-valuemax', '4');
-      expect(slider).toHaveAttribute('aria-valuenow', '1');
+      // Verify all buttons have translated labels (not hardcoded)
+      const buttons = screen.getAllByRole('button');
+      expect(buttons.length).toBe(5); // go to start, step back, play, step forward, go to end
       
-      // Note: The actual slider implementation from Radix UI handles value changes
-      // through pointer events, not simple change events. This test verifies
-      // the component structure is correct.
+      // Each button should have an aria-label attribute
+      buttons.forEach(button => {
+        expect(button).toHaveAttribute('aria-label');
+      });
     });
   });
 });

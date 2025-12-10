@@ -12,6 +12,8 @@ import { LoRAManagementDialog } from '@/components/lora/LoRAManagementDialog';
 import { downloadProjectAsJSON, parseProjectFile } from '@/lib/videoProjectIO';
 import { AspectRatio, QualityPreset, getResolutionConfig } from '@/lib/resolutionConfig';
 import { useToast } from '@/components/ui/toast';
+import { useI18n } from '@/lib/i18n/context';
+import { LanguageIcon } from '@heroicons/react/24/outline';
 
 interface SettingsDialogProps {
     isOpen: boolean;
@@ -34,6 +36,7 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
         addKeyframe,
     } = useStudio();
     const { showToast } = useToast();
+    const { t, language, setLanguage } = useI18n();
     const [activeTab, setActiveTab] = useState<SettingsTab>('video-project');
     const [formData, setFormData] = useState<StudioSettings>(settings);
     const [isSaving, setIsSaving] = useState(false);
@@ -73,7 +76,7 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
     const handleExportJSON = () => {
         if (currentProject) {
             downloadProjectAsJSON(currentProject, tracks, keyframes);
-            showToast('Project saved to file!', 'success');
+            showToast(t('settingsDialog.videoProject.projectSaved'), 'success');
         }
     };
 
@@ -124,10 +127,10 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                     }
                 }
                 
-                showToast('Project imported successfully!', 'success');
+                showToast(t('settingsDialog.videoProject.projectImported'), 'success');
                 onClose();
             } catch (error) {
-                showToast(`Failed to import project: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+                showToast(t('settingsDialog.videoProject.importFailed', { error: error instanceof Error ? error.message : 'Unknown error' }), 'error');
             }
         };
         
@@ -149,9 +152,9 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
         
         try {
             await updateProject(currentProject.id, updates);
-            showToast('Project settings applied!', 'success');
+            showToast(t('settingsDialog.videoProject.settingsApplied'), 'success');
         } catch (error) {
-            showToast('Failed to save project settings', 'error');
+            showToast(t('settingsDialog.videoProject.settingsFailed'), 'error');
         }
     };
 
@@ -222,7 +225,7 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
             <div className="bg-zinc-900 w-full max-w-2xl h-[600px] rounded-xl border border-border shadow-2xl overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-border bg-muted/30">
-                    <h2 className="text-lg font-semibold">Settings</h2>
+                    <h2 className="text-lg font-semibold">{t('settingsDialog.title')}</h2>
                     <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
                         <XMarkIcon className="w-5 h-5" />
                     </button>
@@ -236,31 +239,31 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                             onClick={() => setActiveTab('video-project')}
                             className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'video-project' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'}`}
                         >
-                            Video Project
+                            {t('settingsDialog.tabs.videoProject')}
                         </button>
                         <button
                             onClick={() => setActiveTab('general')}
                             className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'general' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'}`}
                         >
-                            General & API Keys
+                            {t('settingsDialog.tabs.general')}
                         </button>
                         <button
                             onClick={() => setActiveTab('runpod')}
                             className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'runpod' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'}`}
                         >
-                            RunPod Config
+                            {t('settingsDialog.tabs.runpod')}
                         </button>
                         <button
                             onClick={() => setActiveTab('storage')}
                             className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'storage' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'}`}
                         >
-                            Storage (S3)
+                            {t('settingsDialog.tabs.storage')}
                         </button>
                         <button
                             onClick={() => setActiveTab('lora')}
                             className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'lora' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'}`}
                         >
-                            LoRA Management
+                            {t('settingsDialog.tabs.lora')}
                         </button>
                     </div>
 
@@ -270,7 +273,7 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                             <div className="space-y-6">
                                 {/* Save/Load Section */}
                                 <div className="space-y-4">
-                                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Save / Load Project</h3>
+                                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{t('settingsDialog.videoProject.saveLoadSection')}</h3>
                                     <div className="flex gap-2">
                                         <Button
                                             variant="outline"
@@ -279,7 +282,7 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                                             className="flex-1 gap-2"
                                         >
                                             <Download className="h-4 w-4" />
-                                            Save Project
+                                            {t('settingsDialog.videoProject.saveProject')}
                                         </Button>
                                         <Button
                                             variant="outline"
@@ -287,7 +290,7 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                                             className="flex-1 gap-2"
                                         >
                                             <Upload className="h-4 w-4" />
-                                            Load Project
+                                            {t('settingsDialog.videoProject.loadProject')}
                                         </Button>
                                     </div>
                                 </div>
@@ -296,32 +299,32 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                                     <>
                                         {/* Project Info */}
                                         <div className="space-y-4 border-t pt-4">
-                                            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Project Info</h3>
+                                            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{t('settingsDialog.videoProject.projectInfo')}</h3>
                                             <div className="space-y-2">
-                                                <Label>Project Name</Label>
+                                                <Label>{t('settingsDialog.videoProject.projectName')}</Label>
                                                 <Input
                                                     value={projectTitle}
                                                     onChange={(e) => setProjectTitle(e.target.value)}
-                                                    placeholder="My Video Project"
+                                                    placeholder={t('settingsDialog.videoProject.projectNamePlaceholder')}
                                                 />
                                             </div>
                                             <div className="space-y-2">
-                                                <Label>Description</Label>
+                                                <Label>{t('settingsDialog.videoProject.description')}</Label>
                                                 <Input
                                                     value={projectDescription}
                                                     onChange={(e) => setProjectDescription(e.target.value)}
-                                                    placeholder="Project description..."
+                                                    placeholder={t('settingsDialog.videoProject.descriptionPlaceholder')}
                                                 />
                                             </div>
                                         </div>
 
                                         {/* Resolution Settings */}
                                         <div className="space-y-4 border-t pt-4">
-                                            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Resolution Settings</h3>
+                                            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{t('settingsDialog.videoProject.resolutionSettings')}</h3>
                                             
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
-                                                    <Label>Aspect Ratio</Label>
+                                                    <Label>{t('settingsDialog.videoProject.aspectRatio')}</Label>
                                                     <div className="flex gap-2 mt-2">
                                                         <Button
                                                             type="button"
@@ -345,7 +348,7 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                                                 </div>
 
                                                 <div>
-                                                    <Label>Quality</Label>
+                                                    <Label>{t('settingsDialog.videoProject.quality')}</Label>
                                                     <div className="flex gap-2 mt-2">
                                                         <Button
                                                             type="button"
@@ -379,14 +382,14 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                                             </div>
 
                                             <div className="p-3 bg-muted rounded-md">
-                                                <div className="text-sm font-medium">Output Resolution</div>
+                                                <div className="text-sm font-medium">{t('settingsDialog.videoProject.outputResolution')}</div>
                                                 <div className="text-xl font-bold">
                                                     {resolutionConfig.width} × {resolutionConfig.height}
                                                 </div>
                                             </div>
                                             
                                             <Button onClick={handleSaveProjectSettings} className="w-full">
-                                                Apply Project Settings
+                                                {t('settingsDialog.videoProject.applySettings')}
                                             </Button>
                                         </div>
                                     </>
@@ -394,7 +397,7 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
 
                                 {!currentProject && (
                                     <div className="text-center text-muted-foreground py-8">
-                                        No project loaded. Load a project or create a new one.
+                                        {t('settingsDialog.videoProject.noProject')}
                                     </div>
                                 )}
                             </div>
@@ -402,16 +405,40 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
 
                         {activeTab === 'general' && (
                             <div className="space-y-6">
+                                {/* Language Selection */}
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-2">
-                                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">External Providers</h3>
-                                        <span className="px-2 py-0.5 text-[10px] font-medium bg-amber-500/20 text-amber-500 rounded">Coming Soon</span>
+                                        <LanguageIcon className="w-5 h-5 text-primary" />
+                                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{t('language.selectLanguage')}</h3>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            variant={language === 'ko' ? 'default' : 'outline'}
+                                            onClick={() => setLanguage('ko')}
+                                            className="flex-1"
+                                        >
+                                            {t('language.korean')}
+                                        </Button>
+                                        <Button
+                                            variant={language === 'en' ? 'default' : 'outline'}
+                                            onClick={() => setLanguage('en')}
+                                            className="flex-1"
+                                        >
+                                            {t('language.english')}
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4 border-t pt-4">
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{t('settingsDialog.general.externalProviders')}</h3>
+                                        <span className="px-2 py-0.5 text-[10px] font-medium bg-amber-500/20 text-amber-500 rounded">{t('settingsDialog.general.comingSoon')}</span>
                                     </div>
                                     <p className="text-xs text-muted-foreground">
-                                        Support for external AI providers will be added in a future update.
+                                        {t('settingsDialog.general.comingSoonDesc')}
                                     </p>
                                     <div className="space-y-2 opacity-50 pointer-events-none">
-                                        <Label>OpenAI API Key</Label>
+                                        <Label>{t('settingsDialog.general.openaiApiKey')}</Label>
                                         <Input
                                             type="password"
                                             value={formData.apiKeys.openai || ''}
@@ -421,7 +448,7 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                                         />
                                     </div>
                                     <div className="space-y-2 opacity-50 pointer-events-none">
-                                        <Label>Google API Key (Gemini/Veo)</Label>
+                                        <Label>{t('settingsDialog.general.googleApiKey')}</Label>
                                         <Input
                                             type="password"
                                             value={formData.apiKeys.google || ''}
@@ -431,7 +458,7 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                                         />
                                     </div>
                                     <div className="space-y-2 opacity-50 pointer-events-none">
-                                        <Label>Kling AI API Key</Label>
+                                        <Label>{t('settingsDialog.general.klingApiKey')}</Label>
                                         <Input
                                             type="password"
                                             value={formData.apiKeys.kling || ''}
@@ -446,20 +473,20 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                         {activeTab === 'runpod' && (
                             <div className="space-y-6">
                                 <div className="space-y-4">
-                                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">RunPod Configuration</h3>
+                                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{t('settingsDialog.runpod.title')}</h3>
                                     <div className="space-y-2">
-                                        <Label>RunPod API Key</Label>
+                                        <Label>{t('settingsDialog.runpod.apiKey')}</Label>
                                         <Input
                                             type="password"
                                             value={formData.apiKeys.runpod || ''}
                                             onChange={(e) => updateApiKey('runpod', e.target.value)}
-                                            placeholder="rpa_..."
+                                            placeholder={t('settingsDialog.runpod.apiKeyPlaceholder')}
                                         />
                                     </div>
 
                                     <div className="pt-4 space-y-4 border-t border-border">
-                                        <h4 className="text-sm font-medium">Endpoint Mappings</h4>
-                                        <p className="text-xs text-muted-foreground">Map internal model IDs to your specific RunPod Endpoint IDs.</p>
+                                        <h4 className="text-sm font-medium">{t('settingsDialog.runpod.endpointMappings')}</h4>
+                                        <p className="text-xs text-muted-foreground">{t('settingsDialog.runpod.endpointMappingsDesc')}</p>
 
                                         <div className="grid grid-cols-2 gap-4">
                                             {runpodModels.map((model) => (
@@ -468,7 +495,7 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                                                     <Input
                                                         value={formData.runpod.endpoints[model.id] || ''}
                                                         onChange={(e) => updateRunPodEndpoint(model.id, e.target.value)}
-                                                        placeholder={`Enter ${model.name} endpoint ID`}
+                                                        placeholder={t('settingsDialog.runpod.endpointPlaceholder', { name: model.name })}
                                                     />
                                                 </div>
                                             ))}
@@ -483,35 +510,35 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                         {activeTab === 'storage' && (
                             <div className="space-y-6">
                                 <div className="space-y-4">
-                                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">S3 Compatible Storage</h3>
+                                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{t('settingsDialog.storage.title')}</h3>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2 col-span-2">
-                                            <Label>Endpoint URL</Label>
+                                            <Label>{t('settingsDialog.storage.endpointUrl')}</Label>
                                             <Input
                                                 value={formData.storage.endpointUrl || ''}
                                                 onChange={(e) => updateStorage('endpointUrl', e.target.value)}
-                                                placeholder="e.g., https://s3.us-east-1.amazonaws.com"
+                                                placeholder={t('settingsDialog.storage.endpointUrlPlaceholder')}
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label>Bucket Name</Label>
+                                            <Label>{t('settingsDialog.storage.bucketName')}</Label>
                                             <Input
                                                 value={formData.storage.bucket || ''}
                                                 onChange={(e) => updateStorage('bucket', e.target.value)}
-                                                placeholder="e.g., my-studio-assets"
+                                                placeholder={t('settingsDialog.storage.bucketNamePlaceholder')}
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label>Region</Label>
+                                            <Label>{t('settingsDialog.storage.region')}</Label>
                                             <Input
                                                 value={formData.storage.region || ''}
                                                 onChange={(e) => updateStorage('region', e.target.value)}
-                                                placeholder="e.g., us-east-1"
+                                                placeholder={t('settingsDialog.storage.regionPlaceholder')}
                                             />
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Access Key ID</Label>
+                                        <Label>{t('settingsDialog.storage.accessKeyId')}</Label>
                                         <Input
                                             type="password"
                                             value={formData.storage.accessKey || ''}
@@ -519,7 +546,7 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Secret Access Key</Label>
+                                        <Label>{t('settingsDialog.storage.secretAccessKey')}</Label>
                                         <Input
                                             type="password"
                                             value={formData.storage.secretKey || ''}
@@ -533,9 +560,9 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                         {activeTab === 'lora' && (
                             <div className="space-y-6">
                                 <div className="space-y-4">
-                                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">LoRA Management</h3>
+                                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{t('settingsDialog.lora.title')}</h3>
                                     <p className="text-sm text-muted-foreground">
-                                        Manage your LoRA models for custom styling and fine-tuning. Upload, sync, and organize LoRA files for use in image and video generation.
+                                        {t('settingsDialog.lora.description')}
                                     </p>
                                     
                                     <div className="pt-4">
@@ -543,17 +570,17 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
                                             onClick={() => setShowLoRADialog(true)}
                                             className="w-full"
                                         >
-                                            Open LoRA Manager
+                                            {t('settingsDialog.lora.openManager')}
                                         </Button>
                                     </div>
 
                                     <div className="mt-6 p-4 bg-muted/30 rounded-lg border border-border">
-                                        <h4 className="text-sm font-medium mb-2">About LoRA Models</h4>
+                                        <h4 className="text-sm font-medium mb-2">{t('settingsDialog.lora.aboutTitle')}</h4>
                                         <ul className="text-xs text-muted-foreground space-y-1">
-                                            <li>• Upload custom LoRA models (.safetensors format)</li>
-                                            <li>• Sync LoRAs from your S3 bucket</li>
-                                            <li>• Organize LoRAs by high/low noise pairs</li>
-                                            <li>• Use LoRAs in generation forms for custom styling</li>
+                                            <li>• {t('settingsDialog.lora.aboutItems.upload')}</li>
+                                            <li>• {t('settingsDialog.lora.aboutItems.sync')}</li>
+                                            <li>• {t('settingsDialog.lora.aboutItems.organize')}</li>
+                                            <li>• {t('settingsDialog.lora.aboutItems.use')}</li>
                                         </ul>
                                     </div>
                                 </div>
@@ -564,9 +591,9 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
 
                 {/* Footer */}
                 <div className="p-4 border-t border-border bg-muted/30 flex justify-end gap-2">
-                    <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancel</Button>
+                    <Button variant="outline" onClick={onClose} disabled={isSaving}>{t('settingsDialog.footer.cancel')}</Button>
                     <Button onClick={handleSave} disabled={isSaving}>
-                        {isSaving ? 'Saving...' : 'Save Settings'}
+                        {isSaving ? t('settingsDialog.footer.saving') : t('settingsDialog.footer.save')}
                     </Button>
                 </div>
             </div>

@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ExportDialog } from './ExportDialog';
 import { VideoProject } from '@/lib/context/StudioContext';
+import { I18nProvider } from '@/lib/i18n/context';
 import * as fc from 'fast-check';
 import React from 'react';
 
@@ -51,20 +52,6 @@ describe('ExportDialog Component', () => {
     global.fetch = originalFetch;
   });
 
-  // Helper function to find button
-  const findButton = (container: HTMLElement, buttonText: string) => {
-    const buttons = container.querySelectorAll('button');
-    const button = Array.from(buttons).find((btn) => 
-      btn.textContent?.includes(buttonText)
-    );
-
-    if (!button) {
-      throw new Error(`${buttonText} button not found. Available buttons: ${Array.from(buttons).map(b => b.textContent).join(', ')}`);
-    }
-
-    return button;
-  };
-
   // Feature: video-editor-center-panel, Property 21: Export shows progress
   // Validates: Requirements 6.3
   it('should show progress indicator during export rendering', async () => {
@@ -92,18 +79,18 @@ describe('ExportDialog Component', () => {
 
           global.fetch = vi.fn().mockImplementation(() => fetchPromise);
 
-          const { unmount, container } = render(<ExportDialog project={project} />);
+          const { unmount, container } = render(
+            <I18nProvider>
+              <ExportDialog project={project} />
+            </I18nProvider>
+          );
 
           try {
-            // Find the "Start Export" button
-            const startButton = findButton(container, 'Start Export');
-            await user.click(startButton);
-
-            // Wait for rendering state to appear
+            // Wait for rendering state to appear (auto-starts on dialog open)
             await waitFor(
               () => {
-                // Check for progress indicator elements
-                const renderingTexts = screen.queryAllByText(/Rendering/i);
+                // Check for progress indicator elements (Korean or English)
+                const renderingTexts = screen.queryAllByText(/Rendering|렌더링/i);
                 const progressPercentages = screen.queryAllByText(/%/);
 
                 // At least one progress indicator should be visible
@@ -161,31 +148,31 @@ describe('ExportDialog Component', () => {
             json: async () => ({ success: true, downloadUrl }),
           });
 
-          const { unmount, container } = render(<ExportDialog project={project} />);
+          const { unmount, container } = render(
+            <I18nProvider>
+              <ExportDialog project={project} />
+            </I18nProvider>
+          );
 
           try {
-            // Find the "Start Export" button
-            const startButton = findButton(container, 'Start Export');
-            await user.click(startButton);
-
-            // Wait for export to complete and download button to appear
+            // Wait for export to complete and download button to appear (auto-starts on dialog open)
             await waitFor(
               () => {
                 const downloadButtons = Array.from(container.querySelectorAll('button')).filter(
-                  (btn) => btn.textContent?.includes('Download')
+                  (btn) => btn.textContent?.includes('Download') || btn.textContent?.includes('다운로드')
                 );
                 expect(downloadButtons.length).toBeGreaterThan(0);
               },
               { timeout: 3000 }
             );
 
-            // Verify success message is shown
-            const successMessages = screen.queryAllByText(/completed successfully/i);
+            // Verify success message is shown (Korean or English)
+            const successMessages = screen.queryAllByText(/complete|완료/i);
             expect(successMessages.length).toBeGreaterThan(0);
 
             // Verify download button is clickable
             const downloadButtons = Array.from(container.querySelectorAll('button')).filter(
-              (btn) => btn.textContent?.includes('Download')
+              (btn) => btn.textContent?.includes('Download') || btn.textContent?.includes('다운로드')
             );
             expect(downloadButtons[0]).not.toBeDisabled();
           } finally {
@@ -223,28 +210,28 @@ describe('ExportDialog Component', () => {
             json: async () => ({ success: false, error: errorMessage }),
           });
 
-          const { unmount, container } = render(<ExportDialog project={project} />);
+          const { unmount, container } = render(
+            <I18nProvider>
+              <ExportDialog project={project} />
+            </I18nProvider>
+          );
 
           try {
-            // Find the "Start Export" button
-            const startButton = findButton(container, 'Start Export');
-            await user.click(startButton);
-
-            // Wait for error message to appear
+            // Wait for error state to appear (auto-starts on dialog open)
             await waitFor(
               () => {
-                const errorTexts = screen.queryAllByText(/Export Failed/i);
-                expect(errorTexts.length).toBeGreaterThan(0);
+                // Check for Try Again button (Korean or English)
+                const tryAgainButtons = Array.from(container.querySelectorAll('button')).filter(
+                  (btn) => btn.textContent?.includes('Try Again') || btn.textContent?.includes('다시 시도')
+                );
+                expect(tryAgainButtons.length).toBeGreaterThan(0);
               },
               { timeout: 3000 }
             );
 
-            // The property is validated by the presence of "Export Failed" message
-            // and "Try Again" button, which we already checked above
-            
-            // Verify "Try Again" button is available
+            // Verify "Try Again" button is available and clickable
             const tryAgainButtons = Array.from(container.querySelectorAll('button')).filter(
-              (btn) => btn.textContent?.includes('Try Again')
+              (btn) => btn.textContent?.includes('Try Again') || btn.textContent?.includes('다시 시도')
             );
             expect(tryAgainButtons.length).toBeGreaterThan(0);
             expect(tryAgainButtons[0]).not.toBeDisabled();

@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { validateLoRAFileClient } from '@/lib/loraValidation';
 import { Upload, Trash2, Package, AlertCircle, CheckCircle, X, RefreshCw } from 'lucide-react';
+import { useI18n } from '@/lib/i18n/context';
 
 // TypeScript interfaces
 interface LoRAFile {
@@ -50,6 +51,7 @@ export function LoRAManagementDialog({
   onLoRAUploaded,
   workspaceId,
 }: LoRAManagementDialogProps) {
+  const { t } = useI18n();
   const [loras, setLoras] = useState<LoRAFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -214,7 +216,7 @@ export function LoRAManagementDialog({
       const data = await response.json();
 
       if (data.success) {
-        setSuccessMessage(`✓ ${file.name} uploaded successfully!`);
+        setSuccessMessage(`✓ ${file.name} ${t('loraManagement.messages.uploadSuccess')}`);
         await fetchLoras();
         onLoRAUploaded?.();
       } else {
@@ -296,9 +298,9 @@ export function LoRAManagementDialog({
         
         // Show success message
         if (data.warning) {
-          setSuccessMessage(`✓ LoRA deleted (Note: ${data.warning})`);
+          setSuccessMessage(`✓ ${t('loraManagement.messages.deleteSuccess')} (Note: ${data.warning})`);
         } else {
-          setSuccessMessage('✓ LoRA deleted successfully!');
+          setSuccessMessage(`✓ ${t('loraManagement.messages.deleteSuccess')}`);
         }
         
         // Refresh the list
@@ -374,9 +376,9 @@ export function LoRAManagementDialog({
 
       if (data.success) {
         if (data.synced.length > 0) {
-          setSuccessMessage(`✓ Synced ${data.synced.length} LoRA(s) from S3!`);
+          setSuccessMessage(`✓ ${t('loraManagement.messages.syncSuccess', { count: data.synced.length })}`);
         } else {
-          setSuccessMessage('✓ All LoRAs are already synced');
+          setSuccessMessage(`✓ ${t('loraManagement.messages.allSynced')}`);
         }
         await fetchLoras();
         onLoRAUploaded?.();
@@ -405,9 +407,9 @@ export function LoRAManagementDialog({
               <span className="sr-only">Close</span>
             </DialogPrimitive.Close>
             <DialogHeader>
-              <DialogTitle>LoRA Management</DialogTitle>
+              <DialogTitle>{t('loraManagement.title')}</DialogTitle>
               <DialogDescription>
-                Upload and manage your LoRA models (.safetensors, .ckpt, max 5GB)
+                {t('loraManagement.description')}
               </DialogDescription>
           </DialogHeader>
 
@@ -422,7 +424,7 @@ export function LoRAManagementDialog({
                     onClick={() => fetchLoras()}
                     className="text-xs underline hover:no-underline mt-1 opacity-80 hover:opacity-100 transition-opacity"
                   >
-                    Retry now
+                    {t('loraManagement.actions.retryNow')}
                   </button>
                 )}
               </div>
@@ -486,7 +488,7 @@ export function LoRAManagementDialog({
             
             {isUploading ? (
               <div className="space-y-2">
-                <p className="text-sm font-medium">Uploading...</p>
+                <p className="text-sm font-medium">{t('loraManagement.uploadArea.uploading')}</p>
                 <div className="w-full max-w-xs mx-auto bg-muted rounded-full h-2 overflow-hidden">
                   <div
                     className="bg-primary h-2 rounded-full transition-all duration-300 ease-out"
@@ -498,9 +500,9 @@ export function LoRAManagementDialog({
             ) : (
               <>
                 <p className="text-sm font-medium mb-2">
-                  Drag & drop LoRA file here
+                  {t('loraManagement.uploadArea.dragAndDrop')}
                 </p>
-                <p className="text-xs text-muted-foreground mb-4">or click to browse</p>
+                <p className="text-xs text-muted-foreground mb-4">{t('loraManagement.uploadArea.orClickToBrowse')}</p>
                 <Button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -510,10 +512,10 @@ export function LoRAManagementDialog({
                   size="sm"
                   className="hover:bg-primary/10 transition-colors"
                 >
-                  Browse Files
+                  {t('loraManagement.uploadArea.browseFiles')}
                 </Button>
                 <p className="text-xs text-muted-foreground mt-4">
-                  .safetensors, .ckpt • Max 5GB
+                  {t('loraManagement.uploadArea.fileTypes')}
                 </p>
               </>
             )}
@@ -523,7 +525,7 @@ export function LoRAManagementDialog({
           <div className="mt-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">
-                Your LoRAs {loras.length > 0 && `(${loras.length})`}
+                {t('loraManagement.yourLoras')} {loras.length > 0 && `(${loras.length})`}
               </h3>
               <Button
                 variant="outline"
@@ -533,23 +535,23 @@ export function LoRAManagementDialog({
                 className="gap-2"
               >
                 <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                {isSyncing ? 'Syncing...' : 'Sync from S3'}
+                {isSyncing ? t('loraManagement.actions.syncing') : t('loraManagement.actions.syncFromS3')}
               </Button>
             </div>
 
             {isLoading ? (
               <div className="text-center py-12 text-muted-foreground">
                 <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent mb-4" role="status">
-                  <span className="sr-only">Loading...</span>
+                  <span className="sr-only">{t('common.loading')}</span>
                 </div>
-                <p className="text-sm">Loading LoRAs...</p>
+                <p className="text-sm">{t('loraManagement.messages.loadingLoras')}</p>
               </div>
             ) : loras.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p className="font-medium">No LoRAs uploaded yet</p>
+                <p className="font-medium">{t('loraManagement.messages.noLorasUploaded')}</p>
                 <p className="text-sm mt-1">
-                  Upload your first LoRA to get started
+                  {t('loraManagement.messages.uploadFirstLora')}
                 </p>
               </div>
             ) : (
@@ -569,9 +571,9 @@ export function LoRAManagementDialog({
                             <Package className={`h-5 w-5 ${pair.isComplete ? 'text-green-500' : 'text-yellow-500'}`} />
                             <h4 className="font-medium text-sm">{pair.baseName}</h4>
                             {pair.isComplete ? (
-                              <span className="text-xs bg-green-500/10 text-green-500 px-2 py-0.5 rounded">Complete</span>
+                              <span className="text-xs bg-green-500/10 text-green-500 px-2 py-0.5 rounded">{t('loraManagement.status.complete')}</span>
                             ) : (
-                              <span className="text-xs bg-yellow-500/10 text-yellow-500 px-2 py-0.5 rounded">Incomplete</span>
+                              <span className="text-xs bg-yellow-500/10 text-yellow-500 px-2 py-0.5 rounded">{t('loraManagement.status.incomplete')}</span>
                             )}
                           </div>
                         </div>
@@ -581,7 +583,7 @@ export function LoRAManagementDialog({
                           {/* High LoRA */}
                           <div className={`p-3 rounded-md border ${pair.high ? 'bg-muted/30 border-muted' : 'bg-muted/10 border-dashed border-muted-foreground/20'}`}>
                             <div className="flex items-center justify-between mb-1">
-                              <span className="text-xs font-medium text-muted-foreground">HIGH</span>
+                              <span className="text-xs font-medium text-muted-foreground">{t('loraManagement.status.high')}</span>
                               {pair.high && (
                                 <Button
                                   variant="ghost"
@@ -607,14 +609,14 @@ export function LoRAManagementDialog({
                                 </p>
                               </>
                             ) : (
-                              <p className="text-xs text-muted-foreground italic">Not uploaded</p>
+                              <p className="text-xs text-muted-foreground italic">{t('loraManagement.status.notUploaded')}</p>
                             )}
                           </div>
 
                           {/* Low LoRA */}
                           <div className={`p-3 rounded-md border ${pair.low ? 'bg-muted/30 border-muted' : 'bg-muted/10 border-dashed border-muted-foreground/20'}`}>
                             <div className="flex items-center justify-between mb-1">
-                              <span className="text-xs font-medium text-muted-foreground">LOW</span>
+                              <span className="text-xs font-medium text-muted-foreground">{t('loraManagement.status.low')}</span>
                               {pair.low && (
                                 <Button
                                   variant="ghost"
@@ -640,7 +642,7 @@ export function LoRAManagementDialog({
                                 </p>
                               </>
                             ) : (
-                              <p className="text-xs text-muted-foreground italic">Not uploaded</p>
+                              <p className="text-xs text-muted-foreground italic">{t('loraManagement.status.notUploaded')}</p>
                             )}
                           </div>
                         </div>
@@ -667,9 +669,9 @@ export function LoRAManagementDialog({
               <span className="sr-only">Close</span>
             </DialogPrimitive.Close>
           <DialogHeader>
-            <DialogTitle>Delete LoRA</DialogTitle>
+            <DialogTitle>{t('loraManagement.deleteDialog.title')}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this LoRA? This action cannot be undone.
+              {t('loraManagement.deleteDialog.description')}
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2 mt-4">
@@ -678,14 +680,14 @@ export function LoRAManagementDialog({
               onClick={() => setDeleteConfirmId(null)}
               disabled={isDeleting}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               variant="destructive"
               onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}
               disabled={isDeleting}
             >
-              {isDeleting ? 'Deleting...' : 'Delete'}
+              {isDeleting ? t('loraManagement.deleteDialog.deleting') : t('common.delete')}
             </Button>
           </div>
           </DialogPrimitive.Content>
