@@ -108,20 +108,13 @@ export default function VideoGenerationForm() {
 
     // Handle reuse job input event
     useEffect(() => {
-        console.log('📝 VideoGenerationForm: Registering reuseJobInput event listener');
-        
         const handleReuseInput = async (event: CustomEvent) => {
-            console.log('📨 VideoGenerationForm: Received reuseJobInput event', event.detail);
-            
             const { modelId, prompt: jobPrompt, options, type, imageInputPath, videoInputPath, audioInputPath } = event.detail;
             
             // Only handle if it's a video job
             if (type !== 'video') {
-                console.log('⏭️ Skipping: Not a video job, type is', type);
                 return;
             }
-
-            console.log('🔄 Reusing video input:', { modelId, prompt: jobPrompt, options, imageInputPath, videoInputPath, audioInputPath });
 
             try {
                 setIsLoadingMedia(true);
@@ -215,53 +208,37 @@ export default function VideoGenerationForm() {
                 // Load image file from path if exists
                 const imagePath = imageInputPath || parsedOptions.image_path;
                 if (imagePath) {
-                    console.log('📥 Loading image from path:', imagePath);
                     const file = await loadFileFromPath(imagePath);
                     if (file) {
                         setImageFile(file);
                         setImagePreviewUrl(imagePath);
-                        console.log('✅ Image file loaded successfully');
-                    } else {
-                        console.warn('⚠️ Failed to load image file');
                     }
                 }
 
                 // Load video file from path if exists
                 const videoPath = videoInputPath || parsedOptions.video_path;
                 if (videoPath) {
-                    console.log('📥 Loading video from path:', videoPath);
                     const file = await loadFileFromPath(videoPath);
                     if (file) {
                         setVideoFile(file);
                         setVideoPreviewUrl(videoPath);
-                        console.log('✅ Video file loaded successfully');
-                    } else {
-                        console.warn('⚠️ Failed to load video file');
                     }
                 }
 
                 // Load audio file from path if exists
                 const audioPath = audioInputPath || parsedOptions.wav_path || parsedOptions.audio;
                 if (audioPath) {
-                    console.log('📥 Loading audio from path:', audioPath);
                     const file = await loadFileFromPath(audioPath);
                     if (file) {
                         setAudioFile(file);
-                        console.log('✅ Audio file loaded successfully');
-                    } else {
-                        console.warn('⚠️ Failed to load audio file');
                     }
                 }
 
                 // Load second audio file if exists
                 if (parsedOptions.wav_path_2) {
-                    console.log('📥 Loading second audio from path:', parsedOptions.wav_path_2);
                     const file = await loadFileFromPath(parsedOptions.wav_path_2);
                     if (file) {
                         setAudioFile2(file);
-                        console.log('✅ Second audio file loaded successfully');
-                    } else {
-                        console.warn('⚠️ Failed to load second audio file');
                     }
                 }
 
@@ -290,7 +267,6 @@ export default function VideoGenerationForm() {
                         }
                     });
 
-                    console.log('✅ Applied all input values from job');
                 }, 100);
 
                 // Show success feedback
@@ -313,7 +289,6 @@ export default function VideoGenerationForm() {
 
         window.addEventListener('reuseJobInput', handleReuseInput as any);
         return () => {
-            console.log('🧹 VideoGenerationForm: Cleaning up reuseJobInput event listener');
             window.removeEventListener('reuseJobInput', handleReuseInput as any);
         };
     }, [setSelectedModel, selectedModel]);
@@ -526,8 +501,6 @@ export default function VideoGenerationForm() {
             }
             // Duration logic can be added here
 
-            console.log('Submitting to:', currentModel.api.type, currentModel.api.endpoint);
-
             // Construct Headers from Settings
             const headers: Record<string, string> = {};
             if (settings.apiKeys.openai) headers['X-OpenAI-Key'] = settings.apiKeys.openai;
@@ -538,13 +511,6 @@ export default function VideoGenerationForm() {
             // Add RunPod Endpoint ID if applicable
             if (currentModel.api.type === 'runpod') {
                 const endpointId = settings.runpod.endpoints[currentModel.id] || currentModel.api.endpoint;
-                console.log('🔍 RunPod Endpoint Debug:', {
-                    modelId: currentModel.id,
-                    endpointFromSettings: settings.runpod.endpoints[currentModel.id],
-                    endpointFromModel: currentModel.api.endpoint,
-                    finalEndpoint: endpointId,
-                    allEndpoints: settings.runpod.endpoints
-                });
                 headers['X-RunPod-Endpoint-Id'] = endpointId;
             }
 
@@ -558,8 +524,7 @@ export default function VideoGenerationForm() {
             const data = await response.json();
 
             if (response && response.ok && data.success) {
-                console.log('Generation started successfully', data);
-                // Success - job added to queue, no need to show message
+                // Success - job added to queue
 
                 // Add job to context
                 addJob({
@@ -719,20 +684,23 @@ export default function VideoGenerationForm() {
                     <div className="space-y-2">
                         <Label className="text-xs text-muted-foreground font-medium">{t('generationForm.audio')} {parameterValues['person_count'] === 'multi' ? '1' : ''}</Label>
                         {audioFile ? (
-                            <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-muted/30">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-muted-foreground">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
-                                </svg>
-                                <span className="flex-1 text-sm truncate">{audioFile.name}</span>
-                                <button
-                                    type="button"
-                                    onClick={() => handleRemoveAudio(false)}
-                                    className="p-1 hover:bg-muted rounded transition-colors"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                                        <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-muted/30">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-muted-foreground">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
                                     </svg>
-                                </button>
+                                    <span className="flex-1 text-sm truncate">{audioFile.name}</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemoveAudio(false)}
+                                        className="p-1 hover:bg-muted rounded transition-colors"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                                            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                                        </svg>
+                                    </button>
+                                </div>
+                                <audio controls className="w-full h-8" src={URL.createObjectURL(audioFile)} />
                             </div>
                         ) : (
                             <div className="border border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer relative border-border hover:bg-muted/20">
@@ -756,20 +724,23 @@ export default function VideoGenerationForm() {
                     <div className="space-y-2">
                         <Label className="text-xs text-muted-foreground font-medium">{t('generationForm.audio2')}</Label>
                         {audioFile2 ? (
-                            <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-muted/30">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-muted-foreground">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
-                                </svg>
-                                <span className="flex-1 text-sm truncate">{audioFile2.name}</span>
-                                <button
-                                    type="button"
-                                    onClick={() => handleRemoveAudio(true)}
-                                    className="p-1 hover:bg-muted rounded transition-colors"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                                        <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-muted/30">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-muted-foreground">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
                                     </svg>
-                                </button>
+                                    <span className="flex-1 text-sm truncate">{audioFile2.name}</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemoveAudio(true)}
+                                        className="p-1 hover:bg-muted rounded transition-colors"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                                            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                                        </svg>
+                                    </button>
+                                </div>
+                                <audio controls className="w-full h-8" src={URL.createObjectURL(audioFile2)} />
                             </div>
                         ) : (
                             <div className="border border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer relative border-border hover:bg-muted/20">

@@ -7,12 +7,8 @@ import { VideoEditorView } from '@/components/video-editor/VideoEditorView';
 export default function CenterPanel() {
     const { activeArtifactId, activeTool } = useStudio();
 
-    console.log('CenterPanel render - activeTool:', activeTool, 'activeArtifactId:', activeArtifactId);
-
     // Check if we're in video editor mode
     const isVideoEditorMode = activeTool === 'speech-sequencer';
-
-    console.log('isVideoEditorMode:', isVideoEditorMode);
 
     // If in video editor mode, render the VideoEditorView
     if (isVideoEditorMode) {
