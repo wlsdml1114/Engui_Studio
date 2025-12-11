@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useStudio } from '@/lib/context/StudioContext';
-import { getModelsByType, getModelById } from '@/lib/models/modelConfig';
+import { getModelsByType, getModelById, isInputVisible } from '@/lib/models/modelConfig';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -270,8 +270,9 @@ export default function ImageGenerationForm() {
         // Only require prompt if model accepts text input
         if (currentModel.inputs.includes('text') && !prompt) return;
 
-        // 모델이 이미지 입력을 요구하는 경우 이미지 필수 체크
-        if (currentModel.inputs.includes('image') && !imageFile) {
+        // 모델이 이미지 입력을 요구하는 경우 이미지 필수 체크 (conditionalInputs 기반)
+        const imageRequired = isInputVisible(currentModel, 'image', parameterValues);
+        if (imageRequired && !imageFile) {
             setMessage({ type: 'error', text: 'Please upload an image for this model' });
             return;
         }
@@ -289,8 +290,8 @@ export default function ImageGenerationForm() {
                 formData.append('workspaceId', activeWorkspaceId);
             }
 
-            // 모델이 이미지 입력을 받는 경우 File 객체를 직접 추가
-            if (currentModel.inputs.includes('image') && imageFile) {
+            // 모델이 이미지 입력을 받는 경우 File 객체를 직접 추가 (conditionalInputs 기반)
+            if (imageRequired && imageFile) {
                 // Always append as 'image' field - server will handle the key mapping
                 formData.append('image', imageFile);
                 console.log('📤 Appending image file:', imageFile.name, imageFile.size, 'bytes');
@@ -404,8 +405,8 @@ export default function ImageGenerationForm() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Image Upload - 모델이 이미지 입력을 받는 경우 표시 */}
-                {currentModel.inputs.includes('image') && (
+                {/* Image Upload - conditionalInputs 기반으로 표시 */}
+                {isInputVisible(currentModel, 'image', parameterValues) && (
                     <div className="space-y-2">
                         <Label className="text-xs">Input Image</Label>
                         <input
@@ -470,18 +471,36 @@ export default function ImageGenerationForm() {
                 {/* Basic Parameters */}
                 {currentModel.parameters.filter(p => p.group === 'basic' && isParameterVisible(p)).map(param => (
                     <div key={`${param.name}-${param.default}`} className="space-y-2">
-                        <Label className="text-xs">{param.label}</Label>
+                        {param.type !== 'boolean' && <Label className="text-xs">{param.label}</Label>}
                         {param.type === 'boolean' ? (
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    name={param.name}
-                                    id={param.name}
-                                    className="rounded border-border"
-                                    checked={parameterValues[param.name] ?? param.default}
-                                    onChange={(e) => handleParameterChange(param.name, e.target.checked)}
-                                />
-                                <label htmlFor={param.name} className="text-xs text-muted-foreground">{t('generationForm.enable')}</label>
+                            <div 
+                                className="flex items-center justify-between p-3 rounded-lg border border-border bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer"
+                                onClick={() => handleParameterChange(param.name, !(parameterValues[param.name] ?? param.default))}
+                            >
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-sm font-medium text-foreground">{param.label}</span>
+                                    {param.description && (
+                                        <span className="text-xs text-muted-foreground">{param.description}</span>
+                                    )}
+                                </div>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={parameterValues[param.name] ?? param.default}
+                                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                                        (parameterValues[param.name] ?? param.default) ? 'bg-primary' : 'bg-muted'
+                                    }`}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleParameterChange(param.name, !(parameterValues[param.name] ?? param.default));
+                                    }}
+                                >
+                                    <span
+                                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                                            (parameterValues[param.name] ?? param.default) ? 'translate-x-5' : 'translate-x-0'
+                                        }`}
+                                    />
+                                </button>
                             </div>
                         ) : param.type === 'select' ? (
                             <select
@@ -553,18 +572,36 @@ export default function ImageGenerationForm() {
                     <div className={`space-y-4 animate-in slide-in-from-top-2 duration-200 ${showAdvanced ? '' : 'hidden'}`}>
                         {currentModel.parameters.filter(p => (!p.group || p.group === 'advanced') && isParameterVisible(p)).map(param => (
                             <div key={`${param.name}-${param.default}`} className="space-y-2">
-                                <Label className="text-xs">{param.label}</Label>
+                                {param.type !== 'boolean' && <Label className="text-xs">{param.label}</Label>}
                                 {param.type === 'boolean' ? (
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            name={param.name}
-                                            id={param.name}
-                                            className="rounded border-border"
-                                            checked={parameterValues[param.name] ?? param.default}
-                                            onChange={(e) => handleParameterChange(param.name, e.target.checked)}
-                                        />
-                                        <label htmlFor={param.name} className="text-xs text-muted-foreground">{t('generationForm.enable')}</label>
+                                    <div 
+                                        className="flex items-center justify-between p-3 rounded-lg border border-border bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer"
+                                        onClick={() => handleParameterChange(param.name, !(parameterValues[param.name] ?? param.default))}
+                                    >
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="text-sm font-medium text-foreground">{param.label}</span>
+                                            {param.description && (
+                                                <span className="text-xs text-muted-foreground">{param.description}</span>
+                                            )}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            role="switch"
+                                            aria-checked={parameterValues[param.name] ?? param.default}
+                                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                                                (parameterValues[param.name] ?? param.default) ? 'bg-primary' : 'bg-muted'
+                                            }`}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleParameterChange(param.name, !(parameterValues[param.name] ?? param.default));
+                                            }}
+                                        >
+                                            <span
+                                                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                                                    (parameterValues[param.name] ?? param.default) ? 'translate-x-5' : 'translate-x-0'
+                                                }`}
+                                            />
+                                        </button>
                                     </div>
                                 ) : param.type === 'select' ? (
                                     <select

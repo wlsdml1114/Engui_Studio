@@ -59,6 +59,9 @@ interface RunPodConfig {
     'infinite-talk': string; // Infinite Talk endpoint 추가
     upscale: string; // Upscale endpoint
     'qwen-image-edit': string; // Qwen Image Edit endpoint 추가
+    'z-image': string; // Z-Image endpoint 추가
+    onetoall: string; // OneToAll endpoint 추가
+    'video-upscale': string; // Video Upscale endpoint 추가
   };
 }
 
@@ -134,7 +137,10 @@ class SettingsService {
             'wan-animate': '', // WAN Animate endpoint 추가
             'infinite-talk': '', // Infinite Talk endpoint 추가
             upscale: '', // Upscale endpoint
-            'qwen-image-edit': '' // Qwen Image Edit endpoint 추가
+            'qwen-image-edit': '', // Qwen Image Edit endpoint 추가
+            'z-image': '', // Z-Image endpoint 추가
+            onetoall: '', // OneToAll endpoint 추가
+            'video-upscale': '' // Video Upscale endpoint 추가
           },
           generateTimeout: 3600 // 기본값 3600초 (1시간)
         },
@@ -189,7 +195,7 @@ class SettingsService {
               settings.runpod.apiKey = value;
             } else             if (setting.configKey.startsWith('endpoints.')) {
               const endpointType = setting.configKey.split('.')[1];
-              if (endpointType && ['image', 'video', 'multitalk', 'flux-kontext', 'flux-krea', 'wan22', 'wan-animate', 'infinite-talk', 'upscale', 'qwen-image-edit'].includes(endpointType)) {
+              if (endpointType && ['image', 'video', 'multitalk', 'flux-kontext', 'flux-krea', 'wan22', 'wan-animate', 'infinite-talk', 'upscale', 'qwen-image-edit', 'z-image', 'onetoall', 'video-upscale'].includes(endpointType)) {
                 settings.runpod.endpoints[endpointType as keyof typeof settings.runpod.endpoints] = value;
               }
             } else if (setting.configKey === 'generateTimeout') {

@@ -153,6 +153,31 @@ export const MODELS: ModelConfig[] = [
             { name: 'audio2_end', label: 'Audio 2 End (s)', type: 'string', default: '', group: 'advanced', dependsOn: { parameter: 'person_count', value: 'multi' } }
         ]
     },
+    {
+        id: 'onetoall',
+        name: 'OneToAll',
+        provider: 'Wan',
+        type: 'video',
+        inputs: ['image', 'video', 'text'],
+        api: {
+            type: 'runpod',
+            endpoint: 'onetoall'
+        },
+        capabilities: {},
+        imageInputKey: 'image_path',
+        videoInputKey: 'video_path',
+        parameters: [
+            { name: 'workflow_type', label: 'Workflow Type', type: 'select', options: ['onetoall'], default: 'onetoall', group: 'hidden' },
+            { name: 'use_onetoall', label: 'Use OneToAll', type: 'boolean', default: true, group: 'hidden' },
+            { name: 'width', label: 'Width', type: 'number', default: 768, min: 256, max: 2048, step: 64, group: 'basic', validation: { multipleOf: 64 } },
+            { name: 'height', label: 'Height', type: 'number', default: 512, min: 256, max: 2048, step: 64, group: 'basic', validation: { multipleOf: 64 } },
+            { name: 'negativePrompt', label: 'Negative Prompt', type: 'string', default: '', group: 'advanced' },
+            { name: 'seed', label: 'Seed', type: 'number', default: 1234, group: 'advanced' },
+            { name: 'cfg', label: 'CFG Scale', type: 'number', default: 1.0, min: 0.1, max: 20, step: 0.1, group: 'advanced' },
+            { name: 'steps', label: 'Steps', type: 'number', default: 6, min: 1, max: 50, group: 'advanced' },
+            { name: 'fps', label: 'FPS', type: 'number', default: 16, min: 1, max: 60, group: 'advanced' }
+        ]
+    },
     // {
     //     id: 'google-veo',
     //     name: 'Veo',
@@ -229,6 +254,31 @@ export const MODELS: ModelConfig[] = [
             { name: 'seed', label: 'Seed', type: 'number', default: 42, group: 'advanced', description: '-1 for random' },
             { name: 'steps', label: 'Steps', type: 'number', default: 4, min: 1, max: 50, group: 'advanced' },
             { name: 'guidance', label: 'Guidance Scale', type: 'number', default: 1, min: 1, max: 20, step: 0.5, group: 'advanced' }
+        ]
+    },
+    {
+        id: 'z-image',
+        name: 'Z-Image',
+        provider: 'Alibaba',
+        type: 'image',
+        inputs: ['text', 'image'],
+        api: {
+            type: 'runpod',
+            endpoint: 'z-image'
+        },
+        capabilities: {},
+        imageInputKey: 'condition_image',
+        conditionalInputs: [
+            { type: 'image', dependsOn: { parameter: 'use_controlnet', value: true } }
+        ],
+        parameters: [
+            { name: 'use_controlnet', label: 'Use ControlNet', type: 'boolean', default: false, group: 'basic', description: 'Enable ControlNet with reference image' },
+            { name: 'width', label: 'Width', type: 'number', default: 1024, min: 512, max: 2048, step: 64, group: 'basic', validation: { multipleOf: 64 } },
+            { name: 'height', label: 'Height', type: 'number', default: 1024, min: 512, max: 2048, step: 64, group: 'basic', validation: { multipleOf: 64 } },
+            { name: 'negativePrompt', label: 'Negative Prompt', type: 'string', default: '', group: 'advanced' },
+            { name: 'seed', label: 'Seed', type: 'number', default: 533303727624653, group: 'advanced', description: 'Random seed for generation' },
+            { name: 'steps', label: 'Steps', type: 'number', default: 9, min: 1, max: 50, group: 'advanced' },
+            { name: 'cfg', label: 'CFG Scale', type: 'number', default: 1.0, min: 0.1, max: 20, step: 0.1, group: 'advanced' }
         ]
     },
 
