@@ -75,6 +75,18 @@ export default function QwenImageEditPage() {
               .then(file => {
                 setImageFile(file);
                 console.log('✅ Qwen Image Edit 이미지 File 객체 생성 완료:', file.name);
+                
+                // 이미지 로드 후 width와 height 자동 설정
+                const img = new Image();
+                img.onload = () => {
+                  setSettings(prev => ({
+                    ...prev,
+                    width: img.width,
+                    height: img.height
+                  }));
+                  console.log('✅ 재사용 이미지 크기 자동 설정:', img.width, 'x', img.height);
+                };
+                img.src = imagePath;
               })
               .catch(error => {
                 console.error('❌ Qwen Image Edit 이미지 File 객체 생성 실패:', error);
@@ -135,6 +147,18 @@ export default function QwenImageEditPage() {
       setImageFile(file);
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
+      
+      // 이미지 로드 후 width와 height 자동 설정
+      const img = new Image();
+      img.onload = () => {
+        setSettings(prev => ({
+          ...prev,
+          width: img.width,
+          height: img.height
+        }));
+        console.log('✅ 이미지 크기 자동 설정:', img.width, 'x', img.height);
+      };
+      img.src = url;
     }
   };
 
@@ -322,6 +346,18 @@ export default function QwenImageEditPage() {
             const file = await createFileFromUrl(imageUrl, 'dropped_image.jpg', 'image/jpeg');
             setImageFile(file);
             console.log('✅ 드롭된 이미지 File 객체 생성 완료');
+
+            // 이미지 로드 후 width와 height 자동 설정
+            const img = new Image();
+            img.onload = () => {
+              setSettings(prev => ({
+                ...prev,
+                width: img.width,
+                height: img.height
+              }));
+              console.log('✅ 드롭된 이미지 크기 자동 설정:', img.width, 'x', img.height);
+            };
+            img.src = imageUrl;
 
             setMessage({
               type: 'success',

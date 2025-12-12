@@ -11,6 +11,7 @@ import {
   LanguageIcon
 } from '@heroicons/react/24/outline';
 import { useI18n } from '@/lib/i18n/context';
+import { MODELS } from '@/lib/models/modelConfig';
 
 interface ServiceConfig {
   runpod: {
@@ -60,6 +61,11 @@ interface TestResult {
 
 export default function SettingsPage() {
   const { language, setLanguage, t } = useI18n();
+  
+  // modelConfig에서 RunPod 모델들을 가져오기
+  const runpodModels = MODELS.filter(model => model.api.type === 'runpod');
+  console.log('🔍 RunPod Models:', runpodModels.length, runpodModels.map(m => m.id));
+  
   const [settings, setSettings] = useState<Partial<ServiceConfig>>({
     runpod: {
       apiKey: '',
@@ -451,292 +457,44 @@ export default function SettingsPage() {
               </p>
             </div>
 
-            {/* MultiTalk Endpoint ID */}
-            <div>
-              <label className="block text-sm font-medium mb-2">MultiTalk Endpoint ID</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={settings.runpod?.endpoints?.multitalk || ''}
-                  onChange={(e) => updateSetting('runpod', 'endpoints', e.target.value, 'multitalk')}
-                  placeholder="Enter MultiTalk endpoint ID"
-                  className="flex-1 p-2 border rounded-md bg-background"
-                />
-                <button
-                  onClick={() => testConnection('runpod', settings.runpod?.endpoints?.multitalk)}
-                  disabled={!settings.runpod?.apiKey || !settings.runpod?.endpoints?.multitalk || testing[`runpod-multitalk`]}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {testing[`runpod-multitalk`] ? 'Testing...' : 'Test'}
-                </button>
-              </div>
-              {testResults[`runpod-${settings.runpod?.endpoints?.multitalk || 'multitalk'}`] && (
-                <div className={`mt-2 p-2 rounded-md text-sm ${
-                  testResults[`runpod-${settings.runpod?.endpoints?.multitalk || 'multitalk'}`]?.success 
-                    ? 'bg-green-100 text-green-800 border border-green-200' 
-                    : 'bg-red-100 text-red-800 border border-red-200'
-                }`}>
-                  {testResults[`runpod-${settings.runpod?.endpoints?.multitalk || 'multitalk'}`]?.message}
-                  {testResults[`runpod-${settings.runpod?.endpoints?.multitalk || 'multitalk'}`]?.responseTime && (
-                    <span className="ml-2">({testResults[`runpod-${settings.runpod?.endpoints?.multitalk || 'multitalk'}`]?.responseTime}ms)</span>
-                  )}
-                  {testResults[`runpod-${settings.runpod?.endpoints?.multitalk || 'multitalk'}`]?.statusCode && (
-                    <span className="ml-2">Status: {testResults[`runpod-${settings.runpod?.endpoints?.multitalk || 'multitalk'}`]?.statusCode}</span>
-                  )}
+            {/* RunPod Model Endpoints - 동적 생성 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {runpodModels.map((model) => (
+                <div key={model.id}>
+                <label className="block text-sm font-medium mb-2">{model.name} Endpoint ID</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={(settings.runpod?.endpoints as any)?.[model.id] || ''}
+                    onChange={(e) => updateSetting('runpod', 'endpoints', e.target.value, model.id)}
+                    placeholder={`Enter ${model.name} endpoint ID`}
+                    className="flex-1 p-2 border rounded-md bg-background"
+                  />
+                  <button
+                    onClick={() => testEndpoint(model.id as any)}
+                    disabled={!settings.runpod?.apiKey || !(settings.runpod?.endpoints as any)?.[model.id] || testing[model.id]}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {testing[model.id] ? 'Testing...' : 'Test'}
+                  </button>
                 </div>
-              )}
-            </div>
-
-            {/* FLUX KONTEXT Endpoint ID */}
-            <div>
-              <label className="block text-sm font-medium mb-2">FLUX KONTEXT Endpoint ID</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={settings.runpod?.endpoints?.['flux-kontext'] || ''}
-                  onChange={(e) => updateSetting('runpod', 'endpoints', e.target.value, 'flux-kontext')}
-                  placeholder="Enter FLUX KONTEXT endpoint ID"
-                  className="flex-1 p-2 border rounded-md bg-background"
-                />
-                <button
-                  onClick={() => testEndpoint('flux-kontext')}
-                  disabled={!settings.runpod?.apiKey || !settings.runpod?.endpoints?.['flux-kontext'] || testing['flux-kontext']}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {testing['flux-kontext'] ? 'Testing...' : 'Test'}
-                </button>
-              </div>
-              {testResults['flux-kontext'] && (
-                <div className={`mt-2 p-2 rounded-md text-sm ${
-                  testResults['flux-kontext'].success 
-                    ? 'bg-green-100 text-green-800 border border-green-200' 
-                    : 'bg-red-100 text-red-800 border border-red-200'
-                }`}>
-                  {testResults['flux-kontext'].message}
-                  {testResults['flux-kontext'].responseTime && (
-                    <span className="ml-2">({testResults['flux-kontext'].responseTime}ms)</span>
-                  )}
-                  {testResults['flux-kontext'].statusCode && (
-                    <span className="ml-2">Status: {testResults['flux-kontext'].statusCode}</span>
-                  )}
+                {testResults[model.id] && (
+                  <div className={`mt-2 p-2 rounded-md text-sm ${
+                    testResults[model.id].success
+                      ? 'bg-green-100 text-green-800 border border-green-200'
+                      : 'bg-red-100 text-red-800 border border-red-200'
+                  }`}>
+                    {testResults[model.id].message}
+                    {testResults[model.id].responseTime && (
+                      <span className="ml-2">({testResults[model.id].responseTime}ms)</span>
+                    )}
+                    {testResults[model.id].statusCode && (
+                      <span className="ml-2">Status: {testResults[model.id].statusCode}</span>
+                    )}
+                  </div>
+                )}
                 </div>
-              )}
-            </div>
-
-            {/* FLUX KREA Endpoint ID */}
-            <div>
-              <label className="block text-sm font-medium mb-2">FLUX KREA Endpoint ID</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={settings.runpod?.endpoints?.['flux-krea'] || ''}
-                  onChange={(e) => updateSetting('runpod', 'endpoints', e.target.value, 'flux-krea')}
-                  placeholder="Enter FLUX KREA endpoint ID"
-                  className="flex-1 p-2 border rounded-md bg-background"
-                />
-                <button
-                  onClick={() => testEndpoint('flux-krea')}
-                  disabled={!settings.runpod?.apiKey || !settings.runpod?.endpoints?.['flux-krea'] || testing['flux-krea']}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {testing['flux-krea'] ? 'Testing...' : 'Test'}
-                </button>
-              </div>
-              {testResults['flux-krea'] && (
-                <div className={`mt-2 p-2 rounded-md text-sm ${
-                  testResults['flux-krea'].success 
-                    ? 'bg-green-100 text-green-800 border border-green-200' 
-                    : 'bg-red-100 text-red-800 border border-red-200'
-                }`}>
-                  {testResults['flux-krea'].message}
-                  {testResults['flux-krea'].responseTime && (
-                    <span className="ml-2">({testResults['flux-krea'].responseTime}ms)</span>
-                  )}
-                  {testResults['flux-krea'].statusCode && (
-                    <span className="ml-2">Status: {testResults['flux-krea'].statusCode}</span>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* WAN 2.2 Endpoint ID */}
-            <div>
-              <label className="block text-sm font-medium mb-2">WAN 2.2 Endpoint ID</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={settings.runpod?.endpoints?.wan22 || ''}
-                  onChange={(e) => updateSetting('runpod', 'endpoints', e.target.value, 'wan22')}
-                  placeholder="Enter WAN 2.2 endpoint ID"
-                  className="flex-1 p-2 border rounded-md bg-background"
-                />
-                <button
-                  onClick={() => testEndpoint('wan22')}
-                  disabled={!settings.runpod?.apiKey || !settings.runpod?.endpoints?.wan22 || testing['wan22']}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {testing['wan22'] ? 'Testing...' : 'Test'}
-                </button>
-              </div>
-              {testResults['wan22'] && (
-                <div className={`mt-2 p-2 rounded-md text-sm ${
-                  testResults['wan22'].success 
-                    ? 'bg-green-100 text-green-800 border border-green-200' 
-                    : 'bg-red-100 text-red-800 border border-red-200'
-                }`}>
-                  {testResults['wan22'].message}
-                  {testResults['wan22'].responseTime && (
-                    <span className="ml-2">({testResults['wan22'].responseTime}ms)</span>
-                  )}
-                  {testResults['wan22'].statusCode && (
-                    <span className="ml-2">Status: {testResults['wan22'].statusCode}</span>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* WAN Animate Endpoint ID */}
-            <div>
-              <label className="block text-sm font-medium mb-2">WAN Animate Endpoint ID</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={settings.runpod?.endpoints?.['wan-animate'] || ''}
-                  onChange={(e) => updateSetting('runpod', 'endpoints', e.target.value, 'wan-animate')}
-                  placeholder="Enter WAN Animate endpoint ID"
-                  className="flex-1 p-2 border rounded-md bg-background"
-                />
-                <button
-                  onClick={() => testEndpoint('wan-animate')}
-                  disabled={!settings.runpod?.apiKey || !settings.runpod?.endpoints?.['wan-animate'] || testing['wan-animate']}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {testing['wan-animate'] ? 'Testing...' : 'Test'}
-                </button>
-              </div>
-              {testResults['wan-animate'] && (
-                <div className={`mt-2 p-2 rounded-md text-sm ${
-                  testResults['wan-animate'].success 
-                    ? 'bg-green-100 text-green-800 border border-green-200' 
-                    : 'bg-red-100 text-red-800 border border-red-200'
-                }`}>
-                  {testResults['wan-animate'].message}
-                  {testResults['wan-animate'].responseTime && (
-                    <span className="ml-2">({testResults['wan-animate'].responseTime}ms)</span>
-                  )}
-                  {testResults['wan-animate'].statusCode && (
-                    <span className="ml-2">Status: {testResults['wan-animate'].statusCode}</span>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Infinite Talk Endpoint ID */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Infinite Talk Endpoint ID</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={settings.runpod?.endpoints?.['infinite-talk'] || ''}
-                  onChange={(e) => updateSetting('runpod', 'endpoints', e.target.value, 'infinite-talk')}
-                  placeholder="Enter Infinite Talk endpoint ID"
-                  className="flex-1 p-2 border rounded-md bg-background"
-                />
-                <button
-                  onClick={() => testEndpoint('infinite-talk')}
-                  disabled={!settings.runpod?.apiKey || !settings.runpod?.endpoints?.['infinite-talk'] || testing['infinite-talk']}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {testing['infinite-talk'] ? 'Testing...' : 'Test'}
-                </button>
-              </div>
-              {testResults['infinite-talk'] && (
-                <div className={`mt-2 p-2 rounded-md text-sm ${
-                  testResults['infinite-talk'].success 
-                    ? 'bg-green-100 text-green-800 border border-green-200' 
-                    : 'bg-red-100 text-red-800 border border-red-200'
-                }`}>
-                  {testResults['infinite-talk'].message}
-                  {testResults['infinite-talk'].responseTime && (
-                    <span className="ml-2">({testResults['infinite-talk'].responseTime}ms)</span>
-                  )}
-                  {testResults['infinite-talk'].statusCode && (
-                    <span className="ml-2">Status: {testResults['infinite-talk'].statusCode}</span>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Video Upscale Endpoint ID */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Video Upscale Endpoint ID</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={settings.runpod?.endpoints?.['video-upscale'] || ''}
-                  onChange={(e) => updateSetting('runpod', 'endpoints', e.target.value, 'video-upscale')}
-                  placeholder="Enter Video Upscale endpoint ID"
-                  className="flex-1 p-2 border rounded-md bg-background"
-                />
-                <button
-                  onClick={() => testEndpoint('video-upscale')}
-                  disabled={!settings.runpod?.apiKey || !settings.runpod?.endpoints?.['video-upscale'] || testing['video-upscale']}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {testing['video-upscale'] ? 'Testing...' : 'Test'}
-                </button>
-              </div>
-              {testResults['video-upscale'] && (
-                <div className={`mt-2 p-2 rounded-md text-sm ${
-                  testResults['video-upscale'].success
-                    ? 'bg-green-100 text-green-800 border border-green-200'
-                    : 'bg-red-100 text-red-800 border border-red-200'
-                }`}>
-                  {testResults['video-upscale'].message}
-                  {testResults['video-upscale'].responseTime && (
-                    <span className="ml-2">({testResults['video-upscale'].responseTime}ms)</span>
-                  )}
-                  {testResults['video-upscale'].statusCode && (
-                    <span className="ml-2">Status: {testResults['video-upscale'].statusCode}</span>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Qwen Image Edit Endpoint ID */}
-            <div>
-              <label className="block text-sm font-medium mb-2">{t('settings.qwenImageEditEndpoint')}</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={settings.runpod?.endpoints?.['qwen-image-edit'] || ''}
-                  onChange={(e) => updateSetting('runpod', 'endpoints', e.target.value, 'qwen-image-edit')}
-                  placeholder={t('settings.enterEndpoint', { name: 'Qwen Image Edit' })}
-                  className="flex-1 p-2 border rounded-md bg-background"
-                />
-                <button
-                  onClick={() => testEndpoint('qwen-image-edit')}
-                  disabled={!settings.runpod?.apiKey || !settings.runpod?.endpoints?.['qwen-image-edit'] || testing['qwen-image-edit']}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {testing['qwen-image-edit'] ? 'Testing...' : 'Test'}
-                </button>
-              </div>
-              {testResults['qwen-image-edit'] && (
-                <div className={`mt-2 p-2 rounded-md text-sm ${
-                  testResults['qwen-image-edit'].success
-                    ? 'bg-green-100 text-green-800 border border-green-200'
-                    : 'bg-red-100 text-red-800 border border-red-200'
-                }`}>
-                  {testResults['qwen-image-edit'].message}
-                  {testResults['qwen-image-edit'].responseTime && (
-                    <span className="ml-2">({testResults['qwen-image-edit'].responseTime}ms)</span>
-                  )}
-                  {testResults['qwen-image-edit'].statusCode && (
-                    <span className="ml-2">Status: {testResults['qwen-image-edit'].statusCode}</span>
-                  )}
-                </div>
-              )}
+              ))}
             </div>
           </div>
         </div>

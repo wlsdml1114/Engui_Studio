@@ -129,3 +129,114 @@ export const formatFileSize = (bytes: number): string => {
 
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
+
+/**
+ * Convert server internal path to public URL
+ * @param path Server internal path (e.g., /runpod-volume/...)
+ * @returns Public URL path
+ */
+const convertToPublicPath = (path: string): string => {
+  // If already a public URL, return as is
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('/generations/') || path.startsWith('/results/')) {
+    return path;
+  }
+  
+  // Extract filename from runpod-volume path
+  if (path.includes('/runpod-volume/')) {
+    const filename = path.split('/').pop() || '';
+    
+    // Determine folder based on file type
+    if (filename.includes('image_') || filename.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+      return `/generations/${filename}`;
+    } else if (filename.includes('audio') || filename.match(/\.(mp3|wav|ogg|m4a)$/i)) {
+      return `/generations/${filename}`;
+    } else if (filename.match(/\.(mp4|webm|mov|avi)$/i)) {
+      return `/results/${filename}`;
+    }
+    
+    // Default to generations folder
+    return `/generations/${filename}`;
+  }
+  
+  // If path doesn't match expected patterns, return as is
+  return path;
+};
+
+/**
+ * Load a file from a server path and convert it to a File object
+ * @param path Server path to the file
+ * @returns Promise<File | null> - File object or null if loading fails
+ */
+export const loadFileFromPath = async (path: string): Promise<File | null> => {
+  try {
+    console.log('🔄 Loading file from path:', path);
+    
+    // Convert internal server path to public URL
+    const publicPath = convertToPublicPath(path);
+    console.log('🔄 Converted to public path:', publicPath);
+    
+    // Fetch file from server
+    const response = await fetch(publicPath);
+    
+    if (!response.ok) {
+      console.error('❌ Failed to fetch file:', response.status, response.statusText);
+      return null;
+    }
+    
+    // Get the blob from response
+    const blob = await response.blob();
+    
+    // Extract filename from path
+    const filename = path.split('/').pop() || 'file';
+    
+    // Determine MIME type from blob or path extension
+    const mimeType = blob.type || getMimeTypeFromPath(path);
+    
+    // Create File object
+    const file = new File([blob], filename, { type: mimeType });
+    
+    console.log('✅ File loaded successfully:', {
+      name: file.name,
+      size: file.size,
+      type: file.type
+    });
+    
+    return file;
+  } catch (error) {
+    console.error('❌ Error loading file from path:', error);
+    return null;
+  }
+};
+
+/**
+ * Get MIME type from file path extension
+ * @param path File path
+ * @returns MIME type string
+ */
+const getMimeTypeFromPath = (path: string): string => {
+  const extension = path.split('.').pop()?.toLowerCase();
+  
+  const mimeTypes: Record<string, string> = {
+    // Images
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'gif': 'image/gif',
+    'webp': 'image/webp',
+    'svg': 'image/svg+xml',
+    
+    // Videos
+    'mp4': 'video/mp4',
+    'webm': 'video/webm',
+    'mov': 'video/quicktime',
+    'avi': 'video/x-msvideo',
+    
+    // Audio
+    'mp3': 'audio/mpeg',
+    'wav': 'audio/wav',
+    'ogg': 'audio/ogg',
+    'm4a': 'audio/mp4',
+  };
+  
+  return mimeTypes[extension || ''] || 'application/octet-stream';
+};

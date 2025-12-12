@@ -7,23 +7,26 @@ import { join } from 'path';
  * S3 업로드 및 로컬 백업 저장을 처리하는 함수 (서버용)
  * @param file 업로드할 파일
  * @param fileName 저장할 파일 이름
- * @param uploadFunction S3 업로드 함수
+ * @param uploadFunction S3 업로드 함수 - returns both s3Url and filePath
  * @param localStoragePath 로컬 저장 경로 (선택사항)
- * @returns Promise<{s3Path: string, localPath?: string, webPath?: string}>
+ * @returns Promise<{s3Path: string, s3Url?: string, localPath?: string, webPath?: string}>
  */
 export const processFileUpload = async (
   file: File,
   fileName: string,
-  uploadFunction: (file: File, fileName: string) => Promise<string>,
+  uploadFunction: (file: File, fileName: string) => Promise<{ s3Url: string; filePath: string }>,
   localStoragePath?: string
-): Promise<{s3Path: string, localPath?: string, webPath?: string}> => {
+): Promise<{s3Path: string, s3Url?: string, localPath?: string, webPath?: string}> => {
   try {
     // S3에 업로드
     console.log(`📤 S3 업로드 시작:`, fileName);
-    const s3Path = await uploadFunction(file, fileName);
-    console.log('✅ S3 업로드 완료:', s3Path);
+    const uploadResult = await uploadFunction(file, fileName);
+    console.log('✅ S3 업로드 완료:', uploadResult);
 
-    const result: {s3Path: string, localPath?: string, webPath?: string} = { s3Path };
+    const result: {s3Path: string, s3Url?: string, localPath?: string, webPath?: string} = { 
+      s3Path: uploadResult.filePath,
+      s3Url: uploadResult.s3Url
+    };
 
     // 로컬 백업 저장 (경로가 제공된 경우)
     if (localStoragePath) {

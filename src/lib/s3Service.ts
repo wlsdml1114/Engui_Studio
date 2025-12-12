@@ -691,6 +691,54 @@ class S3Service {
       throw error;
     }
   }
+
+  // Presigned URL 생성 (1시간 만료)
+  async generatePresignedUrl(key: string, expiresIn: number = 3600): Promise<string> {
+    return executeWithRetry(
+      async () => {
+        const args = [
+          's3',
+          'presign',
+          `s3://${this.config.bucketName}/${key}`,
+          '--expires-in',
+          expiresIn.toString(),
+          '--region',
+          this.config.region,
+          '--endpoint-url',
+          this.config.endpointUrl,
+        ];
+
+        logger.emoji.search(`Generating presigned URL for: ${key} (expires in ${expiresIn}s)`);
+
+        const { stdout, stderr } = await this.runAwsCommand(args);
+
+        if (stderr && stderr.length > 0) {
+          logger.emoji.search('AWS CLI stderr:', stderr);
+        }
+
+        const presignedUrl = stdout.trim();
+
+        if (!presignedUrl || presignedUrl.length === 0) {
+          throw new Error('Failed to generate presigned URL: empty response');
+        }
+
+        logger.info(`✅ Presigned URL generated successfully (expires in ${expiresIn}s)`);
+
+        return presignedUrl;
+      },
+      this.config.maxRetries || 3,
+      this.config.retryDelay || 1000,
+      'Presigned URL 생성'
+    ).catch(async error => {
+      logger.error('Failed to generate presigned URL after retries:', error);
+
+      if (error instanceof Error && error.message.includes('502')) {
+        throw new Error(`RunPod S3 서버가 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요. (502 Bad Gateway)`);
+      }
+
+      throw new Error(`Presigned URL 생성에 실패했습니다: ${error}`);
+    });
+  }
 }
 
 export default S3Service;

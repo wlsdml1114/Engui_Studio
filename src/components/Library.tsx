@@ -21,7 +21,7 @@ interface JobItem {
   userId: string;
   workspaceId?: string;
   status: 'processing' | 'completed' | 'failed';
-  type: 'video' | 'multitalk' | 'flux-kontext' | 'flux-krea' | 'wan22' | 'wan-animate' | 'infinitetalk'|'video-upscale'|'qwen-image-edit'|'audio';
+  type: 'video' | 'multitalk' | 'flux-kontext' | 'flux-krea' | 'wan22' | 'wan-animate' | 'infinitetalk' | 'video-upscale' | 'qwen-image-edit' | 'audio';
   prompt?: string;
   options?: string;
   resultUrl?: string;
@@ -282,7 +282,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     const rect = itemRef.current?.getBoundingClientRect();
     if (rect) {
       setContextMenu({
@@ -305,7 +305,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
   // 드래그 시작 핸들러
   const handleDragStart = (e: React.DragEvent) => {
     setIsDragging(true);
-    
+
     // 드래그할 데이터 구성
     const dragData = {
       type: 'library-result',
@@ -350,7 +350,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
     // 드래그 데이터를 텍스트로 저장 (다른 페이지에서 접근 가능)
     e.dataTransfer.setData('application/json', JSON.stringify(dragData));
     e.dataTransfer.setData('text/plain', JSON.stringify(dragData)); // 폴백용
-    
+
     // 썸네일을 드래그 이미지로 설정 (또는 오디오의 경우 아이콘)
     const img = itemRef.current?.querySelector('img');
     if (img) {
@@ -388,7 +388,7 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
 
   return (
     <>
-      <div 
+      <div
         ref={itemRef}
         className={`
           relative bg-background/50 rounded-lg border border-border overflow-hidden cursor-pointer transition-all duration-200 hover:border-primary/50 hover:bg-background/70 group
@@ -401,165 +401,162 @@ const LibraryItem: React.FC<LibraryItemProps> = ({ item, onItemClick, onDeleteCl
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-      {/* 썸네일 */}
-      <div className="relative aspect-video bg-background overflow-hidden">
-        {thumbnailUrl ? (
-          <img 
-            src={thumbnailUrl} 
-            alt="Thumbnail" 
-            className={`w-full h-full object-cover transition-transform duration-200 ${isDragging ? 'brightness-50' : 'group-hover:scale-105'}`}
-            onError={(e) => {
-              console.error('❌ Thumbnail error for', item.type, item.id, ':', e);
-              console.error('❌ Failed URL:', thumbnailUrl);
-              console.error('❌ Item details:', {
-                type: item.type,
-                id: item.id,
-                status: item.status,
-                resultUrl: item.resultUrl,
-                options: item.options
-              });
-              e.currentTarget.style.display = 'none';
+        {/* 썸네일 */}
+        <div className="relative aspect-video bg-background overflow-hidden">
+          {thumbnailUrl ? (
+            <img
+              src={thumbnailUrl}
+              alt="Thumbnail"
+              className={`w-full h-full object-cover transition-transform duration-200 ${isDragging ? 'brightness-50' : 'group-hover:scale-105'}`}
+              onError={(e) => {
+                console.error('❌ Thumbnail error for', item.type, item.id, ':', e);
+                console.error('❌ Failed URL:', thumbnailUrl);
+                console.error('❌ Item details:', {
+                  type: item.type,
+                  id: item.id,
+                  status: item.status,
+                  resultUrl: item.resultUrl,
+                  options: item.options
+                });
+                e.currentTarget.style.display = 'none';
+              }}
+              onLoad={() => {
+                console.log('✅ Thumbnail loaded successfully for', item.type, item.id, ':', thumbnailUrl);
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-foreground/30">
+              <PhotoIcon className="w-12 h-12" />
+              <span className="ml-2 text-xs">No thumbnail</span>
+            </div>
+          )}
+
+
+          {/* 삭제 버튼 */}
+          <button
+            onClick={(e) => onDeleteClick(item, e)}
+            className="absolute top-2 right-2 p-1.5 bg-red-500/80 hover:bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-110 backdrop-blur-sm"
+            title={safeT('common.delete')}
+          >
+            <TrashIcon className="w-3.5 h-3.5" />
+          </button>
+
+          {/* 즐겨찾기 버튼 */}
+          <button
+            onClick={(e) => onFavoriteToggle(item, e)}
+            className={`absolute bottom-2 left-2 p-1.5 rounded-full transition-all duration-200 hover:scale-110 backdrop-blur-sm ${item.isFavorite
+                ? 'bg-yellow-500/90 hover:bg-yellow-400 text-white opacity-100'
+                : 'bg-gray-600/80 hover:bg-gray-500 text-white opacity-0 group-hover:opacity-100'
+              }`}
+            title={item.isFavorite ? safeT('library.removeFavorite') : safeT('library.addFavorite')}
+          >
+            <StarIcon className={`w-3.5 h-3.5 ${item.isFavorite ? 'fill-current' : ''}`} />
+          </button>
+        </div>
+
+        <div className="p-3 space-y-2">
+
+          <div className="flex justify-between items-center">
+            <span className={`text-xs px-2 py-1 rounded-full capitalize font-medium ${item.type === 'flux-kontext' || item.type === 'flux-krea' || item.type === 'qwen-image-edit'
+                ? 'bg-purple-500/20 text-purple-300' // 이미지 타입 - 보라색
+                : item.type === 'audio'
+                  ? 'bg-amber-500/20 text-amber-300'   // 오디오 타입 - 황금색
+                  : 'bg-blue-500/20 text-blue-300'     // 비디오 타입 - 파란색
+              }`}>
+              {item.type}
+            </span>
+            <span className={`text-xs font-medium ${item.status === 'completed' ? 'text-green-400' :
+                item.status === 'failed' ? 'text-red-400' : 'text-yellow-400'
+              }`}>
+              {item.status}
+            </span>
+          </div>
+        </div>
+
+        {/* 컨텍스트 메뉴 */}
+        {contextMenu.visible && (
+          <div
+            className="fixed z-50 bg-gradient-to-br from-secondary/95 to-secondary/90 backdrop-blur-xl border border-border/50 rounded-xl shadow-2xl py-2 min-w-[200px]"
+            style={{
+              left: contextMenu.x,
+              top: contextMenu.y,
+              transform: 'translate(-50%, -10px)'
             }}
-            onLoad={() => {
-              console.log('✅ Thumbnail loaded successfully for', item.type, item.id, ':', thumbnailUrl);
-            }}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-foreground/30">
-            <PhotoIcon className="w-12 h-12" />
-            <span className="ml-2 text-xs">No thumbnail</span>
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation(); // 이벤트 버블링 방지
+                console.log('🖱️ 입력값 재사용 버튼 클릭됨');
+                handleReuseInputs();
+              }}
+              className="w-full px-4 py-3 text-left text-sm hover:bg-background/30 transition-all duration-200 flex items-center gap-3 rounded-lg mx-2 group"
+            >
+              <ArrowPathIcon className="w-4 h-4 text-primary group-hover:rotate-180 transition-transform duration-300" />
+              <span className="text-foreground/90">🔄 {safeT('library.reuseInputs')}</span>
+            </button>
+
+            {/* 워크스페이스로 이동 */}
+            {availableWorkspaces.length > 0 && (
+              <>
+                <div className="border-t border-border/30 my-2 mx-2"></div>
+                <div className="px-4 py-2 text-xs text-foreground/60 font-medium bg-background/20 mx-2 rounded-lg">
+                  📂 {safeT('library.moveToWorkspace')}
+                </div>
+                <div className="max-h-40 overflow-y-auto custom-scrollbar">
+                  {availableWorkspaces
+                    .filter((ws: Workspace) => ws.id !== item.workspaceId)
+                    .map((workspace: Workspace) => (
+                      <button
+                        key={workspace.id}
+                        onClick={(e) => {
+                          e.stopPropagation(); // 이벤트 버블링 방지
+                          onMoveToWorkspace(item.id, workspace.id);
+                          setContextMenu({ visible: false, x: 0, y: 0 });
+                        }}
+                        className="w-full px-4 py-3 text-left text-sm hover:bg-background/30 transition-all duration-200 flex items-center gap-3 rounded-lg mx-2 group"
+                      >
+                        {workspace.color ? (
+                          <div
+                            className="w-3 h-3 rounded-full flex-shrink-0 shadow-sm ring-1 ring-white/20"
+                            style={{ backgroundColor: workspace.color }}
+                          />
+                        ) : (
+                          <div className="w-3 h-3 rounded-full bg-gradient-to-br from-primary/60 to-primary/40 flex-shrink-0 shadow-sm ring-1 ring-white/20" />
+                        )}
+                        <span className="text-foreground/90 group-hover:text-foreground transition-colors">
+                          {workspace.name}
+                        </span>
+                      </button>
+                    ))}
+                </div>
+                {/* 워크스페이스에서 제거 */}
+                {item.workspaceId && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation(); // 이벤트 버블링 방지
+                      fetch(`/api/workspaces/${item.workspaceId}/jobs/${item.id}`, {
+                        method: 'DELETE'
+                      }).then(() => {
+                        // 간단한 새로고침 (실제로는 부모에서 mutate 호출해야 함)
+                        window.location.reload();
+                      });
+                      setContextMenu({ visible: false, x: 0, y: 0 });
+                    }}
+                    className="w-full px-4 py-3 text-left text-sm hover:bg-red-500/10 transition-all duration-200 flex items-center gap-3 rounded-lg mx-2 group"
+                  >
+                    <div className="w-4 h-4 rounded-full bg-red-500/20 flex items-center justify-center">
+                      <span className="text-red-400 text-xs">✕</span>
+                    </div>
+                    <span className="text-red-400 group-hover:text-red-300 transition-colors">
+                      {safeT('library.removeFromWorkspace')}
+                    </span>
+                  </button>
+                )}
+              </>
+            )}
           </div>
         )}
-        
-
-        {/* 삭제 버튼 */}
-        <button
-          onClick={(e) => onDeleteClick(item, e)}
-          className="absolute top-2 right-2 p-1.5 bg-red-500/80 hover:bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-110 backdrop-blur-sm"
-          title={safeT('common.delete')}
-        >
-          <TrashIcon className="w-3.5 h-3.5" />
-        </button>
-
-        {/* 즐겨찾기 버튼 */}
-        <button
-          onClick={(e) => onFavoriteToggle(item, e)}
-          className={`absolute bottom-2 left-2 p-1.5 rounded-full transition-all duration-200 hover:scale-110 backdrop-blur-sm ${
-            item.isFavorite 
-              ? 'bg-yellow-500/90 hover:bg-yellow-400 text-white opacity-100' 
-              : 'bg-gray-600/80 hover:bg-gray-500 text-white opacity-0 group-hover:opacity-100'
-          }`}
-          title={item.isFavorite ? safeT('library.removeFavorite') : safeT('library.addFavorite')}
-        >
-          <StarIcon className={`w-3.5 h-3.5 ${item.isFavorite ? 'fill-current' : ''}`} />
-        </button>
       </div>
-      
-      <div className="p-3 space-y-2">
-        
-        <div className="flex justify-between items-center">
-          <span className={`text-xs px-2 py-1 rounded-full capitalize font-medium ${
-            item.type === 'flux-kontext' || item.type === 'flux-krea' || item.type === 'qwen-image-edit'
-              ? 'bg-purple-500/20 text-purple-300' // 이미지 타입 - 보라색
-              : item.type === 'audio'
-              ? 'bg-amber-500/20 text-amber-300'   // 오디오 타입 - 황금색
-              : 'bg-blue-500/20 text-blue-300'     // 비디오 타입 - 파란색
-          }`}>
-            {item.type}
-          </span>
-          <span className={`text-xs font-medium ${
-            item.status === 'completed' ? 'text-green-400' : 
-            item.status === 'failed' ? 'text-red-400' : 'text-yellow-400'
-          }`}>
-            {item.status}
-          </span>
-        </div>
-      </div>
-
-      {/* 컨텍스트 메뉴 */}
-      {contextMenu.visible && (
-        <div
-          className="fixed z-50 bg-gradient-to-br from-secondary/95 to-secondary/90 backdrop-blur-xl border border-border/50 rounded-xl shadow-2xl py-2 min-w-[200px]"
-          style={{
-            left: contextMenu.x,
-            top: contextMenu.y,
-            transform: 'translate(-50%, -10px)'
-          }}
-        >
-          <button
-            onClick={(e) => {
-              e.stopPropagation(); // 이벤트 버블링 방지
-              console.log('🖱️ 입력값 재사용 버튼 클릭됨');
-              handleReuseInputs();
-            }}
-            className="w-full px-4 py-3 text-left text-sm hover:bg-background/30 transition-all duration-200 flex items-center gap-3 rounded-lg mx-2 group"
-          >
-            <ArrowPathIcon className="w-4 h-4 text-primary group-hover:rotate-180 transition-transform duration-300" />
-            <span className="text-foreground/90">🔄 {safeT('library.reuseInputs')}</span>
-          </button>
-          
-          {/* 워크스페이스로 이동 */}
-          {availableWorkspaces.length > 0 && (
-            <>
-              <div className="border-t border-border/30 my-2 mx-2"></div>
-              <div className="px-4 py-2 text-xs text-foreground/60 font-medium bg-background/20 mx-2 rounded-lg">
-                📂 {safeT('library.moveToWorkspace')}
-              </div>
-              <div className="max-h-40 overflow-y-auto custom-scrollbar">
-                {availableWorkspaces
-                  .filter((ws: Workspace) => ws.id !== item.workspaceId)
-                  .map((workspace: Workspace) => (
-                    <button
-                      key={workspace.id}
-                      onClick={(e) => {
-                        e.stopPropagation(); // 이벤트 버블링 방지
-                        onMoveToWorkspace(item.id, workspace.id);
-                        setContextMenu({ visible: false, x: 0, y: 0 });
-                      }}
-                      className="w-full px-4 py-3 text-left text-sm hover:bg-background/30 transition-all duration-200 flex items-center gap-3 rounded-lg mx-2 group"
-                    >
-                      {workspace.color ? (
-                        <div 
-                          className="w-3 h-3 rounded-full flex-shrink-0 shadow-sm ring-1 ring-white/20"
-                          style={{ backgroundColor: workspace.color }}
-                        />
-                      ) : (
-                        <div className="w-3 h-3 rounded-full bg-gradient-to-br from-primary/60 to-primary/40 flex-shrink-0 shadow-sm ring-1 ring-white/20" />
-                      )}
-                      <span className="text-foreground/90 group-hover:text-foreground transition-colors">
-                        {workspace.name}
-                      </span>
-                    </button>
-                  ))}
-              </div>
-              {/* 워크스페이스에서 제거 */}
-              {item.workspaceId && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation(); // 이벤트 버블링 방지
-                    fetch(`/api/workspaces/${item.workspaceId}/jobs/${item.id}`, {
-                      method: 'DELETE'
-                    }).then(() => {
-                      // 간단한 새로고침 (실제로는 부모에서 mutate 호출해야 함)
-                      window.location.reload();
-                    });
-                    setContextMenu({ visible: false, x: 0, y: 0 });
-                  }}
-                  className="w-full px-4 py-3 text-left text-sm hover:bg-red-500/10 transition-all duration-200 flex items-center gap-3 rounded-lg mx-2 group"
-                >
-                  <div className="w-4 h-4 rounded-full bg-red-500/20 flex items-center justify-center">
-                    <span className="text-red-400 text-xs">✕</span>
-                  </div>
-                  <span className="text-red-400 group-hover:text-red-300 transition-colors">
-                    {safeT('library.removeFromWorkspace')}
-                  </span>
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      )}
-    </div>
     </>
   );
 };
@@ -594,18 +591,18 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
       if (item.resultUrl.startsWith('http')) {
         return item.resultUrl;
       }
-      
+
       // 로컬 경로인 경우 (개발 환경)
       if (item.resultUrl.startsWith('/')) {
         return item.resultUrl;
       }
     }
-    
+
     // options에서 RunPod 결과 URL 찾기
     if (options.runpodResultUrl) {
       return options.runpodResultUrl;
     }
-    
+
     return null;
   };
 
@@ -640,7 +637,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
             <XMarkIcon className="w-6 h-6" />
           </button>
         </div>
-        
+
         <div className="p-6 space-y-6">
           {/* 프롬프트 */}
           {item.prompt && (
@@ -649,7 +646,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
               <p className="text-foreground/80 bg-background p-3 rounded-lg">{item.prompt}</p>
             </div>
           )}
-          
+
           {/* 작업 정보 */}
           <div>
             <h4 className="font-medium mb-2">{safeT('library.jobInfo')}</h4>
@@ -666,25 +663,24 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                 </span>
               )}
               <div className="text-sm text-foreground/80">
-                <span className="font-medium">{safeT('library.status')}:</span> 
-                <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
-                  item.status === 'completed' ? 'bg-green-500/20 text-green-300' : 
-                  item.status === 'failed' ? 'bg-red-500/20 text-red-300' : 'bg-yellow-500/20 text-yellow-300'
-                }`}>
+                <span className="font-medium">{safeT('library.status')}:</span>
+                <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${item.status === 'completed' ? 'bg-green-500/20 text-green-300' :
+                    item.status === 'failed' ? 'bg-red-500/20 text-red-300' : 'bg-yellow-500/20 text-yellow-300'
+                  }`}>
                   {item.status}
                 </span>
               </div>
             </div>
           </div>
-          
+
           {/* 결과물 */}
           {resultUrl ? (
             <div>
               <h4 className="font-medium mb-2">Result</h4>
               {item.type === 'multitalk' ? (
                 <div className="space-y-4">
-                  <video 
-                    controls 
+                  <video
+                    controls
                     className="w-full max-h-96 rounded-lg bg-black"
                     src={resultUrl}
                     onError={(e) => console.error('Video error:', e)}
@@ -698,9 +694,9 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
               ) : item.type === 'flux-kontext' ? (
                 // FLUX KONTEXT는 이미지 결과만 표시
                 <div className="space-y-4">
-                  <img 
-                    src={resultUrl} 
-                    alt="Generated FLUX KONTEXT image" 
+                  <img
+                    src={resultUrl}
+                    alt="Generated FLUX KONTEXT image"
                     className="w-full max-h-96 object-contain rounded-lg bg-background"
                     onError={(e) => console.error('FLUX KONTEXT image error:', e)}
                     onLoad={() => console.log('✅ FLUX KONTEXT image loaded successfully:', resultUrl)}
@@ -781,8 +777,8 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <video 
-                    controls 
+                  <video
+                    controls
                     className="w-full max-h-96 rounded-lg bg-black"
                     src={resultUrl}
                     onError={(e) => console.error('Video error:', e)}
@@ -808,27 +804,27 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
               </div>
             </div>
           )}
-          
+
           {/* 입력 이미지 (MultiTalk의 경우) */}
           {item.type === 'multitalk' && (
             <div>
               <h4 className="font-medium mb-2">Input Image</h4>
-              
+
               {/* 로컬 이미지 웹 경로가 있으면 표시 */}
               {options.imageWebPath ? (
                 <div className="relative">
-                  <img 
-                    src={options.imageWebPath} 
-                    alt="Input image" 
+                  <img
+                    src={options.imageWebPath}
+                    alt="Input image"
                     className="w-full max-h-64 object-contain rounded-lg bg-background"
                     onError={(e) => {
                       console.error('❌ Local image error:', e);
                       console.error('❌ Local path:', options.imageWebPath);
-                      
+
                       // 에러 발생 시 이미지 요소를 숨기고 에러 메시지 표시
                       const imgElement = e.currentTarget;
                       imgElement.style.display = 'none';
-                      
+
                       // 에러 메시지 표시
                       const errorDiv = document.createElement('div');
                       errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
@@ -854,7 +850,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
               )}
             </div>
           )}
-          
+
           {/* FLUX KONTEXT 입력 이미지 */}
           {item.type === 'flux-kontext' && (
             <div>
@@ -862,7 +858,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
               {(() => {
                 try {
                   const options = JSON.parse(item.options || '{}');
-                  
+
                   // 입력 이미지 경로가 있으면 표시
                   if (options.inputImagePath) {
                     return (
@@ -874,23 +870,23 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                             <p><strong>Name:</strong> {options.inputImageName || 'Unknown'}</p>
                           </div>
                         </div>
-                        
+
                         {/* 입력 이미지 표시 시도 */}
                         <div className="relative">
-                          <img 
-                            src={`/results/${options.inputImageName}`} 
-                            alt="Input image" 
+                          <img
+                            src={`/results/${options.inputImageName}`}
+                            alt="Input image"
                             className="w-full max-h-64 object-contain rounded-lg bg-background"
                             onError={(e) => {
                               console.error('❌ Input image error:', e);
                               console.error('❌ Image path:', options.inputImagePath);
                               console.error('❌ Image name:', options.inputImageName);
                               console.error('❌ Web path:', `/results/${options.inputImageName}`);
-                              
+
                               // 에러 발생 시 이미지 요소를 숨기고 에러 메시지 표시
                               const imgElement = e.currentTarget;
                               imgElement.style.display = 'none';
-                              
+
                               // 에러 메시지 표시
                               const errorDiv = document.createElement('div');
                               errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
@@ -914,7 +910,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                       </div>
                     );
                   }
-                  
+
                   return (
                     <div className="text-center py-8 text-foreground/50">
                       <PhotoIcon className="w-16 h-16 mx-auto mb-2" />
@@ -940,7 +936,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
               {(() => {
                 try {
                   const options = JSON.parse(item.options || '{}');
-                  
+
                   // 로컬 웹 경로가 있으면 우선 사용 (가장 안정적)
                   if (options.imageWebPath) {
                     return (
@@ -952,21 +948,21 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                             <p><strong>Status:</strong> Available</p>
                           </div>
                         </div>
-                        
+
                         {/* 웹 경로 이미지 표시 */}
                         <div className="relative">
-                          <img 
+                          <img
                             src={options.imageWebPath}
-                            alt="Input image" 
+                            alt="Input image"
                             className="w-full max-h-64 object-contain rounded-lg bg-background"
                             onError={(e) => {
                               console.error('❌ WAN 2.2 input image error:', e);
                               console.error('❌ Image path:', options.imageWebPath);
-                              
+
                               // 에러 발생 시 이미지 요소를 숨기고 에러 메시지 표시
                               const imgElement = e.currentTarget;
                               imgElement.style.display = 'none';
-                              
+
                               // 에러 메시지 표시
                               const errorDiv = document.createElement('div');
                               errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
@@ -987,7 +983,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                       </div>
                     );
                   }
-                  
+
                   // base64 이미지가 있으면 표시 (FLUX KONTEXT와 동일)
                   if (options.imageBase64) {
                     return (
@@ -999,12 +995,12 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                             <p><strong>Size:</strong> {(options.imageBase64.length * 0.75 / 1024).toFixed(2)} KB</p>
                           </div>
                         </div>
-                        
+
                         {/* base64 이미지 표시 */}
                         <div className="relative">
-                          <img 
+                          <img
                             src={`data:image/jpeg;base64,${options.imageBase64}`}
-                            alt="Input image" 
+                            alt="Input image"
                             className="w-full max-h-64 object-contain rounded-lg bg-background"
                             onLoad={() => {
                               console.log('✅ Base64 input image loaded successfully');
@@ -1014,7 +1010,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                       </div>
                     );
                   }
-                  
+
                   // 입력 이미지 경로가 있으면 표시 (폴백)
                   if (options.inputImagePath) {
                     return (
@@ -1026,23 +1022,23 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                             <p><strong>Name:</strong> {options.inputImageName || 'Unknown'}</p>
                           </div>
                         </div>
-                        
+
                         {/* 입력 이미지 표시 시도 */}
                         <div className="relative">
-                          <img 
-                            src={`/results/${options.inputImageName}`} 
-                            alt="Input image" 
+                          <img
+                            src={`/results/${options.inputImageName}`}
+                            alt="Input image"
                             className="w-full max-h-64 object-contain rounded-lg bg-background"
                             onError={(e) => {
                               console.error('❌ Input image error:', e);
                               console.error('❌ Image path:', options.inputImagePath);
                               console.error('❌ Image name:', options.inputImageName);
                               console.error('❌ Web path:', `/results/${options.inputImageName}`);
-                              
+
                               // 에러 발생 시 이미지 요소를 숨기고 에러 메시지 표시
                               const imgElement = e.currentTarget;
                               imgElement.style.display = 'none';
-                              
+
                               // 에러 메시지 표시
                               const errorDiv = document.createElement('div');
                               errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
@@ -1066,7 +1062,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                       </div>
                     );
                   }
-                  
+
                   return (
                     <div className="text-center py-8 text-foreground/50">
                       <PhotoIcon className="w-16 h-16 mx-auto mb-2" />
@@ -1098,7 +1094,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
               {(() => {
                 try {
                   const options = JSON.parse(item.options || '{}');
-                  
+
                   return (
                     <div className="space-y-4">
                       {/* 입력 이미지 */}
@@ -1106,17 +1102,17 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                         <div>
                           <h5 className="font-medium mb-2 text-sm">Input Image</h5>
                           <div className="relative">
-                            <img 
-                              src={options.imageWebPath || `/results/${options.s3ImagePath.split('/').pop()}`} 
-                              alt="Input image" 
+                            <img
+                              src={options.imageWebPath || `/results/${options.s3ImagePath.split('/').pop()}`}
+                              alt="Input image"
                               className="w-full max-h-64 object-contain rounded-lg bg-background"
                               onError={(e) => {
                                 console.error('❌ WAN Animate input image error:', e);
                                 console.error('❌ Image path:', options.imageWebPath || options.s3ImagePath);
-                                
+
                                 const imgElement = e.currentTarget;
                                 imgElement.style.display = 'none';
-                                
+
                                 const errorDiv = document.createElement('div');
                                 errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
                                 errorDiv.innerHTML = `
@@ -1136,23 +1132,23 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                           </div>
                         </div>
                       )}
-                      
+
                       {/* 입력 비디오 */}
                       {options.hasVideo && (options.videoWebPath || options.s3VideoPath) && (
                         <div>
                           <h5 className="font-medium mb-2 text-sm">Input Video</h5>
                           <div className="relative">
-                            <video 
-                              src={options.videoWebPath || `/results/${options.s3VideoPath.split('/').pop()}`} 
+                            <video
+                              src={options.videoWebPath || `/results/${options.s3VideoPath.split('/').pop()}`}
                               controls
                               className="w-full max-h-64 object-contain rounded-lg bg-black"
                               onError={(e) => {
                                 console.error('❌ WAN Animate input video error:', e);
                                 console.error('❌ Video path:', options.s3VideoPath);
-                                
+
                                 const videoElement = e.currentTarget;
                                 videoElement.style.display = 'none';
-                                
+
                                 const errorDiv = document.createElement('div');
                                 errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
                                 errorDiv.innerHTML = `
@@ -1171,7 +1167,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                           </div>
                         </div>
                       )}
-                      
+
                       {/* 입력 파일이 없는 경우 */}
                       {!options.hasImage && !options.hasVideo && (
                         <div className="text-center py-8 text-foreground/50">
@@ -1210,23 +1206,23 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
               {(() => {
                 try {
                   const options = JSON.parse(item.options || '{}');
-                  
+
                   // 입력 타입에 따라 다른 처리
                   if (options.inputType === 'video' && options.videoWebPath) {
                     // 비디오 입력인 경우
                     return (
                       <div className="relative">
-                        <video 
-                          src={options.videoWebPath} 
+                        <video
+                          src={options.videoWebPath}
                           controls
                           className="w-full max-h-64 object-contain rounded-lg bg-black"
                           onError={(e) => {
                             console.error('❌ Infinite Talk input video error:', e);
                             console.error('❌ Video path:', options.videoWebPath);
-                            
+
                             const videoElement = e.currentTarget;
                             videoElement.style.display = 'none';
-                            
+
                             const errorDiv = document.createElement('div');
                             errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
                             errorDiv.innerHTML = `
@@ -1248,17 +1244,17 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                     // 이미지 입력인 경우
                     return (
                       <div className="relative">
-                        <img 
-                          src={options.imageWebPath} 
-                          alt="Input image" 
+                        <img
+                          src={options.imageWebPath}
+                          alt="Input image"
                           className="w-full max-h-64 object-contain rounded-lg bg-background"
                           onError={(e) => {
                             console.error('❌ Infinite Talk input image error:', e);
                             console.error('❌ Image path:', options.imageWebPath);
-                            
+
                             const imgElement = e.currentTarget;
                             imgElement.style.display = 'none';
-                            
+
                             const errorDiv = document.createElement('div');
                             errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
                             errorDiv.innerHTML = `
@@ -1277,23 +1273,23 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                       </div>
                     );
                   }
-                  
+
                   // 기존 경로 구조 fallback
                   if (options.inputType === 'video' && options.videoFileName) {
                     const fallbackPath = `/results/input/infinitetalk/input_${item.id}_${options.videoFileName}`;
                     return (
                       <div className="relative">
-                        <video 
-                          src={encodeURI(fallbackPath)} 
+                        <video
+                          src={encodeURI(fallbackPath)}
                           controls
                           className="w-full max-h-64 object-contain rounded-lg bg-black"
                           onError={(e) => {
                             console.error('❌ Infinite Talk fallback video error:', e);
                             console.error('❌ Fallback path:', fallbackPath);
-                            
+
                             const videoElement = e.currentTarget;
                             videoElement.style.display = 'none';
-                            
+
                             const errorDiv = document.createElement('div');
                             errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
                             errorDiv.innerHTML = `
@@ -1315,18 +1311,18 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                     const fallbackPath = `/results/input/infinitetalk/input_${item.id}_${options.imageFileName}`;
                     return (
                       <div className="relative">
-                        <img 
-                          src={encodeURI(fallbackPath)} 
-                          alt="Input image" 
+                        <img
+                          src={encodeURI(fallbackPath)}
+                          alt="Input image"
                           className="w-full max-h-64 object-contain rounded-lg bg-background"
                           onError={(e) => {
                             console.error('❌ Infinite Talk fallback image error:', e);
                             console.error('❌ Fallback path:', fallbackPath);
-                            
+
                             // 에러 발생 시 이미지 요소를 숨기고 에러 메시지 표시
                             const imgElement = e.currentTarget;
                             imgElement.style.display = 'none';
-                            
+
                             // 에러 메시지 표시
                             const errorDiv = document.createElement('div');
                             errorDiv.className = 'p-4 text-center text-red-400 bg-red-900/20 rounded-lg';
@@ -1346,7 +1342,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
                       </div>
                     );
                   }
-                  
+
                   return (
                     <div className="text-center py-8 text-foreground/50">
                       <PhotoIcon className="w-16 h-16 mx-auto mb-2" />
@@ -1365,7 +1361,7 @@ const ResultModal: React.FC<{ item: JobItem | null; onClose: () => void; t: (key
               })()}
             </div>
           )}
-          
+
 
         </div>
       </div>
@@ -1391,14 +1387,14 @@ export default function Library() {
   const [deleteConfirm, setDeleteConfirm] = useState<JobItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
-  
+
   // 워크스페이스 관련 상태
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null | undefined>(undefined);
   const [workspaceInitialized, setWorkspaceInitialized] = useState(false);
   const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [showWorkspaceDropdown, setShowWorkspaceDropdown] = useState(false);
-  const [deleteWorkspaceConfirm, setDeleteWorkspaceConfirm] = useState<{id: string, name: string} | null>(null);
+  const [deleteWorkspaceConfirm, setDeleteWorkspaceConfirm] = useState<{ id: string, name: string } | null>(null);
   const [isDeletingWorkspace, setIsDeletingWorkspace] = useState(false);
 
   // 스마트 폴링을 위한 상태
@@ -1426,11 +1422,11 @@ export default function Library() {
   const jobsUrl = selectedWorkspaceId
     ? `/api/jobs?page=${currentPage}&limit=${ITEMS_PER_PAGE}&workspaceId=${selectedWorkspaceId}`
     : `/api/jobs?page=${currentPage}&limit=${ITEMS_PER_PAGE}`;
-    
+
   const { data, error, isValidating, mutate } = useSWR(
-    jobsUrl, 
-    fetcher, 
-    { 
+    jobsUrl,
+    fetcher,
+    {
       refreshInterval: isVisible ? refreshInterval : 0, // 탭이 보이지 않으면 폴링 중지
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
@@ -1565,7 +1561,7 @@ export default function Library() {
 
   const handleFavoriteToggle = async (item: JobItem, e: React.MouseEvent) => {
     e.stopPropagation(); // 부모 클릭 이벤트 방지
-    
+
     try {
       const response = await fetch('/api/jobs/favorite', {
         method: 'POST',
@@ -1710,7 +1706,7 @@ export default function Library() {
         stack: error instanceof Error ? error.stack : undefined,
         item: item
       });
-      
+
       // localStorage 용량 초과 오류인 경우 특별 처리
       if (error instanceof Error && error.name === 'QuotaExceededError') {
         alert(safeT('library.quotaExceeded'));
@@ -1841,12 +1837,12 @@ export default function Library() {
       if (response.ok) {
         // 워크스페이스 목록 새로고침
         await mutateWorkspaces();
-        
+
         // 삭제된 워크스페이스가 현재 선택된 워크스페이스라면 전체 작업으로 변경
         if (selectedWorkspaceId === deleteWorkspaceConfirm.id) {
           await handleWorkspaceChange(null);
         }
-        
+
         setDeleteWorkspaceConfirm(null);
         console.log('✅ 워크스페이스가 삭제되었습니다.');
       } else {
@@ -1868,7 +1864,7 @@ export default function Library() {
 
   return (
     <>
-      <aside className="w-[450px] bg-secondary p-6 flex flex-col flex-shrink-0 border-l border-border">
+      <aside className="w-full h-full bg-secondary p-6 flex flex-col flex-shrink-0 border-l border-border">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold">{safeT('library.title')}</h2>
           <div className="flex items-center gap-2">
@@ -1886,7 +1882,7 @@ export default function Library() {
             )}
           </div>
         </div>
-        
+
         {/* 워크스페이스 선택기 */}
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
@@ -1929,10 +1925,10 @@ export default function Library() {
                   <span className="text-foreground/90">...</span>
                 )}
               </div>
-              <svg 
-                className={`w-4 h-4 text-foreground/50 transition-transform duration-200 ${showWorkspaceDropdown ? 'rotate-180' : ''}`} 
-                fill="none" 
-                stroke="currentColor" 
+              <svg
+                className={`w-4 h-4 text-foreground/50 transition-transform duration-200 ${showWorkspaceDropdown ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -1950,9 +1946,8 @@ export default function Library() {
                         handleWorkspaceChange(null);
                         setShowWorkspaceDropdown(false);
                       }}
-                      className={`w-full px-4 py-3 text-left text-sm transition-all duration-200 flex items-center gap-3 hover:bg-primary/10 ${
-                        selectedWorkspaceId === null ? 'bg-primary/15 text-primary font-semibold' : 'text-foreground hover:text-primary'
-                      }`}
+                      className={`w-full px-4 py-3 text-left text-sm transition-all duration-200 flex items-center gap-3 hover:bg-primary/10 ${selectedWorkspaceId === null ? 'bg-primary/15 text-primary font-semibold' : 'text-foreground hover:text-primary'
+                        }`}
                     >
                       <span>📁 {safeT('library.allJobs')}</span>
                     </button>
@@ -1965,19 +1960,17 @@ export default function Library() {
                           handleWorkspaceChange(workspace.id);
                           setShowWorkspaceDropdown(false);
                         }}
-                        className={`w-full px-4 py-3 text-left text-sm transition-all duration-200 flex items-center gap-3 hover:bg-primary/10 ${
-                          selectedWorkspaceId === workspace.id ? 'bg-primary/15 text-primary font-semibold' : 'text-foreground hover:text-primary'
-                        }`}
+                        className={`w-full px-4 py-3 text-left text-sm transition-all duration-200 flex items-center gap-3 hover:bg-primary/10 ${selectedWorkspaceId === workspace.id ? 'bg-primary/15 text-primary font-semibold' : 'text-foreground hover:text-primary'
+                          }`}
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <span>{workspace.name}</span>
                             {workspace.isDefault && (
-                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                selectedWorkspaceId === workspace.id 
-                                  ? 'bg-primary/25 text-primary' 
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${selectedWorkspaceId === workspace.id
+                                  ? 'bg-primary/25 text-primary'
                                   : 'bg-foreground/15 text-foreground/80'
-                              }`}>{safeT('library.default')}</span>
+                                }`}>{safeT('library.default')}</span>
                             )}
                           </div>
                         </div>
@@ -1998,12 +1991,12 @@ export default function Library() {
             {showFavoritesOnly ? safeT('library.showAll') : safeT('library.favoritesOnly')}
           </button>
         </div>
-        
+
         {/* 마지막 업데이트 시간 표시 */}
         <div className="text-xs text-foreground/30 mb-2 text-center">
           {safeT('library.lastUpdated')} {lastUpdate.toLocaleTimeString()}
         </div>
-        
+
         {error && <div className="text-red-500 text-center">{safeT('library.failedToLoadJobs')}</div>}
         {!data && <div className="text-center">{safeT('library.loading')}</div>}
         <div className="flex-1 grid grid-cols-2 gap-3 overflow-y-auto pr-2 auto-rows-min library-scrollbar">
@@ -2013,9 +2006,9 @@ export default function Library() {
             </p>
           ) : (
             filteredJobs.map((job: JobItem) => (
-              <LibraryItem 
-                key={job.id} 
-                item={job} 
+              <LibraryItem
+                key={job.id}
+                item={job}
                 onItemClick={handleItemClick}
                 onDeleteClick={handleDeleteClick}
                 onFavoriteToggle={handleFavoriteToggle}
@@ -2037,28 +2030,27 @@ export default function Library() {
             >
               {safeT('library.previous')}
             </button>
-            
+
             <div className="flex items-center gap-1">
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                 const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
                 if (pageNum > totalPages) return null;
-                
+
                 return (
                   <button
                     key={pageNum}
                     onClick={() => setCurrentPage(pageNum)}
-                    className={`px-3 py-1 text-sm rounded border ${
-                      currentPage === pageNum
+                    className={`px-3 py-1 text-sm rounded border ${currentPage === pageNum
                         ? 'bg-primary text-primary-foreground border-primary'
                         : 'bg-secondary hover:bg-secondary/80 border-border'
-                    }`}
+                      }`}
                   >
                     {pageNum}
                   </button>
                 );
               })}
             </div>
-            
+
             <button
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               disabled={currentPage === totalPages}
@@ -2069,10 +2061,10 @@ export default function Library() {
           </div>
         )}
       </aside>
-      
+
       {/* 결과 모달 */}
       <ResultModal item={selectedItem} onClose={handleCloseModal} t={t} />
-      
+
       {/* 삭제 확인 모달 */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
@@ -2083,7 +2075,7 @@ export default function Library() {
               </div>
               <h3 className="text-lg font-semibold">{safeT('library.deleteConfirm')}</h3>
             </div>
-            
+
             <p className="text-foreground/80 mb-6">
               <strong>{deleteConfirm.type}</strong> {safeT('library.deleteConfirmMessage')}
               <br />
@@ -2091,7 +2083,7 @@ export default function Library() {
                 {safeT('library.deleteConfirmWarning')}
               </span>
             </p>
-            
+
             <div className="flex gap-3 justify-end">
               <button
                 onClick={handleDeleteCancel}
@@ -2134,7 +2126,7 @@ export default function Library() {
                 <XMarkIcon className="w-5 h-5 text-foreground/70" />
               </button>
             </div>
-            
+
             <div className="p-6 space-y-6">
               {/* 새 워크스페이스 생성 */}
               <div className="bg-gradient-to-r from-background/30 to-background/20 rounded-xl p-4 border border-border/30">
@@ -2166,11 +2158,9 @@ export default function Library() {
                     {workspaces.map((workspace: Workspace, index: number) => (
                       <div
                         key={workspace.id}
-                        className={`group flex items-center justify-between px-4 py-3 transition-all duration-200 hover:bg-background/30 ${
-                          index !== workspaces.length - 1 ? 'border-b border-border/20' : ''
-                        } ${
-                          selectedWorkspaceId === workspace.id ? 'bg-primary/5' : ''
-                        }`}
+                        className={`group flex items-center justify-between px-4 py-3 transition-all duration-200 hover:bg-background/30 ${index !== workspaces.length - 1 ? 'border-b border-border/20' : ''
+                          } ${selectedWorkspaceId === workspace.id ? 'bg-primary/5' : ''
+                          }`}
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
@@ -2187,11 +2177,10 @@ export default function Library() {
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleWorkspaceChange(workspace.id)}
-                            className={`px-3 py-1.5 text-xs rounded-lg transition-all duration-200 font-medium ${
-                              selectedWorkspaceId === workspace.id
+                            className={`px-3 py-1.5 text-xs rounded-lg transition-all duration-200 font-medium ${selectedWorkspaceId === workspace.id
                                 ? 'bg-primary text-white shadow-sm'
                                 : 'bg-background/50 hover:bg-background/70 text-foreground/70 hover:text-foreground'
-                            }`}
+                              }`}
                           >
                             {selectedWorkspaceId === workspace.id ? safeT('library.selected') : safeT('library.select')}
                           </button>
@@ -2228,7 +2217,7 @@ export default function Library() {
                 <p className="text-sm text-foreground/60">{safeT('library.deleteWorkspaceWarning')}</p>
               </div>
             </div>
-            
+
             <div className="mb-6">
               <p className="text-foreground/90 mb-2">
                 {safeT('library.deleteWorkspaceConfirm', { name: deleteWorkspaceConfirm.name })}

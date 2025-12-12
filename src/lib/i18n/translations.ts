@@ -174,6 +174,69 @@ export const translations = {
       }
     },
 
+    // LoRA Management Dialog
+    loraManagement: {
+      title: 'LoRA 관리',
+      description: 'LoRA 모델을 업로드하고 관리합니다 (.safetensors, .ckpt, 최대 5GB)',
+      yourLoras: '내 LoRA',
+      uploadArea: {
+        dragAndDrop: '여기에 LoRA 파일을 드래그 앤 드롭하세요',
+        orClickToBrowse: '또는 클릭하여 찾아보기',
+        browseFiles: '파일 찾아보기',
+        fileTypes: '.safetensors, .ckpt • 최대 5GB',
+        uploading: '업로드 중...'
+      },
+      status: {
+        complete: '완료',
+        incomplete: '미완료',
+        high: 'HIGH',
+        low: 'LOW',
+        notUploaded: '업로드되지 않음'
+      },
+      actions: {
+        syncFromS3: 'S3에서 동기화',
+        syncing: '동기화 중...',
+        retryNow: '지금 재시도',
+        change: '변경',
+        clear: '지우기',
+        manage: '관리'
+      },
+      messages: {
+        loadingLoras: 'LoRA 로딩 중...',
+        noLorasUploaded: '아직 업로드된 LoRA가 없습니다',
+        uploadFirstLora: '첫 번째 LoRA를 업로드하여 시작하세요',
+        uploadSuccess: '성공적으로 업로드되었습니다!',
+        deleteSuccess: 'LoRA가 성공적으로 삭제되었습니다!',
+        syncSuccess: 'S3에서 {count}개의 LoRA를 동기화했습니다!',
+        allSynced: '모든 LoRA가 이미 동기화되어 있습니다'
+      },
+      deleteDialog: {
+        title: 'LoRA 삭제',
+        description: '이 LoRA를 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.',
+        deleting: '삭제 중...'
+      },
+      selector: {
+        label: 'LoRA 쌍',
+        description: 'High & Low LoRA와 가중치',
+        noLoraSelected: 'LoRA 쌍이 선택되지 않음',
+        selectPair: '쌍 선택',
+        weight: '가중치',
+        searchPlaceholder: 'LoRA 쌍 검색...',
+        noPairsFound: '쌍을 찾을 수 없습니다',
+        noPairsAvailable: '사용 가능한 LoRA 쌍이 없습니다',
+        uploadNewLora: '새 LoRA 업로드',
+        noLoraSelected2: 'LoRA가 선택되지 않음',
+        selectLora: 'LoRA 선택',
+        searchLorasPlaceholder: 'LoRA 검색...',
+        noLorasFound: 'LoRA를 찾을 수 없습니다',
+        noLorasAvailable: '사용 가능한 LoRA가 없습니다',
+        recent: '최근',
+        allLoras: '모든 LoRA',
+        availableLoras: '사용 가능한 LoRA',
+        uploaded: '업로드됨'
+      }
+    },
+
     // Video Generation (WAN 2.2)
     videoGeneration: {
       title: 'WAN 2.2',
@@ -660,6 +723,245 @@ export const translations = {
       error: '오류: {error}'
     },
 
+    // Video Editor
+    videoEditor: {
+      header: {
+        addMedia: '미디어 추가',
+        export: '내보내기',
+        projectName: '프로젝트 이름',
+        untitledProject: '제목 없는 프로젝트'
+      },
+      timeline: {
+        videoTrack: '비디오 트랙',
+        musicTrack: '음악 트랙',
+        voiceoverTrack: '보이스오버 트랙',
+        addTrack: '트랙 추가',
+        deleteTrack: '트랙 삭제',
+        lockTrack: '트랙 잠금',
+        unlockTrack: '트랙 잠금 해제',
+        emptyTimeline: '타임라인이 비어 있습니다',
+        dragMediaHere: '미디어를 여기에 드래그하세요'
+      },
+      controls: {
+        play: '재생 (Space)',
+        pause: '일시정지 (Space)',
+        stop: '정지',
+        skipForward: '앞으로 건너뛰기',
+        skipBackward: '뒤로 건너뛰기',
+        zoomIn: '확대',
+        zoomOut: '축소',
+        fitToView: '화면에 맞추기',
+        timelineControls: '타임라인 컨트롤',
+        playbackControls: '재생 컨트롤',
+        goToStart: '처음으로 이동 (Home)',
+        goToEnd: '끝으로 이동 (End)',
+        stepBackward: '1초 뒤로 (왼쪽 화살표)',
+        stepForward: '1초 앞으로 (오른쪽 화살표)'
+      },
+      export: {
+        title: '비디오 내보내기',
+        format: '형식',
+        quality: '품질',
+        resolution: '해상도',
+        exportButton: '내보내기',
+        exporting: '내보내는 중...',
+        rendering: '렌더링 중...',
+        success: '내보내기 완료!',
+        failed: '내보내기 실패',
+        cancel: '취소',
+        progress: '진행률',
+        tryAgain: '다시 시도',
+        exportingAs: '"{title}"을(를) MP4로 내보내는 중',
+        close: '닫기',
+        download: '다운로드'
+      },
+      properties: {
+        title: '속성',
+        duration: '길이',
+        volume: '볼륨',
+        fit: '맞춤',
+        fitOptions: {
+          contain: '포함',
+          cover: '채우기',
+          fill: '늘리기'
+        },
+        noSelection: '선택된 항목 없음',
+        selectKeyframe: '키프레임을 선택하세요',
+        audioSettings: '오디오 설정',
+        visualSettings: '비주얼 설정',
+        start: '시작'
+      },
+      project: {
+        newProject: '새 프로젝트',
+        openProject: '프로젝트 열기',
+        saveProject: '프로젝트 저장',
+        projectSettings: '프로젝트 설정',
+        aspectRatio: '화면 비율',
+        qualityPreset: '품질 프리셋',
+        fps: 'FPS',
+        width: '너비',
+        height: '높이'
+      },
+      messages: {
+        noProject: '프로젝트가 없습니다',
+        loadingProject: '프로젝트 로딩 중...',
+        savingProject: '프로젝트 저장 중...',
+        exportComplete: '내보내기가 완료되었습니다!',
+        exportFailed: '내보내기에 실패했습니다.',
+        projectSaved: '프로젝트가 저장되었습니다.',
+        projectLoaded: '프로젝트가 로드되었습니다.',
+        unsavedChanges: '저장되지 않은 변경사항이 있습니다.',
+        validationError: '유효성 검사 오류',
+        dismiss: '닫기',
+        dismissValidationError: '유효성 검사 오류 닫기',
+        dismissNotification: '알림 닫기',
+        dragAndDropMedia: '미디어를 여기에 드래그 앤 드롭하여 편집을 시작하세요',
+        timelineKeyboardShortcuts: '타임라인 키보드 단축키: Home으로 처음으로 이동, End로 끝으로 이동, Page Up으로 5초 뒤로, Page Down으로 5초 앞으로. 타임라인을 클릭하여 위치 이동. 미디어를 드래그 앤 드롭하여 타임라인에 추가. Alt+스크롤 또는 Ctrl+스크롤로 확대/축소, 트랙패드에서 핀치 제스처 사용.',
+        videoTimeline: '비디오 타임라인',
+        timelineTracks: '타임라인 트랙',
+        playheadAt: '재생 헤드 위치: {time}'
+      },
+      projectSelector: {
+        selectProject: '프로젝트 선택',
+        newProject: '새 프로젝트',
+        updated: '업데이트됨',
+        deleteProject: '프로젝트 삭제',
+        deleteConfirmTitle: '프로젝트 삭제',
+        deleteConfirmMessage: '이 프로젝트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
+        cancel: '취소',
+        delete: '삭제',
+        deleting: '삭제 중...',
+        deleteFailed: '프로젝트 삭제에 실패했습니다. 다시 시도해주세요.'
+      }
+    },
+
+    // Generation Form
+    generationForm: {
+      using: '사용 중',
+      imageReference: '이미지 참조',
+      videoReference: '비디오 참조',
+      audio: '오디오',
+      audio2: '오디오 2',
+      dropImageHere: '여기에 이미지를 놓으세요',
+      clickOrDropImage: '클릭하거나 이미지를 드래그하세요',
+      dropVideoHere: '여기에 비디오를 놓으세요',
+      clickOrDropVideo: '클릭하거나 비디오를 드래그하세요',
+      clickOrDropAudio: '클릭하거나 오디오를 드래그하세요',
+      describeYourVideo: '비디오를 설명하세요...',
+      describeYourImage: '이미지를 설명하세요...',
+      size: '크기',
+      duration: '길이',
+      advancedSettings: '고급 설정',
+      enable: '활성화',
+      generate: '생성',
+      generating: '생성 중...',
+      loadingMedia: '미디어 로딩 중...',
+      inputReusedSuccess: '입력값이 성공적으로 재사용되었습니다',
+      loading: '로딩 중...',
+      tabs: {
+        image: '이미지',
+        video: '비디오',
+        voiceover: '음성',
+        music: '음악'
+      }
+    },
+
+    // Job Details Dialog
+    jobDetails: {
+      title: '작업 상세',
+      id: 'ID',
+      prompt: '프롬프트',
+      copyPrompt: '프롬프트 복사',
+      model: '모델',
+      status: '상태',
+      createdAt: '생성 시간',
+      completedAt: '완료 시간',
+      parameters: '파라미터',
+      download: '다운로드',
+      delete: '삭제',
+      deleteConfirm: '이 생성물을 삭제하시겠습니까?',
+      processing: '처리 중...',
+      generationFailed: '생성 실패',
+      openInNewTab: '새 탭에서 열기'
+    },
+
+    // Settings Dialog
+    settingsDialog: {
+      title: '설정',
+      tabs: {
+        videoProject: '비디오 프로젝트',
+        general: '일반 & API 키',
+        runpod: 'RunPod 설정',
+        storage: '스토리지 (S3)',
+        lora: 'LoRA 관리'
+      },
+      videoProject: {
+        saveLoadSection: '프로젝트 저장 / 불러오기',
+        saveProject: '프로젝트 저장',
+        loadProject: '프로젝트 불러오기',
+        projectInfo: '프로젝트 정보',
+        projectName: '프로젝트 이름',
+        projectNamePlaceholder: '내 비디오 프로젝트',
+        description: '설명',
+        descriptionPlaceholder: '프로젝트 설명...',
+        resolutionSettings: '해상도 설정',
+        aspectRatio: '화면 비율',
+        quality: '품질',
+        outputResolution: '출력 해상도',
+        applySettings: '프로젝트 설정 적용',
+        noProject: '프로젝트가 로드되지 않았습니다. 프로젝트를 불러오거나 새로 생성하세요.',
+        projectSaved: '프로젝트가 파일로 저장되었습니다!',
+        projectImported: '프로젝트를 성공적으로 가져왔습니다!',
+        importFailed: '프로젝트 가져오기 실패: {error}',
+        settingsApplied: '프로젝트 설정이 적용되었습니다!',
+        settingsFailed: '프로젝트 설정 저장에 실패했습니다'
+      },
+      general: {
+        externalProviders: '외부 제공자',
+        comingSoon: '곧 출시',
+        comingSoonDesc: '외부 AI 제공자 지원은 향후 업데이트에서 추가될 예정입니다.',
+        openaiApiKey: 'OpenAI API Key',
+        googleApiKey: 'Google API Key (Gemini/Veo)',
+        klingApiKey: 'Kling AI API Key'
+      },
+      runpod: {
+        title: 'RunPod 설정',
+        apiKey: 'RunPod API Key',
+        apiKeyPlaceholder: 'rpa_...',
+        endpointMappings: 'Endpoint 매핑',
+        endpointMappingsDesc: '내부 모델 ID를 특정 RunPod Endpoint ID에 매핑합니다.',
+        endpointPlaceholder: '{name} endpoint ID 입력'
+      },
+      storage: {
+        title: 'S3 호환 스토리지',
+        endpointUrl: 'Endpoint URL',
+        endpointUrlPlaceholder: '예: https://s3.us-east-1.amazonaws.com',
+        bucketName: '버킷 이름',
+        bucketNamePlaceholder: '예: my-studio-assets',
+        region: '리전',
+        regionPlaceholder: '예: us-east-1',
+        accessKeyId: 'Access Key ID',
+        secretAccessKey: 'Secret Access Key'
+      },
+      lora: {
+        title: 'LoRA 관리',
+        description: '커스텀 스타일링 및 파인튜닝을 위한 LoRA 모델을 관리합니다. 이미지 및 비디오 생성에 사용할 LoRA 파일을 업로드, 동기화 및 정리합니다.',
+        openManager: 'LoRA 관리자 열기',
+        aboutTitle: 'LoRA 모델 정보',
+        aboutItems: {
+          upload: '커스텀 LoRA 모델 업로드 (.safetensors 형식)',
+          sync: 'S3 버킷에서 LoRA 동기화',
+          organize: 'high/low 노이즈 쌍으로 LoRA 정리',
+          use: '생성 폼에서 커스텀 스타일링에 LoRA 사용'
+        }
+      },
+      footer: {
+        cancel: '취소',
+        save: '설정 저장',
+        saving: '저장 중...'
+      }
+    },
+
     // API Messages
     api: {
       // Job Processing Messages
@@ -902,6 +1204,69 @@ export const translations = {
         noMediaData: 'No media data found.',
         generationError: 'An error occurred during generation.',
         processingMedia: 'An error occurred while processing media.'
+      }
+    },
+
+    // LoRA Management Dialog
+    loraManagement: {
+      title: 'LoRA Management',
+      description: 'Upload and manage your LoRA models (.safetensors, .ckpt, max 5GB)',
+      yourLoras: 'Your LoRAs',
+      uploadArea: {
+        dragAndDrop: 'Drag & drop LoRA file here',
+        orClickToBrowse: 'or click to browse',
+        browseFiles: 'Browse Files',
+        fileTypes: '.safetensors, .ckpt • Max 5GB',
+        uploading: 'Uploading...'
+      },
+      status: {
+        complete: 'Complete',
+        incomplete: 'Incomplete',
+        high: 'HIGH',
+        low: 'LOW',
+        notUploaded: 'Not uploaded'
+      },
+      actions: {
+        syncFromS3: 'Sync from S3',
+        syncing: 'Syncing...',
+        retryNow: 'Retry now',
+        change: 'Change',
+        clear: 'Clear',
+        manage: 'Manage'
+      },
+      messages: {
+        loadingLoras: 'Loading LoRAs...',
+        noLorasUploaded: 'No LoRAs uploaded yet',
+        uploadFirstLora: 'Upload your first LoRA to get started',
+        uploadSuccess: 'uploaded successfully!',
+        deleteSuccess: 'LoRA deleted successfully!',
+        syncSuccess: 'Synced {count} LoRA(s) from S3!',
+        allSynced: 'All LoRAs are already synced'
+      },
+      deleteDialog: {
+        title: 'Delete LoRA',
+        description: 'Are you sure you want to delete this LoRA? This action cannot be undone.',
+        deleting: 'Deleting...'
+      },
+      selector: {
+        label: 'LoRA Pair',
+        description: 'High & Low LoRA with weights',
+        noLoraSelected: 'No LoRA pair selected',
+        selectPair: 'Select Pair',
+        weight: 'Weight',
+        searchPlaceholder: 'Search LoRA pairs...',
+        noPairsFound: 'No pairs found',
+        noPairsAvailable: 'No LoRA pairs available',
+        uploadNewLora: 'Upload New LoRA',
+        noLoraSelected2: 'No LoRA selected',
+        selectLora: 'Select LoRA',
+        searchLorasPlaceholder: 'Search LoRAs...',
+        noLorasFound: 'No LoRAs found',
+        noLorasAvailable: 'No LoRAs available',
+        recent: 'Recent',
+        allLoras: 'All LoRAs',
+        availableLoras: 'Available LoRAs',
+        uploaded: 'Uploaded'
       }
     },
 
@@ -1389,6 +1754,245 @@ export const translations = {
       autoUpdate: '• Status automatically updates when job completes',
       generationRequestAccepted: 'Image generation request successfully submitted! Job ID: {jobId}. Check progress in Library.',
       error: 'Error: {error}'
+    },
+
+    // Video Editor
+    videoEditor: {
+      header: {
+        addMedia: 'Add Media',
+        export: 'Export',
+        projectName: 'Project Name',
+        untitledProject: 'Untitled Project'
+      },
+      timeline: {
+        videoTrack: 'Video Track',
+        musicTrack: 'Music Track',
+        voiceoverTrack: 'Voiceover Track',
+        addTrack: 'Add Track',
+        deleteTrack: 'Delete Track',
+        lockTrack: 'Lock Track',
+        unlockTrack: 'Unlock Track',
+        emptyTimeline: 'Timeline is empty',
+        dragMediaHere: 'Drag media here'
+      },
+      controls: {
+        play: 'Play (Space)',
+        pause: 'Pause (Space)',
+        stop: 'Stop',
+        skipForward: 'Skip Forward',
+        skipBackward: 'Skip Backward',
+        zoomIn: 'Zoom In',
+        zoomOut: 'Zoom Out',
+        fitToView: 'Fit to View',
+        timelineControls: 'Timeline controls',
+        playbackControls: 'Playback controls',
+        goToStart: 'Go to start (Home)',
+        goToEnd: 'Go to end (End)',
+        stepBackward: 'Step backward 1 second (Left arrow)',
+        stepForward: 'Step forward 1 second (Right arrow)'
+      },
+      export: {
+        title: 'Export Video',
+        format: 'Format',
+        quality: 'Quality',
+        resolution: 'Resolution',
+        exportButton: 'Export',
+        exporting: 'Exporting...',
+        rendering: 'Rendering...',
+        success: 'Export complete!',
+        failed: 'Export failed',
+        cancel: 'Cancel',
+        progress: 'Progress',
+        tryAgain: 'Try Again',
+        exportingAs: 'Exporting "{title}" as MP4',
+        close: 'Close',
+        download: 'Download'
+      },
+      properties: {
+        title: 'Properties',
+        duration: 'Duration',
+        volume: 'Volume',
+        fit: 'Fit',
+        fitOptions: {
+          contain: 'Contain',
+          cover: 'Cover',
+          fill: 'Fill'
+        },
+        noSelection: 'No selection',
+        selectKeyframe: 'Select a keyframe',
+        audioSettings: 'Audio Settings',
+        visualSettings: 'Visual Settings',
+        start: 'Start'
+      },
+      project: {
+        newProject: 'New Project',
+        openProject: 'Open Project',
+        saveProject: 'Save Project',
+        projectSettings: 'Project Settings',
+        aspectRatio: 'Aspect Ratio',
+        qualityPreset: 'Quality Preset',
+        fps: 'FPS',
+        width: 'Width',
+        height: 'Height'
+      },
+      messages: {
+        noProject: 'No project',
+        loadingProject: 'Loading project...',
+        savingProject: 'Saving project...',
+        exportComplete: 'Export completed!',
+        exportFailed: 'Export failed.',
+        projectSaved: 'Project saved.',
+        projectLoaded: 'Project loaded.',
+        unsavedChanges: 'You have unsaved changes.',
+        validationError: 'Validation Error',
+        dismiss: 'Dismiss',
+        dismissValidationError: 'Dismiss validation error',
+        dismissNotification: 'Dismiss notification',
+        dragAndDropMedia: 'Drag and drop media here to start editing',
+        timelineKeyboardShortcuts: 'Timeline keyboard shortcuts: Home to go to start, End to go to end, Page Up to skip back 5 seconds, Page Down to skip forward 5 seconds. Click on timeline to seek to position. Drag and drop media to add to timeline. Use Alt+Scroll or Ctrl+Scroll to zoom, or pinch on trackpad.',
+        videoTimeline: 'Video timeline',
+        timelineTracks: 'Timeline tracks',
+        playheadAt: 'Playhead at {time}'
+      },
+      projectSelector: {
+        selectProject: 'Select Project',
+        newProject: 'New Project',
+        updated: 'Updated',
+        deleteProject: 'Delete Project',
+        deleteConfirmTitle: 'Delete Project',
+        deleteConfirmMessage: 'Are you sure you want to delete this project? This action cannot be undone.',
+        cancel: 'Cancel',
+        delete: 'Delete',
+        deleting: 'Deleting...',
+        deleteFailed: 'Failed to delete project. Please try again.'
+      }
+    },
+
+    // Generation Form
+    generationForm: {
+      using: 'Using',
+      imageReference: 'Image Reference',
+      videoReference: 'Video Reference',
+      audio: 'Audio',
+      audio2: 'Audio 2',
+      dropImageHere: 'Drop image here',
+      clickOrDropImage: 'Click or drop image',
+      dropVideoHere: 'Drop video here',
+      clickOrDropVideo: 'Click or drop video',
+      clickOrDropAudio: 'Click or drop audio',
+      describeYourVideo: 'Describe your video...',
+      describeYourImage: 'Describe your image...',
+      size: 'Size',
+      duration: 'Duration',
+      advancedSettings: 'Advanced Settings',
+      enable: 'Enable',
+      generate: 'Generate',
+      generating: 'Generating...',
+      loadingMedia: 'Loading media...',
+      inputReusedSuccess: 'Input reused successfully',
+      loading: 'Loading...',
+      tabs: {
+        image: 'Image',
+        video: 'Video',
+        voiceover: 'Voiceover',
+        music: 'Music'
+      }
+    },
+
+    // Job Details Dialog
+    jobDetails: {
+      title: 'Job Details',
+      id: 'ID',
+      prompt: 'Prompt',
+      copyPrompt: 'Copy Prompt',
+      model: 'Model',
+      status: 'Status',
+      createdAt: 'Created At',
+      completedAt: 'Completed At',
+      parameters: 'Parameters',
+      download: 'Download',
+      delete: 'Delete',
+      deleteConfirm: 'Are you sure you want to delete this generation?',
+      processing: 'Processing...',
+      generationFailed: 'Generation Failed',
+      openInNewTab: 'Open in new tab'
+    },
+
+    // Settings Dialog
+    settingsDialog: {
+      title: 'Settings',
+      tabs: {
+        videoProject: 'Video Project',
+        general: 'General & API Keys',
+        runpod: 'RunPod Config',
+        storage: 'Storage (S3)',
+        lora: 'LoRA Management'
+      },
+      videoProject: {
+        saveLoadSection: 'Save / Load Project',
+        saveProject: 'Save Project',
+        loadProject: 'Load Project',
+        projectInfo: 'Project Info',
+        projectName: 'Project Name',
+        projectNamePlaceholder: 'My Video Project',
+        description: 'Description',
+        descriptionPlaceholder: 'Project description...',
+        resolutionSettings: 'Resolution Settings',
+        aspectRatio: 'Aspect Ratio',
+        quality: 'Quality',
+        outputResolution: 'Output Resolution',
+        applySettings: 'Apply Project Settings',
+        noProject: 'No project loaded. Load a project or create a new one.',
+        projectSaved: 'Project saved to file!',
+        projectImported: 'Project imported successfully!',
+        importFailed: 'Failed to import project: {error}',
+        settingsApplied: 'Project settings applied!',
+        settingsFailed: 'Failed to save project settings'
+      },
+      general: {
+        externalProviders: 'External Providers',
+        comingSoon: 'Coming Soon',
+        comingSoonDesc: 'Support for external AI providers will be added in a future update.',
+        openaiApiKey: 'OpenAI API Key',
+        googleApiKey: 'Google API Key (Gemini/Veo)',
+        klingApiKey: 'Kling AI API Key'
+      },
+      runpod: {
+        title: 'RunPod Configuration',
+        apiKey: 'RunPod API Key',
+        apiKeyPlaceholder: 'rpa_...',
+        endpointMappings: 'Endpoint Mappings',
+        endpointMappingsDesc: 'Map internal model IDs to your specific RunPod Endpoint IDs.',
+        endpointPlaceholder: 'Enter {name} endpoint ID'
+      },
+      storage: {
+        title: 'S3 Compatible Storage',
+        endpointUrl: 'Endpoint URL',
+        endpointUrlPlaceholder: 'e.g., https://s3.us-east-1.amazonaws.com',
+        bucketName: 'Bucket Name',
+        bucketNamePlaceholder: 'e.g., my-studio-assets',
+        region: 'Region',
+        regionPlaceholder: 'e.g., us-east-1',
+        accessKeyId: 'Access Key ID',
+        secretAccessKey: 'Secret Access Key'
+      },
+      lora: {
+        title: 'LoRA Management',
+        description: 'Manage your LoRA models for custom styling and fine-tuning. Upload, sync, and organize LoRA files for use in image and video generation.',
+        openManager: 'Open LoRA Manager',
+        aboutTitle: 'About LoRA Models',
+        aboutItems: {
+          upload: 'Upload custom LoRA models (.safetensors format)',
+          sync: 'Sync LoRAs from your S3 bucket',
+          organize: 'Organize LoRAs by high/low noise pairs',
+          use: 'Use LoRAs in generation forms for custom styling'
+        }
+      },
+      footer: {
+        cancel: 'Cancel',
+        save: 'Save Settings',
+        saving: 'Saving...'
+      }
     },
 
     // API Messages

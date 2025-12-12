@@ -23,7 +23,16 @@ model Job {
   thumbnailUrl  String?    // 썸네일 URL 추가
   isFavorite    Boolean   @default(false) // 즐겨찾기 상태
   createdAt     DateTime  @default(now())
+  modelId       String    @default("unknown") // 모델 ID 추가
+  endpointId    String?   // RunPod Endpoint ID 추가
+  error         String?   // 에러 메시지 추가
+  cost          Float?    // 비용 추가
   completedAt   DateTime?
+  
+  // Media input paths for job input reuse
+  imageInputPath String?  // Path to input image file
+  videoInputPath String?  // Path to input video file
+  audioInputPath String?  // Path to input audio file
 
   // 관계 설정
   workspace     Workspace? @relation("WorkspaceJobs", fields: [workspaceId], references: [id])
@@ -110,12 +119,111 @@ model Workspace {
   color       String?   // 워크스페이스 색상 테마
   isDefault   Boolean   @default(false) // 기본 워크스페이스 여부
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @ updatedAt
+  updatedAt   DateTime  @updatedAt
 
   // 관계 설정
   jobs        Job[]     @relation("WorkspaceJobs")
+  media       WorkspaceMedia[] @relation("WorkspaceMedia")
+  loras       LoRA[]
   
   @@unique([userId, name]) // 사용자별 워크스페이스 이름은 고유해야 함
   @@index([userId])
   @@map("workspaces")
+}
+
+model WorkspaceMedia {
+  id          String    @id @default(uuid())
+  workspaceId String
+  type        String    // 'image' | 'video' | 'audio'
+  url         String
+  prompt      String?
+  modelId     String?
+  createdAt   DateTime  @default(now())
+
+  // 관계 설정
+  workspace   Workspace @relation("WorkspaceMedia", fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@map("workspace_media")
+}
+
+model VideoProject {
+  id            String   @id @default(uuid())
+  title         String
+  description   String   @default("")
+  
+  // Resolution settings
+  aspectRatio   String   @default("16:9")
+  qualityPreset String   @default("720p")
+  width         Int      @default(1280)
+  height        Int      @default(720)
+  
+  duration      Int      @default(30000)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  tracks        VideoTrack[]
+  
+  @@map("video_projects")
+}
+
+model VideoTrack {
+  id        String   @id @default(uuid())
+  projectId String
+  type      String   // 'video' | 'music' | 'voiceover'
+  label     String
+  locked    Boolean  @default(true)
+  order     Int      @default(0)
+  
+  // Audio settings
+  volume    Int      @default(100) // 0-200
+  muted     Boolean  @default(false)
+  
+  createdAt DateTime @default(now())
+  
+  project   VideoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  keyframes VideoKeyFrame[]
+  
+  @@map("video_tracks")
+}
+
+model VideoKeyFrame {
+  id        String   @id @default(uuid())
+  trackId   String
+  timestamp Int      // milliseconds
+  duration  Int      // milliseconds
+  dataType  String   // 'image' | 'video' | 'music' | 'voiceover'
+  mediaId   String
+  url       String
+  prompt    String?
+  
+  // Media fitting (for image/video)
+  fitMode   String?  @default("contain") // 'contain' | 'cover' | 'fill'
+  
+  // Audio settings (for music/voiceover)
+  volume    Int?     // 0-200, null means use track volume
+  
+  createdAt DateTime @default(now())
+  
+  track     VideoTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  
+  @@map("video_keyframes")
+}
+
+model LoRA {
+  id          String    @id @default(uuid())
+  name        String
+  fileName    String
+  s3Path      String    // Path in S3 bucket
+  s3Url       String    // Full S3 URL
+  fileSize    BigInt    // File size in bytes
+  extension   String    // .safetensors or .ckpt
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  uploadedAt  DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId])
+  @@index([uploadedAt])
+  @@map("loras")
 }

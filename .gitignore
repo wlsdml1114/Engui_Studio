@@ -50,6 +50,8 @@ next-env.d.ts
 # Generated results and uploads
 /public/results/
 /public/upload/
+/public/exports/
+/public/generations/
 
 # Log files
 *.log
@@ -77,3 +79,5 @@ temp_status.txt
 
 # Claude Code
 .claude/
+
+/videosos

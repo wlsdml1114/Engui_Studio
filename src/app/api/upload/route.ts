@@ -1,61 +1,73 @@
-// src/app/api/upload/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
-import S3Service from '@/lib/s3Service';
-import { getApiMessage } from '@/lib/apiMessages';
+import { writeFile, mkdir } from 'fs/promises';
+import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('📁 Processing file upload request...');
-
     const formData = await request.formData();
-    const s3Service = new S3Service();
-    const fileMapping: Record<string, string> = {};
-
-    // Process each file in the form data
-    for (const [key, value] of formData.entries()) {
-      if (value instanceof File) {
-        console.log(`📄 Processing file: ${key} - ${value.name} (${value.type})`);
-
-        try {
-          const arrayBuffer = await value.arrayBuffer();
-          const buffer = Buffer.from(arrayBuffer);
-
-          // Upload individual file to S3
-          const uploadResult = await s3Service.uploadFile(
-            buffer,
-            value.name,
-            value.type
-          );
-
-          fileMapping[key] = uploadResult.filePath;
-          console.log(`✅ ${key} uploaded to: ${uploadResult.filePath}`);
-        } catch (fileError) {
-          console.error(`❌ Error uploading ${key}:`, fileError);
-          throw fileError;
-        }
-      }
-    }
-
-    if (Object.keys(fileMapping).length === 0) {
+    const file = formData.get('file') as File;
+    
+    if (!file) {
       return NextResponse.json(
-        { error: getApiMessage('FILE', 'NO_FILES_PROVIDED') },
+        { success: false, error: 'No file provided' },
         { status: 400 }
       );
     }
 
-    console.log('✅ File upload completed:', fileMapping);
+    // Create results directory if it doesn't exist
+    const resultsDir = path.join(process.cwd(), 'public', 'results');
+    await mkdir(resultsDir, { recursive: true });
+
+    // Generate unique filename
+    const ext = path.extname(file.name) || getExtensionFromMimeType(file.type);
+    const filename = `upload_${uuidv4()}${ext}`;
+    const filepath = path.join(resultsDir, filename);
+
+    // Convert file to buffer and save
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+    await writeFile(filepath, buffer);
+
+    // Return the public URL and file path
+    const url = `/results/${filename}`;
+    const filePath = filepath;
+    
+    console.log(`✅ File uploaded: ${filename}`);
+    console.log(`📁 File path: ${filePath}`);
 
     return NextResponse.json({
       success: true,
-      files: fileMapping,
+      url,
+      filePath,
+      filename,
+      originalName: file.name,
+      size: file.size,
+      type: file.type,
     });
-
   } catch (error) {
-    console.error('❌ File upload error:', error);
+    console.error('❌ Upload error:', error);
     return NextResponse.json(
-      { error: `File upload failed: ${error instanceof Error ? error.message : String(error)}` },
+      { success: false, error: 'Failed to upload file' },
       { status: 500 }
     );
   }
+}
+
+function getExtensionFromMimeType(mimeType: string): string {
+  const mimeToExt: Record<string, string> = {
+    'audio/mpeg': '.mp3',
+    'audio/mp3': '.mp3',
+    'audio/wav': '.wav',
+    'audio/ogg': '.ogg',
+    'audio/webm': '.webm',
+    'video/mp4': '.mp4',
+    'video/webm': '.webm',
+    'video/quicktime': '.mov',
+    'image/jpeg': '.jpg',
+    'image/png': '.png',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+  };
+  return mimeToExt[mimeType] || '';
 }

@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 // 간단한 메모리 캐시 (프로덕션에서는 Redis 사용 권장)
 const cache = new Map<string, { data: any; timestamp: number }>();
@@ -11,27 +9,43 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
-      userId,
+      id, // RunPod ID or custom ID
+      userId = 'user-with-settings', // Default user if not provided (must match GET default)
       workspaceId,
       type,
-      status = 'completed',
+      status = 'queued',
       prompt,
       resultUrl,
       thumbnailUrl,
-      options
+      options,
+      modelId,
+      endpointId,
+      error,
+      cost,
+      createdAt
     } = body;
 
     // 필수 필드 검증
-    if (!userId || !type || !resultUrl) {
+    if (!type) {
       return NextResponse.json(
-        { error: 'Missing required fields: userId, type, resultUrl' },
+        { error: 'Missing required fields: type' },
         { status: 400 }
       );
     }
 
-    // Job 생성
-    const job = await prisma.job.create({
-      data: {
+    // Job 생성 또는 업데이트 (upsert)
+    const job = await prisma.job.upsert({
+      where: { id: id || 'new-job-' + Date.now() },
+      update: {
+        status,
+        resultUrl,
+        thumbnailUrl: thumbnailUrl || null,
+        error,
+        cost,
+        completedAt: status === 'completed' ? new Date() : null
+      },
+      create: {
+        id: id || undefined, // Use provided ID if available
         userId,
         workspaceId: workspaceId || null,
         type,
@@ -40,17 +54,18 @@ export async function POST(request: NextRequest) {
         resultUrl,
         thumbnailUrl: thumbnailUrl || null,
         options: options ? JSON.stringify(options) : null,
-        createdAt: new Date(),
+        modelId: modelId || 'unknown',
+        endpointId,
+        error,
+        cost,
+        createdAt: createdAt ? new Date(createdAt) : new Date(),
         completedAt: status === 'completed' ? new Date() : null
       }
     });
 
-    // 캐시 무효화 (해당 사용자의 모든 캐시 제거)
-    for (const [key, _] of cache.entries()) {
-      if (key.includes(userId)) {
-        cache.delete(key);
-      }
-    }
+    // 캐시 완전 무효화 (모든 캐시 제거)
+    cache.clear();
+    console.log('🗑️ All cache cleared after job creation/update');
 
     return NextResponse.json({ success: true, job }, { status: 201 });
   } catch (error) {
@@ -88,7 +103,7 @@ export async function GET(request: NextRequest) {
       // 캐시 키 생성 (워크스페이스 필터 포함)
       const cacheKey = `jobs-${userId}-${page}-${limit}-${onlyProcessing}-${workspaceId || 'all'}`;
       const cached = cache.get(cacheKey);
-      
+
       // 캐시가 유효한지 확인
       if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
         return NextResponse.json({ success: true, ...cached.data });
@@ -99,7 +114,7 @@ export async function GET(request: NextRequest) {
       if (onlyProcessing) {
         whereCondition.status = 'processing';
       }
-      
+
       // 워크스페이스 필터링
       if (workspaceId) {
         if (workspaceId === 'unassigned') {
@@ -118,32 +133,38 @@ export async function GET(request: NextRequest) {
           orderBy: { createdAt: 'desc' },
           skip,
           take: limit,
-          select: {
-            id: true,
-            status: true,
-            type: true,
-            prompt: true,
-            resultUrl: true,
-            thumbnailUrl: true,
-            createdAt: true,
-            completedAt: true,
-            isFavorite: true,
-            options: true, // 입력 이미지 정보를 위해 options 필드 포함
-            workspaceId: true, // 워크스페이스 ID 추가
-            workspace: { // 워케이스 정보도 포함
+          include: {
+            workspace: {
               select: {
                 id: true,
                 name: true,
                 color: true
               }
             }
-          },
+          }
         }),
         prisma.job.count({ where: whereCondition })
       ]);
 
+      // Format jobs for frontend
+      const formattedJobs = jobs.map(job => ({
+        id: job.id,
+        modelId: job.modelId,
+        type: job.type,
+        status: job.status,
+        prompt: job.prompt || '',
+        createdAt: job.createdAt.getTime(),
+        resultUrl: job.resultUrl,
+        error: job.error,
+        endpointId: job.endpointId,
+        thumbnailUrl: job.thumbnailUrl,
+        workspaceId: job.workspaceId,
+        workspace: job.workspace,
+        cost: job.cost
+      }));
+
       const result = {
-        jobs,
+        jobs: formattedJobs,
         pagination: {
           page,
           limit,
