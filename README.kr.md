@@ -39,6 +39,10 @@ EnguiStudio는 RunPod Serverless 인프라를 활용하여 다양한 오픈소�
   > [![Runpod](https://api.runpod.io/badge/wlsdml1114/InfiniteTalk_Runpod_hub)](https://console.runpod.io/hub/wlsdml1114/InfiniteTalk_Runpod_hub)
 - **📈 Video Upscale**: AI 기반 비디오 업스케일링
   > [![Runpod](https://api.runpod.io/badge/wlsdml1114/upscale_interpolation_runpod_hub)](https://console.runpod.io/hub/wlsdml1114/upscale_interpolation_runpod_hub)
+- **🖼️ Z-Image**: ControlNet 지원이 포함된 빠른 이미지 생성 모델
+  > [![Runpod](https://api.runpod.io/badge/wlsdml1114/Flux-krea_Runpod_hub)](https://console.runpod.io/hub/wlsdml1114/Flux-krea_Runpod_hub)
+- **🔄 OneToAll**: 이미지 참조를 활용한 비디오-투-비디오 변환
+  > [![Runpod](https://api.runpod.io/badge/wlsdml1114/Wan_Animate_Runpod_hub)](https://console.runpod.io/hub/wlsdml1114/Wan_Animate_Runpod_hub)
 - **⚙️ Unified Settings**: RunPod 엔드포인트를 한 곳에서 관리
 - **📚 Library**: 생성된 결과물 관리
 - **☁️ S3 Storage**: 파일 관리 및 저장소
@@ -146,6 +150,8 @@ npm run db:validate
     - **MultiTalk** (Audio 2 Video)
     - **Infinite Talk** (말하는 영상)
     - **Video Upscale** (비디오 향상)
+    - **Z-Image** (ControlNet 지원 빠른 이미지 생성)
+    - **OneToAll** (비디오-투-비디오 변환)
     - **예시**
     ![image](assets/endpoint.png)
 

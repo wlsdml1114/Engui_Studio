@@ -40,6 +40,10 @@ EnguiStudio is a platform that enables easy access to various open-source AI mod
   > [![Runpod](https://api.runpod.io/badge/wlsdml1114/Wan_Animate_Runpod_hub)](https://console.runpod.io/hub/wlsdml1114/Wan_Animate_Runpod_hub)
 - **📈 Video Upscale**: AI-powered video upscaling
   > [![Runpod](https://api.runpod.io/badge/wlsdml1114/upscale_interpolation_runpod_hub)](https://console.runpod.io/hub/wlsdml1114/upscale_interpolation_runpod_hub)
+- **🖼️ Z-Image**: Fast image generation model with optional ControlNet support
+  > [![Runpod](https://api.runpod.io/badge/wlsdml1114/Flux-krea_Runpod_hub)](https://console.runpod.io/hub/wlsdml1114/Flux-krea_Runpod_hub)
+- **🔄 OneToAll**: Video-to-video transformation with image reference
+  > [![Runpod](https://api.runpod.io/badge/wlsdml1114/Wan_Animate_Runpod_hub)](https://console.runpod.io/hub/wlsdml1114/Wan_Animate_Runpod_hub)
 - **⚙️ Unified Settings**: Manage RunPod endpoints in one place
 - **📚 Library**: Manage generated results
 - **☁️ S3 Storage**: File management and storage
@@ -113,6 +117,8 @@ Navigate to `/settings` in your browser
     - **Infinite Talk** (Talking video)
     - **WAN Animate** (Image-to-video animation)
     - **Video Upscale** (Video enhancement)
+    - **Z-Image** (Fast image generation with or without ControlNet)
+    - **OneToAll** (Video-to-video transformation)
     - **Example**
     ![image](assets/endpoint.png)
 
