@@ -48,8 +48,13 @@ EnguiStudio는 RunPod Serverless 인프라를 활용하여 다양한 오픈소�
 
 ### 처음 실행시킬때는 AWS s3 및 ffmpeg 다운로드 및 설치때문에 실행이 여러번 필요할 수 있습니다!
 
-### 📺 유튜브 튜토리얼
+### 📺 YouTube Showcase
 [![Video Label](http://img.youtube.com/vi/-0LYseEEx4M/0.jpg)](https://youtu.be/-0LYseEEx4M)
+
+### 📺 설치 튜토리얼
+[![Video Label](http://img.youtube.com/vi/08AGQOGqb3A/0.jpg)](https://youtu.be/08AGQOGqb3A)
+
+Mac 버전 설치 영상은 [여기](https://youtu.be/vABLy-CAhJ0)를 참고하세요.
 
 ### ⚡ 초간단 설치법 (권장)
 

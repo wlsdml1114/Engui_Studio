@@ -86,7 +86,8 @@ export const translations = {
     // Sidebar
     sidebar: {
       github: 'Engui Studio GitHub',
-      discord: 'Discord 커뮤니티'
+      discord: 'Discord 커뮤니티',
+      youtube: '공식 유튜브 채널'
     },
 
     // Menu Items
@@ -240,6 +241,8 @@ export const translations = {
     videoGeneration: {
       title: 'WAN 2.2',
       prompt: '프롬프트 *',
+      negativePrompt: 'Negative Prompt',
+      negativePromptPlaceholder: '예: blurry, low quality, distorted...',
       imageFile: '이미지 파일 *',
       endFrame: '엔드 프레임 파일',
       endFrameOptional: '(선택사항)',
@@ -1115,7 +1118,8 @@ export const translations = {
     // Sidebar
     sidebar: {
       github: 'Engui Studio GitHub',
-      discord: 'Discord Community'
+      discord: 'Discord Community',
+      youtube: 'Official YouTube Channel'
     },
 
     // Menu Items
@@ -1270,6 +1274,8 @@ export const translations = {
     videoGeneration: {
       title: 'WAN 2.2',
       prompt: 'Prompt *',
+      negativePrompt: 'Negative Prompt',
+      negativePromptPlaceholder: 'e.g., blurry, low quality, distorted...',
       imageFile: 'Image File *',
       endFrame: 'End Frame File',
       endFrameOptional: '(Optional)',

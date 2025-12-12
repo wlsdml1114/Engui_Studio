@@ -60,7 +60,7 @@ export default function Sidebar() {
       </div>
 
       {/* Discord 링크 */}
-      <div className="mb-6">
+      <div className="mb-2">
         <a
           href="https://discord.gg/8Xhq9f77fK"
           target="_blank"
@@ -69,6 +69,24 @@ export default function Sidebar() {
         >
           <DiscordIcon className="w-5 h-5" />
           <span className="font-medium">{t('sidebar.discord')}</span>
+          <svg className="w-4 h-4 ml-auto opacity-70 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+        </a>
+      </div>
+
+      {/* YouTube 링크 */}
+      <div className="mb-6">
+        <a
+          href="https://youtube.com/@enguistudio?si=QG5WmcnuzZR8O2YL"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 p-3 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors duration-200 group"
+        >
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+          </svg>
+          <span className="font-medium">{t('sidebar.youtube')}</span>
           <svg className="w-4 h-4 ml-auto opacity-70 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
           </svg>
