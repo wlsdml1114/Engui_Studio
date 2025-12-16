@@ -20,6 +20,7 @@ export default function ImageGenerationForm() {
     const [parameterValues, setParameterValues] = useState<Record<string, any>>({});
     const [isLoadingMedia, setIsLoadingMedia] = useState(false);
     const [showReuseSuccess, setShowReuseSuccess] = useState(false);
+    const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const formRef = useRef<HTMLDivElement>(null);
 
@@ -384,23 +385,55 @@ export default function ImageGenerationForm() {
             {/* Model Selector Card */}
             <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{t('generationForm.using')}</Label>
-                <div className="bg-muted/30 border border-border rounded-lg p-3 flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                        <select
-                            className="w-full bg-transparent border-none p-0 text-sm font-semibold focus:ring-0 cursor-pointer text-foreground"
-                            value={selectedModel || ''}
-                            onChange={(e) => setSelectedModel(e.target.value)}
-                        >
-                            {imageModels.map(model => (
-                                <option key={model.id} value={model.id} className="bg-zinc-950 text-zinc-100">
-                                    {model.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="ml-2 px-2 py-0.5 bg-muted rounded text-[10px] font-mono text-muted-foreground uppercase">
-                        {currentModel.provider}
-                    </div>
+                <div className="relative">
+                    <button
+                        type="button"
+                        onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+                        className="w-full bg-muted/30 border border-border hover:border-primary/50 rounded-lg px-3 py-2.5 flex items-center justify-between transition-all duration-200"
+                    >
+                        <span className="text-sm font-semibold text-foreground">{currentModel.name}</span>
+                        <div className="flex items-center gap-2">
+                            <span className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono text-muted-foreground uppercase">{currentModel.provider}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${isModelDropdownOpen ? 'rotate-180' : ''}`}>
+                                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                            </svg>
+                        </div>
+                    </button>
+                    
+                    {isModelDropdownOpen && (
+                        <>
+                            <div className="fixed inset-0 z-10" onClick={() => setIsModelDropdownOpen(false)} />
+                            <div className="absolute top-full left-0 right-0 mt-1 z-20 bg-zinc-900 border border-border rounded-lg shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                                <div className="py-1 max-h-64 overflow-y-auto">
+                                    {imageModels.map(model => (
+                                        <button
+                                            key={model.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedModel(model.id);
+                                                setIsModelDropdownOpen(false);
+                                            }}
+                                            className={`w-full flex items-center justify-between px-3 py-2 transition-colors ${
+                                                selectedModel === model.id 
+                                                    ? 'bg-primary/15 text-foreground' 
+                                                    : 'hover:bg-muted/50 text-foreground/80'
+                                            }`}
+                                        >
+                                            <span className="text-sm font-medium">{model.name}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="px-1.5 py-0.5 bg-muted/50 rounded text-[10px] font-mono text-muted-foreground uppercase">{model.provider}</span>
+                                                {selectedModel === model.id && (
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-primary">
+                                                        <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                                                    </svg>
+                                                )}
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
 
