@@ -87,7 +87,7 @@ The easiest way to get started with EnguiStudio:
    ```bash
    git clone https://github.com/wlsdml1114/Engui_Studio.git
    cd Engui_Studio
-   ./start-macos.sh
+   sh ./start-macos.sh
    ```
 
 **That's it!** The script will automatically:
