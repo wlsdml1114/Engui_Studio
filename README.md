@@ -78,6 +78,8 @@ The easiest way to get started with EnguiStudio:
 1. **Install Node.js**: 
    ```bash
    # macOS
+   # if you don't have brew, install brew first using command below. and then install node
+   # /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
    brew install node
    
    # Linux (Ubuntu/Debian)
