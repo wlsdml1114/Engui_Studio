@@ -155,6 +155,7 @@ export async function POST(request: NextRequest) {
     console.log('🎥 Rendering video...');
 
     // Collect audio files for later merging with volume info
+    // Audio keyframes have their own timestamps, which are used directly for synchronization
     const audioFiles: { url: string; startTime: number; volume: number }[] = [];
     for (const [trackId, kfs] of Object.entries(processedKeyframes)) {
       const track = tracks.find((t: any) => t.id === trackId);
@@ -170,9 +171,13 @@ export async function POST(request: NextRequest) {
             const keyframeVolume = kf.data.volume ?? null;
             const finalVolume = keyframeVolume !== null ? keyframeVolume : trackVolume;
             
+            // Use the audio keyframe's own timestamp directly
+            // This ensures audio starts at the correct time relative to the video timeline
+            const audioStartTime = kf.timestamp / 1000; // Convert milliseconds to seconds
+            
             audioFiles.push({
               url: kf.data.url,
-              startTime: kf.timestamp / 1000, // Convert to seconds
+              startTime: audioStartTime, // Audio keyframe's timestamp in seconds
               volume: finalVolume / 100, // Convert to 0-2 range (100% = 1.0)
             });
           }
@@ -216,10 +221,15 @@ export async function POST(request: NextRequest) {
         console.log(`🎵 Audio paths:`, audioPaths);
         
         if (audioPaths.length === 1) {
-          // Single audio file - simple merge with volume
-          const vol = audioPaths[0].volume;
-          const volumeFilter = vol !== 1.0 ? `-af "volume=${vol}"` : '';
-          const ffmpegCmd = `ffmpeg -y -i "${tempVideoPath}" -i "${audioPaths[0].path}" ${volumeFilter} -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 -shortest "${outputPath}"`;
+          // Single audio file - merge with volume and delay
+          const ap = audioPaths[0];
+          const delayMs = Math.round(ap.startTime * 1000);
+          // Apply delay and volume using filter_complex
+          const filterComplex = delayMs > 0 || ap.volume !== 1.0
+            ? `-filter_complex "[1:a]volume=${ap.volume}${delayMs > 0 ? `,adelay=${delayMs}|${delayMs}` : ''}[aout]"`
+            : '';
+          const mapAudio = delayMs > 0 || ap.volume !== 1.0 ? '-map "[aout]"' : '-map 1:a:0';
+          const ffmpegCmd = `ffmpeg -y -i "${tempVideoPath}" -i "${ap.path}" ${filterComplex} -c:v copy -c:a aac -map 0:v:0 ${mapAudio} -shortest "${outputPath}"`;
           console.log(`🎵 FFmpeg command: ${ffmpegCmd}`);
           execSync(ffmpegCmd, { stdio: 'pipe' });
         } else {
