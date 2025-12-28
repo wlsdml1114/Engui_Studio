@@ -8,6 +8,7 @@ import { preloadVideo, preloadImage, preloadAudio } from '@remotion/preload';
 import { validatePlayerInit } from '@/lib/videoEditorValidation';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { normalizeUrl } from '@/lib/utils';
 
 interface VideoPreviewProps {
   project: VideoProject;
@@ -48,13 +49,17 @@ export const VideoPreview = React.memo(function VideoPreview({
     
     allKeyframes.forEach((keyframe) => {
       const url = keyframe.data.url;
+      if (!url) return;
+      
+      // Normalize URL to handle relative paths (especially on Windows)
+      const normalizedUrl = normalizeUrl(url);
       
       if (keyframe.data.type === 'video') {
-        preloadVideo(url);
+        preloadVideo(normalizedUrl);
       } else if (keyframe.data.type === 'image') {
-        preloadImage(url);
+        preloadImage(normalizedUrl);
       } else if (keyframe.data.type === 'music' || keyframe.data.type === 'voiceover') {
-        preloadAudio(url);
+        preloadAudio(normalizedUrl);
       }
     });
   }, [keyframes]);

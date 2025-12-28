@@ -1,7 +1,7 @@
 'use client';
 
 import React, { HTMLAttributes, useRef, MouseEvent, DragEvent, useState, useMemo, useCallback, useEffect } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, normalizeUrl } from '@/lib/utils';
 import { useStudio, VideoProject, VideoTrack, VideoKeyFrame } from '@/lib/context/StudioContext';
 import { TimelineRuler } from './TimelineRuler';
 import { VideoTrackRow } from './VideoTrackRow';
@@ -129,17 +129,20 @@ export const VideoTimeline = React.memo(function VideoTimeline({
       const TIMEOUT_MS = 15000; // Increased timeout for blob URLs
       let resolved = false;
       
+      // Normalize URL to handle relative paths (especially on Windows)
+      const normalizedUrl = normalizeUrl(url);
+      
       const resolveOnce = (duration: number, source: string) => {
         if (!resolved) {
           resolved = true;
-          console.log(`Duration detected (${source}): ${duration}ms for ${url.substring(0, 50)}...`);
+          console.log(`Duration detected (${source}): ${duration}ms for ${normalizedUrl.substring(0, 50)}...`);
           resolve(duration);
         }
       };
       
       // Timeout fallback
       const timeoutId = setTimeout(() => {
-        console.warn(`Media duration detection timed out for: ${url}`);
+        console.warn(`Media duration detection timed out for: ${normalizedUrl}`);
         resolveOnce(5000, 'timeout');
       }, TIMEOUT_MS);
       
@@ -183,7 +186,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
           resolveOnce(5000, 'error');
         });
         
-        audio.src = url;
+        audio.src = normalizedUrl;
         // Force load for some browsers (skip in test environment where load() is not implemented)
         if (typeof audio.load === 'function') {
           try {
@@ -231,7 +234,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
           resolveOnce(5000, 'error');
         });
         
-        video.src = url;
+        video.src = normalizedUrl;
         // Force load for some browsers (skip in test environment where load() is not implemented)
         if (typeof video.load === 'function') {
           try {
@@ -264,7 +267,9 @@ export const VideoTimeline = React.memo(function VideoTimeline({
       // Library uses: mediaType, mediaUrl/audioUrl/videoUrl
       // Direct drops use: type, url
       const mediaType = rawMediaData.type || rawMediaData.mediaType;
-      const mediaUrl = rawMediaData.url || rawMediaData.mediaUrl || rawMediaData.audioUrl || rawMediaData.videoUrl || rawMediaData.resultUrl;
+      const rawMediaUrl = rawMediaData.url || rawMediaData.mediaUrl || rawMediaData.audioUrl || rawMediaData.videoUrl || rawMediaData.resultUrl;
+      // Normalize URL immediately to handle relative paths (especially on Windows)
+      const mediaUrl = rawMediaUrl ? normalizeUrl(rawMediaUrl) : null;
       const mediaId = rawMediaData.id || rawMediaData.jobId || `media-${Date.now()}`;
       const mediaName = rawMediaData.prompt || rawMediaData.audioName || rawMediaData.name || '';
       
@@ -274,7 +279,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
         normalizedType = 'music';
       }
       
-      console.log('Drop data normalized:', { mediaType, normalizedType, mediaUrl, mediaId, mediaName });
+      console.log('Drop data normalized:', { mediaType, normalizedType, mediaUrl, rawMediaUrl, mediaId, mediaName });
 
       const relativeX = event.clientX - rect.left;
       const timestamp = Math.max(0, (relativeX / timelineWidth) * durationSeconds * 1000);
@@ -326,7 +331,8 @@ export const VideoTimeline = React.memo(function VideoTimeline({
       }
 
       // If video type, check for audio and create muted version if needed
-      let finalVideoUrl = mediaUrl;
+      // Ensure finalVideoUrl is normalized
+      let finalVideoUrl = mediaUrl ? normalizeUrl(mediaUrl) : null;
       if (normalizedType === 'video' && mediaUrl) {
         // Skip audio processing for blob URLs (browser-only, can't be processed server-side)
         const isBlobUrl = mediaUrl.startsWith('blob:');
@@ -379,8 +385,11 @@ export const VideoTimeline = React.memo(function VideoTimeline({
 
             if (mutedResponse.ok) {
               const { mutedVideoPath } = await mutedResponse.json();
-              finalVideoUrl = mutedVideoPath;
-              console.log('✓ Using muted video for video track:', mutedVideoPath);
+              console.log('[VideoTimeline] Received mutedVideoPath from API:', mutedVideoPath);
+              // Normalize URL to handle relative paths (especially on Windows)
+              finalVideoUrl = normalizeUrl(mutedVideoPath);
+              console.log('[VideoTimeline] Normalized mutedVideoPath:', finalVideoUrl);
+              console.log('✓ Using muted video for video track:', finalVideoUrl);
             } else {
               const errorData = await mutedResponse.json();
               console.error('Failed to create muted video:', errorData);
@@ -402,7 +411,11 @@ export const VideoTimeline = React.memo(function VideoTimeline({
             }
 
             const { audioPath } = await audioResponse.json();
-            console.log('✓ Audio extracted:', audioPath);
+            console.log('[VideoTimeline] Received audioPath from API:', audioPath);
+            // Normalize URL to handle relative paths (especially on Windows)
+            const normalizedAudioPath = normalizeUrl(audioPath);
+            console.log('[VideoTimeline] Normalized audioPath:', normalizedAudioPath);
+            console.log('✓ Audio extracted:', normalizedAudioPath);
             
             // Find available audio track
             const audioTrackId = findAvailableAudioTrack(
@@ -427,7 +440,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
                 data: {
                   type: audioType,
                   mediaId: `${mediaId}-audio`,
-                  url: audioPath,
+                  url: normalizedAudioPath,
                   prompt: `${mediaName} (audio)`,
                   originalDuration: duration,
                 },

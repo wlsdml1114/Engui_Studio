@@ -295,7 +295,8 @@ export class FFmpegService {
       console.log(`[FFmpeg] Audio extracted successfully: ${outputPath} (${stats.size} bytes)`);
       
       // Return relative path from public directory for web access
-      const relativePath = outputPath.replace(path.join(process.cwd(), 'public'), '');
+      // Convert Windows path separators (\) to web path separators (/)
+      const relativePath = outputPath.replace(path.join(process.cwd(), 'public'), '').replace(/\\/g, '/');
       return relativePath.startsWith('/') ? relativePath : '/' + relativePath;
     } catch (error) {
       console.error(`[FFmpeg] Error extracting audio:`, error);
@@ -412,7 +413,8 @@ export class FFmpegService {
       console.log(`[FFmpeg] Muted video created successfully: ${outputPath} (${stats.size} bytes)`);
       
       // Return relative path from public directory for web access
-      const relativePath = outputPath.replace(path.join(process.cwd(), 'public'), '');
+      // Convert Windows path separators (\) to web path separators (/)
+      const relativePath = outputPath.replace(path.join(process.cwd(), 'public'), '').replace(/\\/g, '/');
       return relativePath.startsWith('/') ? relativePath : '/' + relativePath;
     } catch (error) {
       console.error(`[FFmpeg] Error creating muted video:`, error);
