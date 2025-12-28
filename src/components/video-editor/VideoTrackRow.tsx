@@ -1,7 +1,7 @@
 'use client';
 
 import React, { HTMLAttributes, MouseEventHandler, createElement, useMemo, useRef, useCallback } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, normalizeUrl } from '@/lib/utils';
 import { useStudio, VideoTrack, VideoKeyFrame } from '@/lib/context/StudioContext';
 import { TrashIcon, VideoIcon, MusicIcon, MicIcon } from 'lucide-react';
 import { AudioWaveform } from './AudioWaveform';
@@ -119,7 +119,8 @@ export const VideoTrackView = React.memo(function VideoTrackView({
 
   const imageUrl = useMemo(() => {
     if (frame.data.type === 'image' || frame.data.type === 'video') {
-      return frame.data.url;
+      // Normalize URL to handle relative paths (especially on Windows)
+      return frame.data.url ? normalizeUrl(frame.data.url) : undefined;
     }
     return undefined;
   }, [frame.data]);
