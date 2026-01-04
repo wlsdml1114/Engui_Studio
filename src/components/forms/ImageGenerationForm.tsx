@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PhotoIcon } from '@heroicons/react/24/outline';
 import { loadFileFromPath } from '@/lib/fileUtils';
+import { LoRASelector, type LoRAFile } from '@/components/lora/LoRASelector';
+import { LoRAManagementDialog } from '@/components/lora/LoRAManagementDialog';
 import { useI18n } from '@/lib/i18n/context';
 
 export default function ImageGenerationForm() {
@@ -23,6 +25,11 @@ export default function ImageGenerationForm() {
     const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const formRef = useRef<HTMLDivElement>(null);
+    
+    // LoRA state
+    const [showLoRADialog, setShowLoRADialog] = useState(false);
+    const [availableLoras, setAvailableLoras] = useState<LoRAFile[]>([]);
+    const [isLoadingLoras, setIsLoadingLoras] = useState(false);
 
     const imageModels = getModelsByType('image');
 
@@ -37,6 +44,34 @@ export default function ImageGenerationForm() {
     }, [selectedModel, setSelectedModel, imageModels]);
 
     const currentModel = getModelById(selectedModel || '') || imageModels[0];
+
+    // Check if current model has LoRA parameters
+    const hasLoRAParameter = (model: typeof currentModel) => {
+        return model?.parameters.some(param => param.type === 'lora-selector');
+    };
+
+    // Fetch available LoRAs
+    const fetchAvailableLoras = async () => {
+        if (!activeWorkspaceId) return;
+        
+        setIsLoadingLoras(true);
+        try {
+            const response = await fetch(`/api/lora?workspaceId=${activeWorkspaceId}`);
+            const data = await response.json();
+            
+            if (data.success && data.loras) {
+                setAvailableLoras(data.loras);
+            } else {
+                console.error('Failed to fetch LoRAs:', data.error);
+                setAvailableLoras([]);
+            }
+        } catch (error) {
+            console.error('Error fetching LoRAs:', error);
+            setAvailableLoras([]);
+        } finally {
+            setIsLoadingLoras(false);
+        }
+    };
 
     // Initialize parameter values with defaults when model changes
     useEffect(() => {
@@ -56,6 +91,13 @@ export default function ImageGenerationForm() {
         setImageFile(null);
         setPreviewUrl('');
     }, [selectedModel]);
+
+    // Fetch LoRAs when model changes or dialog closes
+    useEffect(() => {
+        if (currentModel && hasLoRAParameter(currentModel)) {
+            fetchAvailableLoras();
+        }
+    }, [currentModel, showLoRADialog, activeWorkspaceId]);
 
     // Handle reuse job input event
     useEffect(() => {
@@ -605,8 +647,17 @@ export default function ImageGenerationForm() {
                     <div className={`space-y-4 animate-in slide-in-from-top-2 duration-200 ${showAdvanced ? '' : 'hidden'}`}>
                         {currentModel.parameters.filter(p => (!p.group || p.group === 'advanced') && isParameterVisible(p)).map(param => (
                             <div key={`${param.name}-${param.default}`} className="space-y-2">
-                                {param.type !== 'boolean' && <Label className="text-xs">{param.label}</Label>}
-                                {param.type === 'boolean' ? (
+                                {param.type !== 'boolean' && param.type !== 'lora-selector' && <Label className="text-xs">{param.label}</Label>}
+                                {param.type === 'lora-selector' ? (
+                                    <LoRASelector
+                                        value={parameterValues[param.name] || ''}
+                                        onChange={(value) => handleParameterChange(param.name, value)}
+                                        label={param.label}
+                                        description={param.description}
+                                        availableLoras={availableLoras}
+                                        onManageClick={() => setShowLoRADialog(true)}
+                                    />
+                                ) : param.type === 'boolean' ? (
                                     <div 
                                         className="flex items-center justify-between p-3 rounded-lg border border-border bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer"
                                         onClick={() => handleParameterChange(param.name, !(parameterValues[param.name] ?? param.default))}
@@ -687,6 +738,16 @@ export default function ImageGenerationForm() {
                     </Button>
                 </div>
             </form >
+
+            {/* LoRA Management Dialog */}
+            {showLoRADialog && (
+                <LoRAManagementDialog
+                    open={showLoRADialog}
+                    onOpenChange={setShowLoRADialog}
+                    workspaceId={activeWorkspaceId || undefined}
+                    onLoRAsUpdated={fetchAvailableLoras}
+                />
+            )}
         </div >
     );
 }

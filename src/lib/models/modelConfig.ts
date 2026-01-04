@@ -128,7 +128,7 @@ export const MODELS: ModelConfig[] = [
         name: 'Infinite Talk',
         provider: 'MeiGen',
         type: 'video',
-        inputs: ['image', 'video', 'audio'],
+        inputs: ['text', 'image', 'video', 'audio'],
         api: {
             type: 'runpod',
             endpoint: 'infinite-talk'
@@ -278,7 +278,9 @@ export const MODELS: ModelConfig[] = [
             { name: 'negativePrompt', label: 'Negative Prompt', type: 'string', default: '', group: 'advanced' },
             { name: 'seed', label: 'Seed', type: 'number', default: 533303727624653, group: 'advanced', description: 'Random seed for generation' },
             { name: 'steps', label: 'Steps', type: 'number', default: 9, min: 1, max: 50, group: 'advanced' },
-            { name: 'cfg', label: 'CFG Scale', type: 'number', default: 1.0, min: 0.1, max: 20, step: 0.1, group: 'advanced' }
+            { name: 'cfg', label: 'CFG Scale', type: 'number', default: 1.0, min: 0.1, max: 20, step: 0.1, group: 'advanced' },
+            { name: 'lora', label: 'LoRA Model', type: 'lora-selector', default: '', group: 'advanced', description: 'LoRA model for custom styling' },
+            { name: 'loraWeight', label: 'LoRA Weight', type: 'number', default: 1.0, min: 0.1, max: 2.0, step: 0.1, group: 'advanced' }
         ]
     },
 
