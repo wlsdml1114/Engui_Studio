@@ -187,6 +187,28 @@ class RunPodService {
           }
         };
 
+      case 'z-image':
+        const zImageInput: Record<string, any> = {
+          prompt: input.prompt,
+          seed: input.seed,
+          width: input.width,
+          height: input.height,
+          steps: input.steps,
+          cfg: input.cfg,
+          ...(input.negativePrompt && { negativePrompt: input.negativePrompt }),
+          ...(input.condition_image && { condition_image: input.condition_image }),
+          ...(input.use_controlnet !== undefined && { use_controlnet: input.use_controlnet })
+        };
+
+        // Add lora array if provided
+        // Format: lora: [["/my_volume/loras/style_lora.safetensors", 0.8]]
+        if (input.lora && Array.isArray(input.lora) && input.lora.length > 0) {
+          zImageInput.lora = input.lora;
+          console.log(`🔍 Z-Image LoRA array:`, JSON.stringify(input.lora));
+        }
+
+        return { input: zImageInput };
+
       default:
         // Generic fallback - pass input as-is
         console.log(`⚠️ Unknown model '${modelId}', using generic payload`);
