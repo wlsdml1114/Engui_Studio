@@ -265,8 +265,9 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
 
                   if (mutedResponse.ok) {
                     const { mutedVideoPath } = await mutedResponse.json();
-                    finalUrl = mutedVideoPath;
-                    console.log('✓ Using muted video:', mutedVideoPath);
+                    // Normalize URL to handle relative paths (especially on Windows)
+                    finalUrl = normalizeUrl(mutedVideoPath);
+                    console.log('✓ Using muted video:', finalUrl);
                   }
 
                   // Extract audio
@@ -279,7 +280,9 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
 
                   if (audioResponse.ok) {
                     const { audioPath } = await audioResponse.json();
-                    console.log('✓ Audio extracted:', audioPath);
+                    // Normalize URL to handle relative paths (especially on Windows)
+                    const normalizedAudioPath = normalizeUrl(audioPath);
+                    console.log('✓ Audio extracted:', normalizedAudioPath);
 
                     // Find or create audio track
                     let audioTrack = tracks.find(t => t.type === 'music');
@@ -314,7 +317,7 @@ export const VideoEditorHeader = React.memo(function VideoEditorHeader({ project
                         data: {
                           type: 'music',
                           mediaId: `local-audio-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                          url: audioPath,
+                          url: normalizedAudioPath,
                           prompt: `${file.name} (audio)`,
                           originalDuration,
                         },

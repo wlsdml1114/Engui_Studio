@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, normalizeUrl } from '@/lib/utils';
 
 interface AudioWaveformProps {
   url: string;
@@ -43,7 +43,10 @@ export const AudioWaveform = React.memo(function AudioWaveform({
   useEffect(() => {
     if (!url) return;
 
-    // Check cache first
+    // Normalize URL to handle relative paths (especially on Windows)
+    const normalizedUrl = normalizeUrl(url);
+    
+    // Check cache first (use original url for cache key to maintain consistency)
     const cached = waveformCache.get(url);
     if (cached) {
       setWaveformData(cached.peaks);
@@ -62,7 +65,8 @@ export const AudioWaveform = React.memo(function AudioWaveform({
         setIsLoading(true);
         setError(null);
 
-        const response = await fetch(url, { signal: abortController.signal });
+        console.log('Fetching audio from:', normalizedUrl, '(original:', url, ')');
+        const response = await fetch(normalizedUrl, { signal: abortController.signal });
         const arrayBuffer = await response.arrayBuffer();
         
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -231,12 +235,13 @@ export const AudioWaveform = React.memo(function AudioWaveform({
 export async function getAudioDuration(url: string): Promise<number> {
   return new Promise((resolve, reject) => {
     const audio = new Audio();
+    const normalizedUrl = normalizeUrl(url);
     audio.addEventListener('loadedmetadata', () => {
       resolve(audio.duration * 1000);
     });
     audio.addEventListener('error', () => {
       reject(new Error('Failed to load audio'));
     });
-    audio.src = url;
+    audio.src = normalizedUrl;
   });
 }

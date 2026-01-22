@@ -11,6 +11,7 @@ import {
 import { VideoProject, VideoTrack, VideoKeyFrame } from '@/lib/context/StudioContext';
 import { fitMedia, FitMode } from '@/lib/mediaFitting';
 import { calculateFinalVolume, volumeToGain } from '@/lib/audioMixing';
+import { normalizeUrl } from '@/lib/utils';
 
 // Constants
 const FPS = 30;
@@ -71,10 +72,18 @@ function MediaKeyFrame({ keyframe, canvasWidth, canvasHeight }: MediaKeyFramePro
   
   const objectFit = getObjectFit(fitMode);
   
+  // Normalize URL to handle relative paths (especially on Windows)
+  const normalizedUrl = keyframe.data.url ? normalizeUrl(keyframe.data.url) : '';
+  
+  // Debug log for video URLs
+  if (keyframe.data.type === 'video' && normalizedUrl) {
+    console.log('[VideoComposition] Video URL - original:', keyframe.data.url, 'normalized:', normalizedUrl);
+  }
+  
   if (keyframe.data.type === 'video') {
     return (
       <OffthreadVideo
-        src={keyframe.data.url}
+        src={normalizedUrl}
         style={{
           width: '100%',
           height: '100%',
@@ -87,7 +96,7 @@ function MediaKeyFrame({ keyframe, canvasWidth, canvasHeight }: MediaKeyFramePro
   if (keyframe.data.type === 'image') {
     return (
       <Img
-        src={keyframe.data.url}
+        src={normalizedUrl}
         style={{
           width: '100%',
           height: '100%',
@@ -161,8 +170,10 @@ function AudioKeyFrame({ keyframe, trackVolume, trackMuted }: AudioKeyFrameProps
     lastFrameTimeRef.current = Date.now();
     
     // Create audio element if not exists
-    if (!audioRef.current) {
-      audioRef.current = new Audio(keyframe.data.url);
+    if (!audioRef.current && keyframe.data.url) {
+      // Normalize URL to handle relative paths (especially on Windows)
+      const normalizedUrl = normalizeUrl(keyframe.data.url);
+      audioRef.current = new Audio(normalizedUrl);
       audioRef.current.preload = 'auto';
       
       // Detect actual audio duration when loaded

@@ -252,6 +252,20 @@ export async function POST(request: NextRequest) {
             }
         }
 
+        // Collect LoRA parameters for z-image (single LoRA with weight)
+        // Format: lora: [["/my_volume/loras/style_lora.safetensors", 0.8]]
+        if (modelId === 'z-image') {
+            const lora = formData.get('lora') as string;
+            const loraWeight = formData.get('loraWeight') as string;
+            
+            if (lora && lora.trim() !== '') {
+                const weight = loraWeight ? parseFloat(loraWeight) : 1.0;
+                // Store as array format: [[path, weight]]
+                inputData['lora'] = [[lora, weight]];
+                console.log(`🔍 Z-Image LoRA: [["${lora}", ${weight}]]`);
+            }
+        }
+
         // Add prompt if model accepts text
         if (model.inputs.includes('text') && prompt) {
             inputData.prompt = prompt;
