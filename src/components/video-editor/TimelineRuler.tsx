@@ -32,40 +32,25 @@ const MIN_MAJOR_SPACING_PX = 96;
 const EPSILON = 0.000_01;
 
 function formatTickLabel(seconds: number, majorInterval: number) {
-  if (seconds < EPSILON) {
-    return "0s";
+  if (Math.abs(seconds) < EPSILON) {
+    return "0:00";
   }
 
-  if (seconds >= 3600) {
-    const hours = seconds / 3600;
-    const decimals = majorInterval < 3600 ? 1 : 0;
-    return `${hours.toFixed(decimals)}h`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+
+  // Decide on decimal places based on interval
+  // If interval is less than 1 second, we likely need decimals
+  if (majorInterval < 1) {
+    // Show decimals - e.g. 0:00.50
+    // Keep seconds part fixed width if possible, or just standard numeric
+    const s = remainingSeconds.toFixed(2).padStart(5, '0');
+    return `${minutes}:${s}`;
   }
 
-  if (seconds >= 60) {
-    const minutes = seconds / 60;
-    const decimals = majorInterval < 60 ? 1 : 0;
-    return `${minutes.toFixed(decimals)}m`;
-  }
-
-  if (seconds >= 1) {
-    const isNearInteger = Math.abs(seconds - Math.round(seconds)) < 0.005;
-    const decimals =
-      isNearInteger && majorInterval >= 1
-        ? 0
-        : majorInterval < 1
-          ? Math.ceil(-Math.log10(majorInterval))
-          : Math.min(
-              2,
-              Math.max(
-                1,
-                Math.ceil(-Math.log10(seconds - Math.floor(seconds))),
-              ),
-            );
-    return `${seconds.toFixed(decimals)}s`;
-  }
-
-  return `${Math.round(seconds * 1000)}ms`;
+  // Integer seconds - e.g. 0:10, 1:05
+  const s = Math.floor(remainingSeconds).toString().padStart(2, '0');
+  return `${minutes}:${s}`;
 }
 
 function chooseMajorInterval(pixelsPerSecond: number) {
