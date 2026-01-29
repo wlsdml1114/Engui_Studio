@@ -607,6 +607,44 @@ export const VideoTimeline = React.memo(function VideoTimeline({
     }
   }, []);
 
+  // Handle playhead dragging
+  const handlePlayheadMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const timelineEl = timelineRef.current;
+    if (!timelineEl) return;
+
+    const startX = e.clientX;
+    const rect = timelineEl.getBoundingClientRect();
+
+    // We want to continue tracking mouse anywhere
+    const handleMouseMove = (moveEvent: globalThis.MouseEvent) => {
+      // Calculate relative position including scroll
+      const scrollLeft = timelineEl.scrollLeft || 0;
+      const relativeX = (moveEvent.clientX - rect.left) + scrollLeft;
+
+      // Convert to timestamp
+      const timestamp = Math.max(0, relativeX / pixelsPerSecond);
+
+      // Update timestamp
+      setCurrentTimestamp(timestamp);
+
+      // Seek player
+      if (player && typeof player.seekTo === 'function') {
+        player.seekTo(Math.floor(timestamp * 30)); // 30fps assumption
+      }
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [pixelsPerSecond, player, setCurrentTimestamp]);
+
   // Handle wheel zoom (Alt+Wheel or Ctrl+Wheel for mouse, pinch for trackpad)
   const handleWheel = useCallback((event: WheelEvent) => {
     // Check if Alt or Ctrl is pressed (for mouse wheel zoom)
@@ -797,14 +835,22 @@ export const VideoTimeline = React.memo(function VideoTimeline({
             />
           </div>
 
-          {/* Playhead indicator */}
+          {/* Playhead indicator - Draggable */}
           <div
-            className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-30 pointer-events-none"
+            className="absolute top-0 bottom-0 z-30 flex justify-center w-4 -ml-2 cursor-ew-resize group touch-none"
             style={{ left: `${playheadPosition}px` }}
-            role="presentation"
+            onMouseDown={handlePlayheadMouseDown}
+            role="slider"
+            aria-valuenow={currentTimestamp}
+            aria-valuemin={0}
+            aria-valuemax={durationSeconds}
             aria-label={t('videoEditor.messages.playheadAt', { time: formatTime(currentTimestamp) })}
+            tabIndex={0}
           >
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3 h-3 bg-red-500 rounded-full" aria-hidden="true" />
+            {/* Visual line */}
+            <div className="w-0.5 h-full bg-red-500 pointer-events-none group-hover:bg-red-400 transition-colors" />
+            {/* Knob */}
+            <div className="absolute top-0 w-3 h-3 bg-red-500 rounded-full pointer-events-none group-hover:bg-red-400 transition-colors shadow-sm" />
           </div>
 
           {/* Track rows - positioned below ruler */}
