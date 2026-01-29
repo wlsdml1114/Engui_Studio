@@ -186,6 +186,12 @@ interface StudioContextType {
     deselectKeyframe: (keyframeId: string) => void;
     clearSelection: () => void;
     setExportDialogOpen: (open: boolean) => void;
+
+    // History
+    undo: () => void;
+    redo: () => void;
+    canUndo: boolean;
+    canRedo: boolean;
 }
 
 const StudioContext = createContext<StudioContextType | undefined>(undefined);
@@ -211,6 +217,65 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     const [zoom, setZoom] = useState<number>(1);
     const [selectedKeyframeIds, setSelectedKeyframeIds] = useState<string[]>([]);
     const [exportDialogOpen, setExportDialogOpen] = useState<boolean>(false);
+
+    // History State
+    const [history, setHistory] = useState<Record<string, VideoKeyFrame[]>[]>([]);
+    const [historyIndex, setHistoryIndex] = useState(-1);
+
+    // Helper to record history
+    // Helper to record history
+    const recordHistory = (newState: Record<string, VideoKeyFrame[]>) => {
+        // Deep clone to ensure immutability
+        const snapshot = JSON.parse(JSON.stringify(newState));
+
+        setHistory(prev => {
+            // If this is the first action, save the INITIAL state (which is 'keyframes' before this action)
+            // But we can't access 'keyframes' clean state easily here if we are in a callback.
+            // We rely on the fact that when we start editing, we trust the history flow.
+            // To fix "first undo", we ensure history starts populated or we push [old, new].
+
+            const slicedHistory = prev.slice(0, historyIndex + 1);
+
+            // If history was empty, we need the base state.
+            // We use the current 'keyframes' state as the base.
+            let newHistory = slicedHistory;
+            if (slicedHistory.length === 0) {
+                const baseState = JSON.parse(JSON.stringify(keyframes));
+                newHistory = [baseState];
+            }
+
+            return [...newHistory, snapshot];
+        });
+
+        setHistoryIndex(prev => {
+            if (prev === -1) return 1; // 0 was base, 1 is new
+            return prev + 1;
+        });
+    };
+
+    const undo = () => {
+        if (historyIndex > 0) {
+            const prevIndex = historyIndex - 1;
+            setKeyframes(history[prevIndex]);
+            setHistoryIndex(prevIndex);
+        } else if (historyIndex === 0) {
+            // Undo to initial empty state or initial loaded state if we tracked it?
+            // Currently we only track changes.
+            // Let's assume history[0] is the first state pushed.
+            // If we are at index 0, we can't undo further unless we saved initial state.
+        }
+    };
+
+    const redo = () => {
+        if (historyIndex < history.length - 1) {
+            const nextIndex = historyIndex + 1;
+            setKeyframes(history[nextIndex]);
+            setHistoryIndex(nextIndex);
+        }
+    };
+
+    const canUndo = historyIndex > 0;
+    const canRedo = historyIndex < history.length - 1;
 
     // Jobs should always come from DB, not localStorage
     const [jobs, setJobs] = useState<Job[]>([]);
@@ -696,6 +761,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             console.error('Failed to fetch projects:', error);
         }
     };
+
+    // Initialize history with loaded keyframes?
+    // We should probably clear history when a project is loaded contextually.
+    // The loadProject function is where we should reset history.
+
 
     // Initial Load
     useEffect(() => {
@@ -1299,10 +1369,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             id: `keyframe-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         };
 
-        setKeyframes(prev => ({
-            ...prev,
-            [keyframe.trackId]: [...(prev[keyframe.trackId] || []), newKeyframe],
-        }));
+        const nextKeyframes = { ...keyframes };
+        nextKeyframes[keyframe.trackId] = [...(nextKeyframes[keyframe.trackId] || []), newKeyframe];
+
+        // Record history
+        recordHistory(nextKeyframes);
+
+        setKeyframes(nextKeyframes);
 
         try {
             // Transform keyframe data to match API expectations
@@ -1340,15 +1413,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     };
 
     const updateKeyframe = async (keyframeId: string, updates: Partial<VideoKeyFrame>): Promise<void> => {
-        setKeyframes(prev => {
-            const updated = { ...prev };
-            Object.keys(updated).forEach(trackId => {
-                updated[trackId] = updated[trackId].map(kf =>
-                    kf.id === keyframeId ? { ...kf, ...updates } : kf
-                );
-            });
-            return updated;
+        const nextKeyframes = { ...keyframes };
+        Object.keys(nextKeyframes).forEach(trackId => {
+            nextKeyframes[trackId] = nextKeyframes[trackId].map(kf =>
+                kf.id === keyframeId ? { ...kf, ...updates } : kf
+            );
         });
+
+        recordHistory(nextKeyframes);
+        setKeyframes(nextKeyframes);
 
         try {
             // Transform updates for API - extract data fields to top level
@@ -1378,13 +1451,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     };
 
     const removeKeyframe = async (keyframeId: string): Promise<void> => {
-        setKeyframes(prev => {
-            const updated = { ...prev };
-            Object.keys(updated).forEach(trackId => {
-                updated[trackId] = updated[trackId].filter(kf => kf.id !== keyframeId);
-            });
-            return updated;
+        const nextKeyframes = { ...keyframes };
+        Object.keys(nextKeyframes).forEach(trackId => {
+            nextKeyframes[trackId] = nextKeyframes[trackId].filter(kf => kf.id !== keyframeId);
         });
+
+        recordHistory(nextKeyframes);
+        setKeyframes(nextKeyframes);
 
         try {
             await fetch(`/api/video-keyframes/${keyframeId}`, {
@@ -1466,6 +1539,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             deselectKeyframe,
             clearSelection,
             setExportDialogOpen,
+
+            // History
+            undo,
+            redo,
+            canUndo,
+            canRedo,
         }}>
             {children}
         </StudioContext.Provider>

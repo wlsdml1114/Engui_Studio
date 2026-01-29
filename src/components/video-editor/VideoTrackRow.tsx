@@ -106,7 +106,7 @@ export const VideoTrackView = React.memo(function VideoTrackView({
     if (e.detail > 1) {
       return;
     }
-    
+
     // Only select if we didn't drag (click without movement)
     if (!isDraggingRef.current) {
       selectKeyframe(frame.id);
@@ -125,7 +125,7 @@ export const VideoTrackView = React.memo(function VideoTrackView({
     return undefined;
   }, [frame.data]);
 
-  const isAudio = useMemo(() => 
+  const isAudio = useMemo(() =>
     frame.data.type === 'music' || frame.data.type === 'voiceover',
     [frame.data.type]
   );
@@ -148,14 +148,14 @@ export const VideoTrackView = React.memo(function VideoTrackView({
     }
 
     e.preventDefault();
-    
+
     const trackElement = trackRef.current;
     if (!trackElement) return;
 
     // Reset drag state
     isDraggingRef.current = false;
     dragStartPosRef.current = { x: e.clientX, y: e.clientY };
-    
+
     const startX = e.clientX;
     const startY = e.clientY;
     const startLeft = trackElement.offsetLeft;
@@ -168,7 +168,7 @@ export const VideoTrackView = React.memo(function VideoTrackView({
     // Get all other keyframes for snapping
     const otherKeyframes = allKeyframes.filter(kf => kf.id !== frame.id);
     const snapPoints: number[] = [0];
-    
+
     otherKeyframes.forEach(kf => {
       snapPoints.push(kf.timestamp);
       snapPoints.push(kf.timestamp + kf.duration);
@@ -177,7 +177,7 @@ export const VideoTrackView = React.memo(function VideoTrackView({
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const deltaX = moveEvent.clientX - startX;
       const deltaY = moveEvent.clientY - startY;
-      
+
       // Check if we've moved enough to consider it a drag
       if (!isDraggingRef.current && dragStartPosRef.current) {
         const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
@@ -185,9 +185,9 @@ export const VideoTrackView = React.memo(function VideoTrackView({
           isDraggingRef.current = true;
         }
       }
-      
+
       if (!isDraggingRef.current) return;
-      
+
       const newLeft = startLeft + deltaX;
       let newTimestamp = Math.max(0, newLeft / pixelsPerMs);
       const clipEnd = newTimestamp + frame.duration;
@@ -206,17 +206,17 @@ export const VideoTrackView = React.memo(function VideoTrackView({
 
       newTimestamp = Math.max(0, newTimestamp);
       trackElement.style.left = `${newTimestamp * pixelsPerMs}px`;
-      
+
       // For audio clips, check if we're hovering over a different track
       if (isAudio) {
         // Find the track element under the mouse
         const elementsUnderMouse = document.elementsFromPoint(moveEvent.clientX, moveEvent.clientY);
         const trackRowElement = elementsUnderMouse.find(el => el.hasAttribute('data-track-id'));
-        
+
         if (trackRowElement) {
           const hoveredTrackId = trackRowElement.getAttribute('data-track-id');
           const hoveredTrackType = trackRowElement.getAttribute('data-track-type');
-          
+
           // Only allow moving to audio tracks
           if (hoveredTrackId && (hoveredTrackType === 'music' || hoveredTrackType === 'voiceover')) {
             targetTrackId = hoveredTrackId;
@@ -224,7 +224,7 @@ export const VideoTrackView = React.memo(function VideoTrackView({
             trackRowElement.classList.add('ring-2', 'ring-blue-500');
           }
         }
-        
+
         // Remove highlight from other tracks
         document.querySelectorAll('[data-track-id].ring-2').forEach(el => {
           if (el.getAttribute('data-track-id') !== targetTrackId) {
@@ -237,18 +237,18 @@ export const VideoTrackView = React.memo(function VideoTrackView({
     const handleMouseUp = async () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
-      
+
       // Remove all track highlights
       document.querySelectorAll('[data-track-id].ring-2').forEach(el => {
         el.classList.remove('ring-2', 'ring-blue-500');
       });
-      
+
       const wasDragging = isDraggingRef.current;
-      
+
       // Reset drag state
       isDraggingRef.current = false;
       dragStartPosRef.current = null;
-      
+
       if (!wasDragging) return;
 
       const finalLeft = trackElement.offsetLeft;
@@ -274,7 +274,7 @@ export const VideoTrackView = React.memo(function VideoTrackView({
   ) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     const trackElement = trackRef.current;
     if (!trackElement) return;
 
@@ -295,34 +295,34 @@ export const VideoTrackView = React.memo(function VideoTrackView({
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!isResizingRef.current) return;
-      
+
       const deltaX = moveEvent.clientX - startX;
       const deltaMs = deltaX / pixelsPerMs;
 
       if (direction === 'right') {
         let newDuration = Math.max(minDuration, startDuration + deltaMs);
         const newEnd = startTimestamp + newDuration;
-        
+
         for (const snapPoint of snapPoints) {
           if (Math.abs(newEnd - snapPoint) < SNAP_THRESHOLD_MS) {
             newDuration = snapPoint - startTimestamp;
             break;
           }
         }
-        
+
         newDuration = Math.max(minDuration, newDuration);
         trackElement.style.width = `${newDuration * pixelsPerMs}px`;
       } else {
         const rightEdge = startTimestamp + startDuration;
         let newTimestamp = Math.max(0, startTimestamp + deltaMs);
-        
+
         for (const snapPoint of snapPoints) {
           if (Math.abs(newTimestamp - snapPoint) < SNAP_THRESHOLD_MS) {
             newTimestamp = snapPoint;
             break;
           }
         }
-        
+
         newTimestamp = Math.max(0, newTimestamp);
         const newDuration = Math.max(minDuration, rightEdge - newTimestamp);
 
@@ -334,7 +334,7 @@ export const VideoTrackView = React.memo(function VideoTrackView({
     const handleMouseUp = async () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
-      
+
       if (!isResizingRef.current) return;
       isResizingRef.current = false;
 
@@ -417,9 +417,9 @@ export const VideoTrackView = React.memo(function VideoTrackView({
           style={
             imageUrl
               ? {
-                  background: `url(${imageUrl})`,
-                  backgroundSize: 'auto 100%',
-                }
+                background: `url(${imageUrl})`,
+                backgroundSize: 'auto 100%',
+              }
               : undefined
           }
         >
@@ -437,7 +437,24 @@ export const VideoTrackView = React.memo(function VideoTrackView({
               />
             </div>
           )}
-          
+
+          {/* Left trim handle */}
+          <div
+            data-resize-handle="left"
+            className={cn(
+              'absolute left-0 z-50 top-0 bg-black/20 group-hover:bg-black/40',
+              'rounded-md bottom-0 w-2 m-1 p-px cursor-ew-resize backdrop-blur-md text-white/40',
+              'transition-colors flex flex-col items-center justify-center text-xs tracking-tighter',
+            )}
+            onMouseDown={(e) => handleResize(e, 'left')}
+            draggable={false}
+          >
+            <span className="flex gap-[1px]">
+              <span className="w-px h-2 rounded bg-white/40" />
+              <span className="w-px h-2 rounded bg-white/40" />
+            </span>
+          </div>
+
           {/* Right trim handle */}
           <div
             data-resize-handle="right"

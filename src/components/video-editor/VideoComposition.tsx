@@ -52,11 +52,11 @@ interface MediaKeyFrameProps {
 function MediaKeyFrame({ keyframe, canvasWidth, canvasHeight }: MediaKeyFrameProps) {
   // Get fit mode from keyframe data, default to 'contain'
   const fitMode: FitMode = keyframe.data.fitMode || 'contain';
-  
+
   // For now, we'll use a placeholder for media dimensions
   // In a real implementation, we would need to load the media to get its actual dimensions
   // For this implementation, we'll use CSS object-fit which handles this automatically
-  
+
   const getObjectFit = (mode: FitMode): 'contain' | 'cover' | 'fill' => {
     switch (mode) {
       case 'contain':
@@ -69,17 +69,17 @@ function MediaKeyFrame({ keyframe, canvasWidth, canvasHeight }: MediaKeyFramePro
         return 'contain';
     }
   };
-  
+
   const objectFit = getObjectFit(fitMode);
-  
+
   // Normalize URL to handle relative paths (especially on Windows)
   const normalizedUrl = keyframe.data.url ? normalizeUrl(keyframe.data.url) : '';
-  
+
   // Debug log for video URLs
   if (keyframe.data.type === 'video' && normalizedUrl) {
     console.log('[VideoComposition] Video URL - original:', keyframe.data.url, 'normalized:', normalizedUrl);
   }
-  
+
   if (keyframe.data.type === 'video') {
     return (
       <OffthreadVideo
@@ -92,7 +92,7 @@ function MediaKeyFrame({ keyframe, canvasWidth, canvasHeight }: MediaKeyFramePro
       />
     );
   }
-  
+
   if (keyframe.data.type === 'image') {
     return (
       <Img
@@ -105,7 +105,7 @@ function MediaKeyFrame({ keyframe, canvasWidth, canvasHeight }: MediaKeyFramePro
       />
     );
   }
-  
+
   return null;
 }
 
@@ -124,7 +124,7 @@ function AudioKeyFrame({ keyframe, trackVolume, trackMuted }: AudioKeyFrameProps
   const lastFrameTimeRef = useRef<number>(Date.now());
   const pauseCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const detectedDurationRef = useRef<number | null>(null);
-  
+
   // Calculate the original audio duration (in seconds)
   // Priority: detected duration > originalDuration > keyframe duration
   const getEffectiveDuration = () => {
@@ -136,15 +136,15 @@ function AudioKeyFrame({ keyframe, trackVolume, trackMuted }: AudioKeyFrameProps
     }
     return keyframe.duration / 1000;
   };
-  
+
   const originalDurationSec = getEffectiveDuration();
-  
+
   // Set up interval to check if playback has stopped (frame not changing)
   useEffect(() => {
     if (keyframe.data.type !== 'music' && keyframe.data.type !== 'voiceover') {
       return;
     }
-    
+
     // Check every 100ms if frame has stopped changing (player paused)
     pauseCheckIntervalRef.current = setInterval(() => {
       const timeSinceLastFrame = Date.now() - lastFrameTimeRef.current;
@@ -153,29 +153,29 @@ function AudioKeyFrame({ keyframe, trackVolume, trackMuted }: AudioKeyFrameProps
         audioRef.current.pause();
       }
     }, 100);
-    
+
     return () => {
       if (pauseCheckIntervalRef.current) {
         clearInterval(pauseCheckIntervalRef.current);
       }
     };
   }, [keyframe.data.type]);
-  
+
   useEffect(() => {
     if (keyframe.data.type !== 'music' && keyframe.data.type !== 'voiceover') {
       return;
     }
-    
+
     // Update last frame time
     lastFrameTimeRef.current = Date.now();
-    
+
     // Create audio element if not exists
     if (!audioRef.current && keyframe.data.url) {
       // Normalize URL to handle relative paths (especially on Windows)
       const normalizedUrl = normalizeUrl(keyframe.data.url);
       audioRef.current = new Audio(normalizedUrl);
       audioRef.current.preload = 'auto';
-      
+
       // Detect actual audio duration when loaded
       audioRef.current.addEventListener('loadedmetadata', () => {
         if (audioRef.current && audioRef.current.duration && isFinite(audioRef.current.duration)) {
@@ -183,33 +183,33 @@ function AudioKeyFrame({ keyframe, trackVolume, trackMuted }: AudioKeyFrameProps
           console.log(`AudioKeyFrame: Detected duration ${audioRef.current.duration}s for ${keyframe.data.url?.substring(0, 50)}...`);
         }
       });
-      
+
       audioRef.current.addEventListener('durationchange', () => {
         if (audioRef.current && audioRef.current.duration && isFinite(audioRef.current.duration)) {
           detectedDurationRef.current = audioRef.current.duration;
         }
       });
     }
-    
+
     const audio = audioRef.current;
-    
+    if (!audio) return;
     // Calculate and apply final volume
     const keyframeVolume = keyframe.data.volume;
     const finalVolume = calculateFinalVolume(trackVolume, keyframeVolume, trackMuted);
     const gain = volumeToGain(finalVolume);
     audio.volume = Math.max(0, Math.min(1, gain)); // Clamp to 0-1 for HTML5 Audio
-    
+
     const currentTimeSec = frame / fps;
-    
+
     // Only update if frame changed significantly (avoid micro-updates)
     if (Math.abs(frame - lastFrameRef.current) < 2 && lastFrameRef.current !== -1) {
       return;
     }
     lastFrameRef.current = frame;
-    
+
     // Use detected duration if available, otherwise fall back to stored duration
     const effectiveDuration = detectedDurationRef.current || originalDurationSec;
-    
+
     // Check if current time is within the audio's actual duration
     if (currentTimeSec >= 0 && currentTimeSec < effectiveDuration) {
       // Sync audio position if it drifted too much (more than 0.3 seconds)
@@ -217,7 +217,7 @@ function AudioKeyFrame({ keyframe, trackVolume, trackMuted }: AudioKeyFrameProps
       if (drift > 0.3 || audio.paused) {
         audio.currentTime = currentTimeSec;
       }
-      
+
       // Play if paused
       if (audio.paused) {
         audio.play().catch(() => {
@@ -231,7 +231,7 @@ function AudioKeyFrame({ keyframe, trackVolume, trackMuted }: AudioKeyFrameProps
       }
     }
   }, [frame, fps, keyframe.data.type, keyframe.data.url, originalDurationSec]);
-  
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -245,7 +245,7 @@ function AudioKeyFrame({ keyframe, trackVolume, trackMuted }: AudioKeyFrameProps
       }
     };
   }, []);
-  
+
   // This component doesn't render anything visible
   return null;
 }
@@ -261,13 +261,13 @@ interface TrackSequenceProps {
 function VideoTrackSequence({ track, keyframes, canvasWidth, canvasHeight }: TrackSequenceProps) {
   // Sort keyframes by timestamp
   const sortedKeyframes = [...keyframes].sort((a, b) => a.timestamp - b.timestamp);
-  
+
   return (
     <>
       {sortedKeyframes.map((keyframe) => {
         const startFrame = msToFrames(keyframe.timestamp);
         const durationFrames = msToFrames(keyframe.duration);
-        
+
         return (
           <Sequence
             key={keyframe.id}
@@ -275,10 +275,10 @@ function VideoTrackSequence({ track, keyframes, canvasWidth, canvasHeight }: Tra
             durationInFrames={durationFrames}
           >
             <AbsoluteFill>
-              <MediaKeyFrame 
-                keyframe={keyframe} 
-                canvasWidth={canvasWidth} 
-                canvasHeight={canvasHeight} 
+              <MediaKeyFrame
+                keyframe={keyframe}
+                canvasWidth={canvasWidth}
+                canvasHeight={canvasHeight}
               />
             </AbsoluteFill>
           </Sequence>
@@ -291,28 +291,28 @@ function VideoTrackSequence({ track, keyframes, canvasWidth, canvasHeight }: Tra
 function AudioTrackSequence({ track, keyframes, canvasWidth, canvasHeight }: TrackSequenceProps) {
   // Sort keyframes by timestamp
   const sortedKeyframes = [...keyframes].sort((a, b) => a.timestamp - b.timestamp);
-  
+
   // Get track volume and muted state, with defaults
   const trackVolume = track.volume ?? 100;
   const trackMuted = track.muted ?? false;
-  
+
   return (
     <>
       {sortedKeyframes.map((keyframe) => {
         const startFrame = msToFrames(keyframe.timestamp);
-        // For audio, use originalDuration if available (actual audio length)
-        // This ensures the Sequence doesn't end before the audio finishes
-        const audioDuration = keyframe.data.originalDuration || keyframe.duration;
+        // Use the keyframe's duration (visual duration on timeline) for the Sequence length
+        // This ensures the component unmounts (and audio stops) when the keyframe ends
+        const audioDuration = keyframe.duration;
         const durationFrames = msToFrames(audioDuration);
-        
-        console.log(`AudioTrackSequence: keyframe ${keyframe.id}, duration=${keyframe.duration}ms, originalDuration=${keyframe.data.originalDuration}ms, using=${audioDuration}ms, frames=${durationFrames}`);
-        
+
+        console.log(`AudioTrackSequence: keyframe ${keyframe.id}, duration=${keyframe.duration}ms, frames=${durationFrames}`);
+
         // Skip if no valid URL
         if (!keyframe.data.url) {
           console.warn(`Skipping audio keyframe ${keyframe.id} - no URL`);
           return null;
         }
-        
+
         return (
           <Sequence
             key={keyframe.id}
@@ -320,8 +320,8 @@ function AudioTrackSequence({ track, keyframes, canvasWidth, canvasHeight }: Tra
             durationInFrames={durationFrames}
           >
             {/* HTML5 audio for preview playback */}
-            <AudioKeyFrame 
-              keyframe={keyframe} 
+            <AudioKeyFrame
+              keyframe={keyframe}
               trackVolume={trackVolume}
               trackMuted={trackMuted}
             />
@@ -339,11 +339,11 @@ export function MainComposition({ project, tracks, keyframes }: VideoComposition
   const { width: canvasWidth, height: canvasHeight } = project.width && project.height
     ? { width: project.width, height: project.height }
     : getAspectRatioDimensions(project.aspectRatio);
-  
+
   // Separate tracks by type
   const videoTracks = tracks.filter(t => t.type === 'video');
   const audioTracks = tracks.filter(t => t.type === 'music' || t.type === 'voiceover');
-  
+
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
       {/* Render video tracks (layered) */}
@@ -359,7 +359,7 @@ export function MainComposition({ project, tracks, keyframes }: VideoComposition
           />
         );
       })}
-      
+
       {/* Render audio tracks */}
       {audioTracks.map((track) => {
         const trackKeyframes = keyframes[track.id] || [];
