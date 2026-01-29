@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import SettingsService from '@/lib/settingsService';
+import ElevenLabsService from '@/lib/elevenlabsService';
 
 const settingsService = new SettingsService();
 
@@ -119,6 +120,58 @@ export async function POST(request: NextRequest) {
           responseTime,
           statusCode: 500,
           endpoint: endpointUrl
+        });
+      }
+    } else if (service === 'elevenlabs') {
+      // Eleven Labs 연결 테스트
+      const { apiKey } = config;
+
+      if (!apiKey) {
+        return NextResponse.json({ error: 'Eleven Labs API key is required' }, { status: 400 });
+      }
+
+      const startTime = Date.now();
+
+      try {
+        // Eleven Labs API를 통해 API key 유효성 확인
+        const elevenlabsService = new ElevenLabsService({
+          apiKey,
+          voiceId: 'EXAVITQu4vr4xnSDxMaL', // Test voice ID
+        });
+
+        // Test API key by fetching available voices
+        const voicesResponse = await elevenlabsService.getVoices();
+
+        const endTime = Date.now();
+        const responseTime = endTime - startTime;
+
+        if (voicesResponse.voices && voicesResponse.voices.length > 0) {
+          return NextResponse.json({
+            success: true,
+            message: 'Eleven Labs API key is valid',
+            responseTime,
+            statusCode: 200,
+            endpoint: 'https://api.elevenlabs.io'
+          });
+        } else {
+          return NextResponse.json({
+            success: false,
+            message: 'Eleven Labs API test failed: No voices returned',
+            responseTime,
+            statusCode: 500,
+            endpoint: 'https://api.elevenlabs.io'
+          });
+        }
+      } catch (error) {
+        const endTime = Date.now();
+        const responseTime = endTime - startTime;
+
+        return NextResponse.json({
+          success: false,
+          message: `Eleven Labs 연결 실패: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          responseTime,
+          statusCode: 500,
+          endpoint: 'https://api.elevenlabs.io'
         });
       }
     } else {

@@ -142,6 +142,37 @@ function validateSettings(settings: any): string | null {
       return 'S3 useGlobalNetworking must be a boolean';
     }
   }
+
+  // Validate Eleven Labs settings if provided
+  if (settings.elevenlabs) {
+    if (settings.elevenlabs.apiKey && typeof settings.elevenlabs.apiKey !== 'string') {
+      return 'Eleven Labs API key must be a string';
+    }
+
+    if (settings.elevenlabs.voiceId && typeof settings.elevenlabs.voiceId !== 'string') {
+      return 'Eleven Labs voice ID must be a string';
+    }
+
+    if (settings.elevenlabs.model && typeof settings.elevenlabs.model !== 'string') {
+      return 'Eleven Labs model must be a string';
+    }
+
+    if (settings.elevenlabs.stability !== undefined && typeof settings.elevenlabs.stability !== 'number') {
+      return 'Eleven Labs stability must be a number';
+    }
+
+    if (settings.elevenlabs.similarity !== undefined && typeof settings.elevenlabs.similarity !== 'number') {
+      return 'Eleven Labs similarity must be a number';
+    }
+
+    if (settings.elevenlabs.style !== undefined && typeof settings.elevenlabs.style !== 'number') {
+      return 'Eleven Labs style must be a number';
+    }
+
+    if (settings.elevenlabs.useStreaming !== undefined && typeof settings.elevenlabs.useStreaming !== 'boolean') {
+      return 'Eleven Labs useStreaming must be a boolean';
+    }
+  }
   
   return null;
 }

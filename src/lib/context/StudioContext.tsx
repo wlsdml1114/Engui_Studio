@@ -21,9 +21,19 @@ export interface StudioSettings {
         google?: string;
         kling?: string;
         runpod?: string;
+        elevenlabs?: string;
     };
     runpod: {
         endpoints: Record<string, string>; // modelId -> endpointId
+    };
+    elevenlabs?: {
+        apiKey?: string;
+        voiceId?: string;
+        model?: string;
+        stability?: number;
+        similarity?: number;
+        style?: number;
+        useStreaming?: boolean;
     };
     upscale: {
         endpoint?: string; // Unified upscale endpoint (handles image, video, and frame interpolation)
@@ -47,7 +57,7 @@ export interface Workspace {
 export interface Job {
     id: string;
     modelId: string;
-    type: 'image' | 'video' | 'audio';
+    type: 'image' | 'video' | 'audio' | 'tts' | 'music';
     status: 'queued' | 'processing' | 'completed' | 'failed';
     prompt: string;
     createdAt: number;
@@ -61,7 +71,7 @@ export interface Job {
 export interface WorkspaceMedia {
     id: string;
     workspaceId: string;
-    type: 'image' | 'video' | 'audio';
+    type: 'image' | 'video' | 'audio' | 'tts' | 'music';
     url: string;
     prompt?: string;
     modelId?: string;
@@ -132,6 +142,7 @@ interface StudioContextType {
     // Jobs
     jobs: Job[];
     addJob: (job: Job) => void;
+    addCompletedJob: (job: Job) => void;
     updateJobStatus: (id: string, status: Job['status'], resultUrl?: string, error?: string, cost?: number) => void;
     deleteJob: (id: string) => void;
     reuseJobInput: (jobId: string) => void;
@@ -239,6 +250,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                 apiSettings.runpod.apiKey = updated.apiKeys.runpod;
             }
 
+            // Map 'apiKeys.elevenlabs' to 'elevenlabs.apiKey' for the API
+            if (updated.apiKeys?.elevenlabs) {
+                if (!apiSettings.elevenlabs) apiSettings.elevenlabs = {};
+                apiSettings.elevenlabs.apiKey = updated.apiKeys.elevenlabs;
+            }
+
             fetch('/api/settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -279,6 +296,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                             merged.apiKeys.runpod = data.settings.runpod.apiKey;
                         }
 
+                        // Map 'elevenlabs.apiKey' from API to 'apiKeys.elevenlabs' in state
+                        if (data.settings.elevenlabs?.apiKey) {
+                            if (!merged.apiKeys) merged.apiKeys = {};
+                            merged.apiKeys.elevenlabs = data.settings.elevenlabs.apiKey;
+                        }
+
                         // Ensure nested objects exist
                         if (data.settings.runpod) {
                             merged.runpod = { ...prev.runpod, ...data.settings.runpod };
@@ -312,16 +335,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             if (data.workspaces) {
                 setWorkspaces(data.workspaces);
                 console.log('📂 Found workspaces:', data.workspaces.length);
-                
+
                 // Set default workspace if none active
                 if (!activeWorkspaceId && data.workspaces.length > 0) {
                     // Try to restore last selected workspace from localStorage
-                    const savedWorkspaceId = typeof window !== 'undefined' 
-                        ? localStorage.getItem('activeWorkspaceId') 
+                    const savedWorkspaceId = typeof window !== 'undefined'
+                        ? localStorage.getItem('activeWorkspaceId')
                         : null;
-                    
+
                     let workspaceToSelect: Workspace | undefined;
-                    
+
                     if (savedWorkspaceId && data.workspaces.find((w: Workspace) => w.id === savedWorkspaceId)) {
                         // Use saved workspace if it still exists
                         workspaceToSelect = data.workspaces.find((w: Workspace) => w.id === savedWorkspaceId);
@@ -333,7 +356,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                             console.log('✅ Setting default workspace:', workspaceToSelect.id, workspaceToSelect.name);
                         }
                     }
-                    
+
                     if (workspaceToSelect) {
                         setActiveWorkspaceId(workspaceToSelect.id);
                     }
@@ -396,7 +419,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             if (data.success) {
                 console.log('✅ Fetched jobs:', data.jobs.length, 'jobs for workspace:', activeWorkspaceId);
                 console.log('📊 Job statuses:', data.jobs.map((j: Job) => ({ id: j.id.substring(0, 8), status: j.status, resultUrl: j.resultUrl ? '✓' : '✗' })));
-                
+
                 // Simply replace with fetched jobs - server is source of truth
                 setJobs(data.jobs);
             }
@@ -418,6 +441,32 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         // Optimistic update
         setJobs(prev => [jobWithWorkspace, ...prev]);
 
+        // If job is already completed (e.g. from ElevenLabs), add it to media immediately
+        if (job.status === 'completed' && job.resultUrl && activeWorkspaceId) {
+            console.log(`✅ Job ${job.id} added as completed, processing media...`);
+            const newMedia: WorkspaceMedia = {
+                id: `media-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                workspaceId: activeWorkspaceId,
+                type: job.type as 'image' | 'video' | 'audio',
+                url: job.resultUrl,
+                prompt: job.prompt,
+                modelId: job.modelId,
+                createdAt: Date.now(),
+            };
+            setWorkspaceMedia(prev => [...prev, newMedia]);
+
+            // Save media to database
+            try {
+                await fetch('/api/workspace-media', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newMedia)
+                });
+            } catch (err) {
+                console.error('Failed to save media:', err);
+            }
+        }
+
         try {
             const response = await fetch('/api/jobs', {
                 method: 'POST',
@@ -426,7 +475,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             });
             const data = await response.json();
             console.log('✅ Job saved to DB:', data);
-            
+
             // Update with server response to ensure consistency
             if (data.success && data.job) {
                 setJobs(prev => prev.map(j => j.id === job.id ? {
@@ -441,10 +490,43 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    /**
+     * Adds a job that is already completed and persisted on the server (e.g. synchronous external providers).
+     * This updates the local UI state without re-posting the job to the API.
+     */
+    const addCompletedJob = (job: Job) => {
+        const jobWithWorkspace = { ...job, workspaceId: activeWorkspaceId || undefined };
+        console.log('➕ Adding completed job (local sync):', job.id);
+
+        // Update jobs list
+        setJobs(prev => [jobWithWorkspace, ...prev]);
+
+        // Add to workspace media
+        if (job.resultUrl && activeWorkspaceId) {
+            const newMedia: WorkspaceMedia = {
+                id: `media-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                workspaceId: activeWorkspaceId,
+                type: job.type as 'image' | 'video' | 'audio',
+                url: job.resultUrl,
+                prompt: job.prompt,
+                modelId: job.modelId,
+                createdAt: Date.now(),
+            };
+            setWorkspaceMedia(prev => [...prev, newMedia]);
+
+            // Allow background sync of media
+            fetch('/api/workspace-media', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newMedia)
+            }).catch(err => console.error('Failed to sync media:', err));
+        }
+    };
+
     const updateJobStatus = async (id: string, status: Job['status'], resultUrl?: string, error?: string, cost?: number) => {
         // Find the job to get its details
         const job = jobs.find(j => j.id === id);
-        
+
         // Optimistic update
         setJobs(prev => prev.map(job =>
             job.id === id ? { ...job, status, resultUrl, error, cost } : job
@@ -453,7 +535,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         // If job completed successfully with a result, add to workspace media
         if (status === 'completed' && resultUrl && job && activeWorkspaceId) {
             console.log(`✅ Job ${id} completed, adding to workspace media:`, resultUrl);
-            
+
             const newMedia: WorkspaceMedia = {
                 id: `media-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 workspaceId: activeWorkspaceId,
@@ -511,7 +593,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         }
 
         console.log('🔄 Reusing job input:', job);
-        
+
         // Set the model
         setSelectedModel(job.modelId);
 
@@ -521,15 +603,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             if (!response.ok) {
                 throw new Error(`Failed to fetch job: ${response.status}`);
             }
-            
+
             const data = await response.json();
-            
+
             if (data.success && data.job) {
                 // Parse options JSON safely with error handling
                 let options = {};
                 try {
-                    options = typeof data.job.options === 'string' 
-                        ? JSON.parse(data.job.options) 
+                    options = typeof data.job.options === 'string'
+                        ? JSON.parse(data.job.options)
                         : (data.job.options || {});
                 } catch (parseError) {
                     console.error('Failed to parse job options:', parseError);
@@ -691,6 +773,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                                 else if (data.output.image_url) resultUrl = data.output.image_url;
                                 else if (data.output.video) resultUrl = data.output.video;
                                 else if (data.output.video_url) resultUrl = data.output.video_url;
+                                else if (data.output.audioUrl) resultUrl = data.output.audioUrl;
                                 else if (data.output.url) resultUrl = data.output.url;
                                 else if (data.output.images && Array.isArray(data.output.images) && data.output.images.length > 0) resultUrl = data.output.images[0];
                                 else if (data.output.videos && Array.isArray(data.output.videos) && data.output.videos.length > 0) resultUrl = data.output.videos[0];
@@ -798,7 +881,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                 // Update with server-generated ID if different
                 setProjects(prev => prev.map(p => p.id === newProject.id ? data.project : p));
                 setCurrentProject(data.project);
-                
+
                 // Save default tracks to API only if not skipped
                 if (!options?.skipDefaultTracks) {
                     const defaultTracks = createDefaultTracks(data.project.id);
@@ -814,7 +897,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                         }
                     }
                 }
-                
+
                 return data.project.id;
             }
         } catch (error) {
@@ -864,11 +947,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     const loadProject = async (projectId: string): Promise<void> => {
         try {
             const response = await fetch(`/api/video-projects/${projectId}`);
-            
+
             // If project doesn't exist (404), create a new default project and save to DB
             if (response.status === 404) {
                 console.log('Project not found, creating new default project...');
-                
+
                 // Create a default project
                 const defaultProject: VideoProject = {
                     id: `project-${Date.now()}`,
@@ -879,20 +962,20 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                     createdAt: Date.now(),
                     updatedAt: Date.now(),
                 };
-                
+
                 // Create default tracks
                 const defaultTracks = createDefaultTracks(defaultProject.id);
                 const defaultKeyframes: Record<string, VideoKeyFrame[]> = {};
                 defaultTracks.forEach(track => {
                     defaultKeyframes[track.id] = [];
                 });
-                
+
                 // Update state first
                 setCurrentProject(defaultProject);
                 setProjects(prev => [...prev, defaultProject]);
                 setTracks(defaultTracks);
                 setKeyframes(defaultKeyframes);
-                
+
                 // Save project to DB
                 try {
                     const createResponse = await fetch('/api/video-projects', {
@@ -905,7 +988,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                         // Update with server-generated data if needed
                         setCurrentProject(createData.project);
                         setProjects(prev => prev.map(p => p.id === defaultProject.id ? createData.project : p));
-                        
+
                         // Save default tracks to DB
                         for (const track of defaultTracks) {
                             await fetch('/api/video-tracks', {
@@ -919,28 +1002,28 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                 } catch (err) {
                     console.error('Failed to save default project to DB:', err);
                 }
-                
+
                 return;
             }
-            
+
             const data = await response.json();
             if (data.success && data.project) {
                 setCurrentProject(data.project);
-                
+
                 // If no tracks exist, create default tracks
                 const loadedTracks = data.tracks || [];
                 if (loadedTracks.length === 0) {
                     console.log('No tracks found, creating default tracks...');
                     const defaultTracks = createDefaultTracks(data.project.id);
                     setTracks(defaultTracks);
-                    
+
                     // Initialize empty keyframes for default tracks
                     const defaultKeyframes: Record<string, VideoKeyFrame[]> = {};
                     defaultTracks.forEach(track => {
                         defaultKeyframes[track.id] = [];
                     });
                     setKeyframes(defaultKeyframes);
-                    
+
                     // Save default tracks to API
                     for (const track of defaultTracks) {
                         try {
@@ -958,7 +1041,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                     const seenTypes = new Set<string>();
                     const deduplicatedTracks: VideoTrack[] = [];
                     const duplicateTrackIds: string[] = [];
-                    
+
                     for (const track of loadedTracks) {
                         if (!seenTypes.has(track.type)) {
                             seenTypes.add(track.type);
@@ -967,7 +1050,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                             duplicateTrackIds.push(track.id);
                         }
                     }
-                    
+
                     // Delete duplicate tracks from DB
                     if (duplicateTrackIds.length > 0) {
                         console.log('🧹 Cleaning up duplicate tracks:', duplicateTrackIds);
@@ -979,9 +1062,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                             }
                         }
                     }
-                    
+
                     setTracks(deduplicatedTracks);
-                    
+
                     // Organize keyframes by trackId (only for non-duplicate tracks)
                     const keyframesByTrack: Record<string, VideoKeyFrame[]> = {};
                     if (data.keyframes) {
@@ -1008,7 +1091,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             await createAndSaveDefaultProject();
         }
     };
-    
+
     // Helper function to create and save a default project to DB
     const createAndSaveDefaultProject = async () => {
         const defaultProject: VideoProject = {
@@ -1020,19 +1103,19 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             createdAt: Date.now(),
             updatedAt: Date.now(),
         };
-        
+
         const defaultTracks = createDefaultTracks(defaultProject.id);
         const defaultKeyframes: Record<string, VideoKeyFrame[]> = {};
         defaultTracks.forEach(track => {
             defaultKeyframes[track.id] = [];
         });
-        
+
         // Update state first
         setCurrentProject(defaultProject);
         setProjects(prev => [...prev, defaultProject]);
         setTracks(defaultTracks);
         setKeyframes(defaultKeyframes);
-        
+
         // Save to DB
         try {
             const createResponse = await fetch('/api/video-projects', {
@@ -1044,7 +1127,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             if (createData.success && createData.project) {
                 setCurrentProject(createData.project);
                 setProjects(prev => prev.map(p => p.id === defaultProject.id ? createData.project : p));
-                
+
                 // Save default tracks to DB
                 for (const track of defaultTracks) {
                     await fetch('/api/video-tracks', {
@@ -1065,7 +1148,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
     const updateProject = async (projectId: string, updates: Partial<VideoProject>): Promise<void> => {
         const updatedProject = { ...updates, updatedAt: Date.now() };
-        
+
         // Optimistic update
         setProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updatedProject } : p));
         if (currentProject?.id === projectId) {
@@ -1085,7 +1168,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(updatedProject),
                 });
-                
+
                 // If project doesn't exist (404), create it first
                 if (response.status === 404) {
                     console.log('Project not found in DB, creating it...');
@@ -1098,16 +1181,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                         createdAt: Date.now(),
                         ...updatedProject,
                     };
-                    
+
                     const createResponse = await fetch('/api/video-projects', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(projectToCreate),
                     });
-                    
+
                     if (createResponse.ok) {
                         console.log('✅ Project created and saved:', projectId);
-                        
+
                         // Also save tracks if they exist
                         for (const track of tracks) {
                             if (track.projectId === projectId) {
@@ -1115,17 +1198,17 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify(track),
-                                }).catch(() => {}); // Ignore errors for tracks
+                                }).catch(() => { }); // Ignore errors for tracks
                             }
                         }
                     }
                     return;
                 }
-                
+
                 if (!response.ok) {
                     throw new Error(`Auto-save failed with status: ${response.status}`);
                 }
-                
+
                 console.log('✅ Project auto-saved:', projectId);
             } catch (error) {
                 console.error('❌ Failed to auto-save project:', error);
@@ -1233,7 +1316,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                 prompt: newKeyframe.data.prompt || '',
                 originalDuration: newKeyframe.data.originalDuration,
             };
-            
+
             const response = await fetch('/api/video-keyframes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1243,7 +1326,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             if (data.success && data.keyframe) {
                 setKeyframes(prev => ({
                     ...prev,
-                    [keyframe.trackId]: prev[keyframe.trackId].map(kf => 
+                    [keyframe.trackId]: prev[keyframe.trackId].map(kf =>
                         kf.id === newKeyframe.id ? data.keyframe : kf
                     ),
                 }));
@@ -1270,10 +1353,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         try {
             // Transform updates for API - extract data fields to top level
             const apiUpdates: any = {};
-            
+
             if (updates.timestamp !== undefined) apiUpdates.timestamp = updates.timestamp;
             if (updates.duration !== undefined) apiUpdates.duration = updates.duration;
-            
+
             // Extract data fields to top level for API
             if (updates.data) {
                 if (updates.data.type !== undefined) apiUpdates.dataType = updates.data.type;
@@ -1283,7 +1366,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
                 if (updates.data.fitMode !== undefined) apiUpdates.fitMode = updates.data.fitMode;
                 if (updates.data.volume !== undefined) apiUpdates.volume = updates.data.volume;
             }
-            
+
             await fetch(`/api/video-keyframes/${keyframeId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -1339,6 +1422,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             // Jobs
             jobs,
             addJob,
+            addCompletedJob,
             updateJobStatus,
             deleteJob,
             reuseJobInput,

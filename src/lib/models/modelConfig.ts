@@ -1,6 +1,6 @@
-export type ModelInputType = 'text' | 'image' | 'video' | 'audio';
+export type ModelInputType = 'text' | 'image' | 'image2' | 'video' | 'audio';
 export type ApiType = 'runpod' | 'external';
-export type ModelType = 'image' | 'video' | 'audio';
+export type ModelType = 'image' | 'video' | 'audio' | 'tts' | 'music';
 
 export type ModelParameterType = 'string' | 'number' | 'boolean' | 'select' | 'lora-selector';
 
@@ -55,15 +55,67 @@ export interface ModelConfig {
     };
 
     parameters: ModelParameter[];
-    
+
     // Input field names for API payload
     imageInputKey?: string; // Key name for image input in API payload (default: 'image')
+    imageInput2Key?: string; // Key name for second image input in API payload
     videoInputKey?: string; // Key name for video input in API payload (default: 'video')
     audioInputKey?: string; // Key name for audio input in API payload (default: 'audio')
-    
+
     // Conditional inputs - for models that accept different input types based on parameters
     conditionalInputs?: ConditionalInput[];
+
+    // Optional inputs - inputs that are shown but not required
+    optionalInputs?: ModelInputType[];
 }
+
+// --- Eleven Labs Models ---
+const ELEVENLABS_MODELS: ModelConfig[] = [
+    {
+        id: 'elevenlabs-tts',
+        name: 'Eleven Labs TTS',
+        provider: 'Eleven Labs',
+        type: 'tts',
+        inputs: ['text'],
+        api: {
+            type: 'external',
+            endpoint: 'https://api.elevenlabs.io/v1/text-to-speech'
+        },
+        capabilities: {
+            durations: [0, 300] // Max 5 minutes
+        },
+        parameters: [
+            { name: 'voiceId', label: 'Voice ID', type: 'string', default: 'EXAVITQu4vr4xnSDxMaL', group: 'basic' },
+            { name: 'eleven_model_id', label: 'Model', type: 'select', options: ['eleven_multilingual_v2', 'eleven_english_v2', 'eleven_turbo_v2', 'eleven_monolingual_v1'], default: 'eleven_multilingual_v2', group: 'basic' },
+            { name: 'stability', label: 'Stability', type: 'number', default: 0.8, min: 0, max: 1, step: 0.1, group: 'advanced' },
+            { name: 'similarity', label: 'Similarity', type: 'number', default: 0.8, min: 0, max: 1, step: 0.1, group: 'advanced' },
+            { name: 'style', label: 'Style', type: 'number', default: 0.0, min: 0, max: 1, step: 0.1, group: 'advanced' },
+            { name: 'useStreaming', label: 'Use Streaming', type: 'boolean', default: false, group: 'advanced' }
+        ]
+    },
+    {
+        id: 'elevenlabs-music',
+        name: 'Eleven Labs Music',
+        provider: 'Eleven Labs',
+        type: 'music',
+        inputs: ['text'],
+        api: {
+            type: 'external',
+            endpoint: 'https://api.elevenlabs.io/v1/music'
+        },
+        capabilities: {
+            durations: [30, 300] // 30 seconds to 5 minutes
+        },
+        parameters: [
+            { name: 'eleven_model_id', label: 'Model', type: 'select', options: ['music_generator', 'music_generator_v2'], default: 'music_generator_v2', group: 'basic' },
+            { name: 'prompt_genre', label: 'Genre', type: 'string', default: '', group: 'advanced' },
+            { name: 'prompt_tempo', label: 'Tempo', type: 'string', default: '', group: 'advanced' },
+            { name: 'prompt_instrumentation', label: 'Instrumentation', type: 'string', default: '', group: 'advanced' },
+            { name: 'prompt_structure', label: 'Structure', type: 'string', default: '', group: 'advanced' },
+            { name: 'duration_seconds', label: 'Duration (seconds)', type: 'number', default: 60, min: 30, max: 300, group: 'advanced' }
+        ]
+    }
+];
 
 export const MODELS: ModelConfig[] = [
     // --- Video Models ---
@@ -178,6 +230,29 @@ export const MODELS: ModelConfig[] = [
             { name: 'fps', label: 'FPS', type: 'number', default: 16, min: 1, max: 60, group: 'advanced' }
         ]
     },
+    {
+        id: 'ltx2',
+        name: 'LTX2',
+        provider: 'LTX',
+        type: 'video',
+        inputs: ['text', 'image'],
+        api: {
+            type: 'runpod',
+            endpoint: 'ltx2'
+        },
+        capabilities: {},
+        imageInputKey: 'image_path',
+        parameters: [
+            { name: 'width', label: 'Width', type: 'number', default: 1280, min: 256, max: 2048, step: 64, group: 'basic', validation: { multipleOf: 64 } },
+            { name: 'height', label: 'Height', type: 'number', default: 720, min: 256, max: 2048, step: 64, group: 'basic', validation: { multipleOf: 64 } },
+            { name: 'negative_prompt', label: 'Negative Prompt', type: 'string', default: 'blurry, low quality, still frame, frames, watermark, overlay, titles, has blurbox, has subtitles', group: 'advanced' },
+            { name: 'seed', label: 'Seed', type: 'number', default: 10, group: 'advanced', description: '-1 for random' },
+            { name: 'steps', label: 'Steps', type: 'number', default: 20, min: 1, max: 100, group: 'advanced' },
+            { name: 'cfg', label: 'CFG Scale', type: 'number', default: 4.0, min: 0.1, max: 20, step: 0.1, group: 'advanced' },
+            { name: 'length', label: 'Length', type: 'number', default: 129, min: 1, max: 257, group: 'advanced' },
+            { name: 'frame_rate', label: 'Frame Rate', type: 'number', default: 25.0, min: 1, max: 60, step: 0.1, group: 'advanced' }
+        ]
+    },
     // {
     //     id: 'google-veo',
     //     name: 'Veo',
@@ -241,13 +316,15 @@ export const MODELS: ModelConfig[] = [
         name: 'Qwen Image Edit',
         provider: 'Qwen',
         type: 'image',
-        inputs: ['text', 'image'],
+        inputs: ['text', 'image', 'image2'],
+        optionalInputs: ['image2'],
         api: {
             type: 'runpod',
             endpoint: 'qwen-image-edit'
         },
         capabilities: {},
         imageInputKey: 'image_path',
+        imageInput2Key: 'image_path_2',
         parameters: [
             { name: 'width', label: 'Width', type: 'number', default: 512, min: 256, max: 1920, step: 64, group: 'basic', validation: { multipleOf: 64 } },
             { name: 'height', label: 'Height', type: 'number', default: 512, min: 256, max: 1920, step: 64, group: 'basic', validation: { multipleOf: 64 } },
@@ -324,11 +401,17 @@ export const MODELS: ModelConfig[] = [
             { name: 'media_type', label: 'Media Type', type: 'select', options: ['video'], default: 'video', group: 'hidden' },
             { name: 'frame_interpolation', label: 'Frame Interpolation', type: 'boolean', default: false, group: 'advanced' }
         ]
-    }
+    },
 ];
 
-export const getModelsByType = (type: ModelType) => MODELS.filter(m => m.type === type);
-export const getModelById = (id: string) => MODELS.find(m => m.id === id);
+// --- Eleven Labs Models ---
+const ALL_MODELS: ModelConfig[] = [
+    ...MODELS,
+    ...ELEVENLABS_MODELS,
+];
+
+export const getModelsByType = (type: ModelType) => ALL_MODELS.filter(m => m.type === type);
+export const getModelById = (id: string) => ALL_MODELS.find(m => m.id === id);
 
 // Validation types and functions
 export interface ValidationResult {
@@ -357,24 +440,24 @@ export function validateParameter(param: ModelParameter, value: any): Validation
 
         // Min/max validation
         if (param.min !== undefined && value < param.min) {
-            return { 
-                valid: false, 
-                error: `Value ${value} is outside the allowed range [${param.min}, ${param.max ?? '∞'}]` 
+            return {
+                valid: false,
+                error: `Value ${value} is outside the allowed range [${param.min}, ${param.max ?? '∞'}]`
             };
         }
         if (param.max !== undefined && value > param.max) {
-            return { 
-                valid: false, 
-                error: `Value ${value} is outside the allowed range [${param.min ?? '-∞'}, ${param.max}]` 
+            return {
+                valid: false,
+                error: `Value ${value} is outside the allowed range [${param.min ?? '-∞'}, ${param.max}]`
             };
         }
 
         // MultipleOf validation
         if (param.validation?.multipleOf !== undefined) {
             if (value % param.validation.multipleOf !== 0) {
-                return { 
-                    valid: false, 
-                    error: `Value ${value} must be a multiple of ${param.validation.multipleOf}` 
+                return {
+                    valid: false,
+                    error: `Value ${value} must be a multiple of ${param.validation.multipleOf}`
                 };
             }
         }
@@ -383,9 +466,9 @@ export function validateParameter(param: ModelParameter, value: any): Validation
     // Select validation
     if (param.type === 'select' && param.options) {
         if (!param.options.includes(value)) {
-            return { 
-                valid: false, 
-                error: `Value '${value}' is not a valid option. Valid options: ${param.options.join(', ')}` 
+            return {
+                valid: false,
+                error: `Value '${value}' is not a valid option. Valid options: ${param.options.join(', ')}`
             };
         }
     }
@@ -398,7 +481,7 @@ export function validateParameter(param: ModelParameter, value: any): Validation
  * Returns an array of ValidationResult for all parameters.
  */
 export function validateModelInputs(
-    modelId: string, 
+    modelId: string,
     inputs: Record<string, any>
 ): ValidationResult[] {
     const model = getModelById(modelId);
@@ -452,7 +535,7 @@ export function isInputVisible(
 
     // Find the conditional input configuration
     const conditionalInput = model.conditionalInputs.find(ci => ci.type === inputType);
-    
+
     // If input type not in conditionalInputs, don't show it
     if (!conditionalInput) {
         return false;

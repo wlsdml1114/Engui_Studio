@@ -54,10 +54,10 @@ EnguiStudio is a platform that enables easy access to various open-source AI mod
 ### You may need to run the script multiple times on your first launch due to AWS S3 and ffmpeg download/installation steps!
 
 ### 📺 YouTube Showcase
-[![Video Label](http://img.youtube.com/vi/-0LYseEEx4M/0.jpg)](https://youtu.be/-0LYseEEx4M)
+[![Video Label](http://img.youtube.com/vi/E9EJ7RfmaWE/0.jpg)](https://youtu.be/E9EJ7RfmaWE)
 
 ### 📺 Installation Tutorial
-[![Video Label](http://img.youtube.com/vi/08AGQOGqb3A/0.jpg)](https://youtu.be/08AGQOGqb3A)
+[![Video Label](http://img.youtube.com/vi/uTdejvGj__g/0.jpg)](https://youtu.be/uTdejvGj__g)
 
 For Mac version installation, see [this video](https://youtu.be/vABLy-CAhJ0).
 
@@ -147,7 +147,7 @@ Navigate to `/settings` in your browser
 
 ## 📄 License
 
-This project is distributed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is distributed under the Engui Studio License. See the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 

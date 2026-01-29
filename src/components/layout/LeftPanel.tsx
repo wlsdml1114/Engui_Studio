@@ -6,6 +6,8 @@ import { useStudio } from '@/lib/context/StudioContext';
 import { CogIcon } from '@heroicons/react/24/outline';
 import VideoGenerationForm from '../forms/VideoGenerationForm';
 import ImageGenerationForm from '../forms/ImageGenerationForm';
+import AudioGenerationForm from '../forms/AudioGenerationForm';
+import MusicGenerationForm from '../forms/MusicGenerationForm';
 import GenerationTabs, { GenerationMode } from '../forms/GenerationTabs';
 import SettingsDialog from '../settings/SettingsDialog';
 
@@ -37,20 +39,20 @@ export default function LeftPanel() {
     React.useEffect(() => {
         const handleReuseInput = (event: CustomEvent) => {
             const { type, _redispatched } = event.detail;
-            
+
             // Ignore re-dispatched events to prevent infinite loop
             if (_redispatched) {
                 return;
             }
-            
+
             console.log('🎯 LeftPanel received reuseJobInput event, type:', type);
-            
+
             if (type === 'video') {
                 setGenerationMode('video');
                 // Re-dispatch event after tab switch to ensure form is mounted
                 setTimeout(() => {
                     console.log('🔄 Re-dispatching event after tab switch');
-                    window.dispatchEvent(new CustomEvent('reuseJobInput', { 
+                    window.dispatchEvent(new CustomEvent('reuseJobInput', {
                         detail: { ...event.detail, _redispatched: true }
                     }));
                 }, 150);
@@ -59,7 +61,25 @@ export default function LeftPanel() {
                 // Re-dispatch event after tab switch to ensure form is mounted
                 setTimeout(() => {
                     console.log('🔄 Re-dispatching event after tab switch');
-                    window.dispatchEvent(new CustomEvent('reuseJobInput', { 
+                    window.dispatchEvent(new CustomEvent('reuseJobInput', {
+                        detail: { ...event.detail, _redispatched: true }
+                    }));
+                }, 150);
+            } else if (type === 'music') {
+                setGenerationMode('music');
+                // Re-dispatch event after tab switch to ensure form is mounted
+                setTimeout(() => {
+                    console.log('🔄 Re-dispatching event after tab switch');
+                    window.dispatchEvent(new CustomEvent('reuseJobInput', {
+                        detail: { ...event.detail, _redispatched: true }
+                    }));
+                }, 150);
+            } else if (type === 'audio' || type === 'tts') {
+                setGenerationMode('tts');
+                // Re-dispatch event after tab switch to ensure form is mounted
+                setTimeout(() => {
+                    console.log('🔄 Re-dispatching event after tab switch');
+                    window.dispatchEvent(new CustomEvent('reuseJobInput', {
                         detail: { ...event.detail, _redispatched: true }
                     }));
                 }, 150);
@@ -113,8 +133,8 @@ export default function LeftPanel() {
                     <GenerationTabs activeMode={generationMode} onModeChange={setGenerationMode} />
                     {generationMode === 'image' && <ImageGenerationForm />}
                     {generationMode === 'video' && <VideoGenerationForm />}
-                    {generationMode === 'voiceover' && <div className="text-sm text-muted-foreground p-4 text-center">Voiceover generation coming soon</div>}
-                    {generationMode === 'music' && <div className="text-sm text-muted-foreground p-4 text-center">Music generation coming soon</div>}
+                    {generationMode === 'tts' && <AudioGenerationForm />}
+                    {generationMode === 'music' && <MusicGenerationForm />}
                 </div>
             </div>
 

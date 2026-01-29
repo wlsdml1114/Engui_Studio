@@ -10,7 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useI18n } from '@/lib/i18n/context';
 
-export type GenerationMode = 'image' | 'video' | 'voiceover' | 'music';
+export type GenerationMode = 'image' | 'video' | 'tts' | 'music';
 
 interface GenerationTabsProps {
     activeMode: GenerationMode;
@@ -23,7 +23,7 @@ export default function GenerationTabs({ activeMode, onModeChange }: GenerationT
     const tabs: { id: GenerationMode; labelKey: string; icon: React.ElementType }[] = [
         { id: 'image', labelKey: 'generationForm.tabs.image', icon: PhotoIcon },
         { id: 'video', labelKey: 'generationForm.tabs.video', icon: VideoCameraIcon },
-        { id: 'voiceover', labelKey: 'generationForm.tabs.voiceover', icon: MicrophoneIcon },
+        { id: 'tts', labelKey: 'generationForm.tabs.voiceover', icon: MicrophoneIcon },
         { id: 'music', labelKey: 'generationForm.tabs.music', icon: MusicalNoteIcon },
     ];
 

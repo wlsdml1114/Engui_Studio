@@ -33,9 +33,16 @@ export async function GET(request: Request) {
             return NextResponse.json({ success: false, error: 'Unknown model' }, { status: 400 });
         }
 
-        // Only handle RunPod jobs
         if (model.api.type !== 'runpod') {
-            return NextResponse.json({ success: false, error: 'Not a RunPod job' }, { status: 400 });
+            const jobOptions = typeof job.options === 'string' ? JSON.parse(job.options) : job.options;
+            return NextResponse.json({
+                success: true,
+                status: job.status === 'completed' ? 'COMPLETED' : 
+                        job.status === 'failed' ? 'FAILED' : 
+                        job.status === 'processing' ? 'IN_PROGRESS' : job.status.toUpperCase(),
+                output: job.resultUrl ? { audioUrl: job.resultUrl, ...jobOptions } : undefined,
+                error: job.status === 'failed' ? (jobOptions.error || 'Job failed') : undefined
+            });
         }
 
         // Get settings

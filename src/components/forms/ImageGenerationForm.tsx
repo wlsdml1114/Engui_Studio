@@ -19,13 +19,16 @@ export default function ImageGenerationForm() {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string>('');
+    const [imageFile2, setImageFile2] = useState<File | null>(null);
+    const [previewUrl2, setPreviewUrl2] = useState<string>('');
     const [parameterValues, setParameterValues] = useState<Record<string, any>>({});
     const [isLoadingMedia, setIsLoadingMedia] = useState(false);
     const [showReuseSuccess, setShowReuseSuccess] = useState(false);
     const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const fileInputRef2 = useRef<HTMLInputElement>(null);
     const formRef = useRef<HTMLDivElement>(null);
-    
+
     // LoRA state
     const [showLoRADialog, setShowLoRADialog] = useState(false);
     const [availableLoras, setAvailableLoras] = useState<LoRAFile[]>([]);
@@ -53,12 +56,12 @@ export default function ImageGenerationForm() {
     // Fetch available LoRAs
     const fetchAvailableLoras = async () => {
         if (!activeWorkspaceId) return;
-        
+
         setIsLoadingLoras(true);
         try {
             const response = await fetch(`/api/lora?workspaceId=${activeWorkspaceId}`);
             const data = await response.json();
-            
+
             if (data.success && data.loras) {
                 setAvailableLoras(data.loras);
             } else {
@@ -90,6 +93,8 @@ export default function ImageGenerationForm() {
     useEffect(() => {
         setImageFile(null);
         setPreviewUrl('');
+        setImageFile2(null);
+        setPreviewUrl2('');
     }, [selectedModel]);
 
     // Fetch LoRAs when model changes or dialog closes
@@ -103,7 +108,7 @@ export default function ImageGenerationForm() {
     useEffect(() => {
         const handleReuseInput = async (event: CustomEvent) => {
             const { modelId, prompt: jobPrompt, options, type, imageInputPath } = event.detail;
-            
+
             // Only handle if it's an image job
             if (type !== 'image') return;
 
@@ -139,6 +144,20 @@ export default function ImageGenerationForm() {
                     }
                 }
 
+                // Load second image file (image_path_2) if exists
+                const imagePath2 = parsedOptions.image_path_2;
+                if (currentModel && currentModel.inputs.includes('image2') && imagePath2) {
+                    console.log('📥 Loading second image from path:', imagePath2);
+                    const file2 = await loadFileFromPath(imagePath2);
+                    if (file2) {
+                        setImageFile2(file2);
+                        setPreviewUrl2(imagePath2);
+                        console.log('✅ Second image file loaded successfully');
+                    } else {
+                        console.warn('⚠️ Failed to load second image file');
+                    }
+                }
+
                 // Apply parameter values in parent-first order
                 // First, collect all parameter values from options
                 const allParamValues: Record<string, any> = {};
@@ -155,12 +174,12 @@ export default function ImageGenerationForm() {
                     // Separate parameters into parent and dependent
                     const parentParams: string[] = [];
                     const dependentParams: Array<{ name: string; dependsOn: string }> = [];
-                    
+
                     model.parameters.forEach(param => {
                         if (param.dependsOn) {
-                            dependentParams.push({ 
-                                name: param.name, 
-                                dependsOn: param.dependsOn.parameter 
+                            dependentParams.push({
+                                name: param.name,
+                                dependsOn: param.dependsOn.parameter
                             });
                         } else if (allParamValues[param.name] !== undefined) {
                             parentParams.push(param.name);
@@ -248,7 +267,7 @@ export default function ImageGenerationForm() {
             setImageFile(file);
             const url = URL.createObjectURL(file);
             setPreviewUrl(url);
-            
+
             // 이미지 로드 후 width와 height 자동 설정
             const img = new Image();
             img.onload = () => {
@@ -269,7 +288,7 @@ export default function ImageGenerationForm() {
     const handleDrop = async (e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        
+
         try {
             const data = e.dataTransfer.getData('application/json');
             if (data) {
@@ -279,10 +298,10 @@ export default function ImageGenerationForm() {
                     const response = await fetch(mediaData.url);
                     const blob = await response.blob();
                     const file = new File([blob], `workspace-${mediaData.id}.png`, { type: 'image/png' });
-                    
+
                     setImageFile(file);
                     setPreviewUrl(mediaData.url);
-                    
+
                     // Auto-set dimensions
                     const img = new Image();
                     img.onload = () => {
@@ -307,16 +326,57 @@ export default function ImageGenerationForm() {
         e.stopPropagation();
     };
 
+    const handleImageUpload2 = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            setImageFile2(file);
+            const url = URL.createObjectURL(file);
+            setPreviewUrl2(url);
+        }
+    };
+
+    const handleDrop2 = async (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        try {
+            const data = e.dataTransfer.getData('application/json');
+            if (data) {
+                const mediaData = JSON.parse(data);
+                if (mediaData.type === 'image' && mediaData.url) {
+                    // Fetch the image from workspace and convert to File
+                    const response = await fetch(mediaData.url);
+                    const blob = await response.blob();
+                    const file = new File([blob], `workspace-${mediaData.id}.png`, { type: 'image/png' });
+
+                    setImageFile2(file);
+                    setPreviewUrl2(mediaData.url);
+                }
+            }
+        } catch (error) {
+            console.error('Error handling drop 2:', error);
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setMessage(null);
         // Only require prompt if model accepts text input
         if (currentModel.inputs.includes('text') && !prompt) return;
 
-        // 모델이 이미지 입력을 요구하는 경우 이미지 필수 체크 (conditionalInputs 기반)
-        const imageRequired = isInputVisible(currentModel, 'image', parameterValues);
-        if (imageRequired && !imageFile) {
+        // 모델이 이미지 입력을 요구하는 경우 이미지 필수 체크 (conditionalInputs 및 optionalInputs 기반)
+        const imageVisible = isInputVisible(currentModel, 'image', parameterValues);
+        const imageOptional = currentModel.optionalInputs?.includes('image');
+        if (imageVisible && !imageOptional && !imageFile) {
             setMessage({ type: 'error', text: 'Please upload an image for this model' });
+            return;
+        }
+
+        // 두 번째 이미지 필수 체크
+        const image2Visible = isInputVisible(currentModel, 'image2', parameterValues);
+        const image2Optional = currentModel.optionalInputs?.includes('image2');
+        if (image2Visible && !image2Optional && !imageFile2) {
+            setMessage({ type: 'error', text: 'Please upload the second image' });
             return;
         }
 
@@ -327,17 +387,23 @@ export default function ImageGenerationForm() {
             formData.append('userId', 'user-with-settings');
             formData.append('modelId', currentModel.id);
             formData.append('prompt', prompt);
-            
+
             // Add workspace ID
             if (activeWorkspaceId) {
                 formData.append('workspaceId', activeWorkspaceId);
             }
 
             // 모델이 이미지 입력을 받는 경우 File 객체를 직접 추가 (conditionalInputs 기반)
-            if (imageRequired && imageFile) {
+            if (imageVisible && imageFile) {
                 // Always append as 'image' field - server will handle the key mapping
                 formData.append('image', imageFile);
                 console.log('📤 Appending image file:', imageFile.name, imageFile.size, 'bytes');
+            }
+
+            // Append second image if exists (specifically for qwen-image-edit)
+            if (imageFile2) {
+                formData.append('image2', imageFile2);
+                console.log('📤 Appending second image file:', imageFile2.name, imageFile2.size, 'bytes');
             }
 
             // Collect dynamic parameters from state
@@ -423,7 +489,7 @@ export default function ImageGenerationForm() {
                     </div>
                 </div>
             )}
-            
+
             {/* Model Selector Card */}
             <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{t('generationForm.using')}</Label>
@@ -441,7 +507,7 @@ export default function ImageGenerationForm() {
                             </svg>
                         </div>
                     </button>
-                    
+
                     {isModelDropdownOpen && (
                         <>
                             <div className="fixed inset-0 z-10" onClick={() => setIsModelDropdownOpen(false)} />
@@ -455,11 +521,10 @@ export default function ImageGenerationForm() {
                                                 setSelectedModel(model.id);
                                                 setIsModelDropdownOpen(false);
                                             }}
-                                            className={`w-full flex items-center justify-between px-3 py-2 transition-colors ${
-                                                selectedModel === model.id 
-                                                    ? 'bg-primary/15 text-foreground' 
-                                                    : 'hover:bg-muted/50 text-foreground/80'
-                                            }`}
+                                            className={`w-full flex items-center justify-between px-3 py-2 transition-colors ${selectedModel === model.id
+                                                ? 'bg-primary/15 text-foreground'
+                                                : 'hover:bg-muted/50 text-foreground/80'
+                                                }`}
                                         >
                                             <span className="text-sm font-medium">{model.name}</span>
                                             <div className="flex items-center gap-2">
@@ -483,7 +548,9 @@ export default function ImageGenerationForm() {
                 {/* Image Upload - conditionalInputs 기반으로 표시 */}
                 {isInputVisible(currentModel, 'image', parameterValues) && (
                     <div className="space-y-2">
-                        <Label className="text-xs">Input Image</Label>
+                        <Label className="text-xs">
+                            Input Image {currentModel.optionalInputs?.includes('image') ? '(Optional)' : '(Required)'}
+                        </Label>
                         <input
                             ref={fileInputRef}
                             type="file"
@@ -531,6 +598,59 @@ export default function ImageGenerationForm() {
                     </div>
                 )}
 
+                {/* Second Image Upload - Specific to Models with imageInput2Key */}
+                {isInputVisible(currentModel, 'image2', parameterValues) && (
+                    <div className="space-y-2">
+                        <Label className="text-xs">
+                            Second Image {currentModel.optionalInputs?.includes('image2') ? '(Optional)' : '(Required)'}
+                        </Label>
+                        <input
+                            ref={fileInputRef2}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload2}
+                            className="hidden"
+                        />
+                        <div
+                            className="w-full p-4 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary transition-colors"
+                            onClick={() => !isLoadingMedia && fileInputRef2.current?.click()}
+                            onDrop={handleDrop2}
+                            onDragOver={handleDragOver}
+                        >
+                            {isLoadingMedia ? (
+                                <div className="text-center text-muted-foreground">
+                                    <div className="w-8 h-8 mx-auto mb-2 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                                    <p className="text-xs">Loading media file...</p>
+                                </div>
+                            ) : previewUrl2 ? (
+                                <div className="space-y-2">
+                                    <img
+                                        src={previewUrl2}
+                                        alt="Preview 2"
+                                        className="max-w-full max-h-48 mx-auto rounded-lg"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setPreviewUrl2('');
+                                            setImageFile2(null);
+                                        }}
+                                        className="text-xs text-red-400 hover:text-red-300"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="text-center text-muted-foreground">
+                                    <PhotoIcon className="w-8 h-8 mx-auto mb-2" />
+                                    <p className="text-xs">Click to upload second image (optional)</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 {/* Prompt - only show if model accepts text input */}
                 {currentModel.inputs.includes('text') && (
                     <div className="relative">
@@ -548,7 +668,7 @@ export default function ImageGenerationForm() {
                     <div key={`${param.name}-${param.default}`} className="space-y-2">
                         {param.type !== 'boolean' && <Label className="text-xs">{param.label}</Label>}
                         {param.type === 'boolean' ? (
-                            <div 
+                            <div
                                 className="flex items-center justify-between p-3 rounded-lg border border-border bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer"
                                 onClick={() => handleParameterChange(param.name, !(parameterValues[param.name] ?? param.default))}
                             >
@@ -562,18 +682,16 @@ export default function ImageGenerationForm() {
                                     type="button"
                                     role="switch"
                                     aria-checked={parameterValues[param.name] ?? param.default}
-                                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                                        (parameterValues[param.name] ?? param.default) ? 'bg-primary' : 'bg-muted'
-                                    }`}
+                                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${(parameterValues[param.name] ?? param.default) ? 'bg-primary' : 'bg-muted'
+                                        }`}
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         handleParameterChange(param.name, !(parameterValues[param.name] ?? param.default));
                                     }}
                                 >
                                     <span
-                                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                                            (parameterValues[param.name] ?? param.default) ? 'translate-x-5' : 'translate-x-0'
-                                        }`}
+                                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${(parameterValues[param.name] ?? param.default) ? 'translate-x-5' : 'translate-x-0'
+                                            }`}
                                     />
                                 </button>
                             </div>
@@ -658,7 +776,7 @@ export default function ImageGenerationForm() {
                                         onManageClick={() => setShowLoRADialog(true)}
                                     />
                                 ) : param.type === 'boolean' ? (
-                                    <div 
+                                    <div
                                         className="flex items-center justify-between p-3 rounded-lg border border-border bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer"
                                         onClick={() => handleParameterChange(param.name, !(parameterValues[param.name] ?? param.default))}
                                     >
@@ -672,18 +790,16 @@ export default function ImageGenerationForm() {
                                             type="button"
                                             role="switch"
                                             aria-checked={parameterValues[param.name] ?? param.default}
-                                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                                                (parameterValues[param.name] ?? param.default) ? 'bg-primary' : 'bg-muted'
-                                            }`}
+                                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${(parameterValues[param.name] ?? param.default) ? 'bg-primary' : 'bg-muted'
+                                                }`}
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 handleParameterChange(param.name, !(parameterValues[param.name] ?? param.default));
                                             }}
                                         >
                                             <span
-                                                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                                                    (parameterValues[param.name] ?? param.default) ? 'translate-x-5' : 'translate-x-0'
-                                                }`}
+                                                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${(parameterValues[param.name] ?? param.default) ? 'translate-x-5' : 'translate-x-0'
+                                                    }`}
                                             />
                                         </button>
                                     </div>
@@ -745,7 +861,7 @@ export default function ImageGenerationForm() {
                     open={showLoRADialog}
                     onOpenChange={setShowLoRADialog}
                     workspaceId={activeWorkspaceId || undefined}
-                    onLoRAsUpdated={fetchAvailableLoras}
+                    onLoRAUploaded={fetchAvailableLoras}
                 />
             )}
         </div >

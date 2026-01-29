@@ -183,9 +183,7 @@ export async function POST(request: NextRequest) {
           }
         }
       }
-    }
-    
-    console.log(`🎵 Found ${audioFiles.length} audio files to merge`);
+     }
 
     // Render the video (without audio from AudioKeyFrame since it uses HTML5 Audio)
     await renderMedia({
@@ -197,12 +195,11 @@ export async function POST(request: NextRequest) {
     });
 
     console.log('✅ Video rendered to:', outputPath);
-    
-    // If there are audio files, merge them with FFmpeg
-    if (audioFiles.length > 0) {
-      console.log('🎵 Merging audio with video using FFmpeg...');
-      
-      const { execSync } = await import('child_process');
+
+     // If there are audio files, merge them with FFmpeg
+     if (audioFiles.length > 0) {
+
+       const { execSync } = await import('child_process');
       const tempVideoPath = outputPath.replace(`.${format}`, `_temp.${format}`);
       
       // Rename original video to temp
@@ -216,10 +213,8 @@ export async function POST(request: NextRequest) {
             ? path.join(publicDir, af.url.replace('http://localhost:3000/', ''))
             : af.url;
           return { path: audioPath, startTime: af.startTime, volume: af.volume };
-        });
-        
-        console.log(`🎵 Audio paths:`, audioPaths);
-        
+         });
+
         if (audioPaths.length === 1) {
           // Single audio file - merge with volume and delay
           const ap = audioPaths[0];
@@ -230,7 +225,6 @@ export async function POST(request: NextRequest) {
             : '';
           const mapAudio = delayMs > 0 || ap.volume !== 1.0 ? '-map "[aout]"' : '-map 1:a:0';
           const ffmpegCmd = `ffmpeg -y -i "${tempVideoPath}" -i "${ap.path}" ${filterComplex} -c:v copy -c:a aac -map 0:v:0 ${mapAudio} -shortest "${outputPath}"`;
-          console.log(`🎵 FFmpeg command: ${ffmpegCmd}`);
           execSync(ffmpegCmd, { stdio: 'pipe' });
         } else {
           // Multiple audio files - mix them together with individual volumes
@@ -241,10 +235,9 @@ export async function POST(request: NextRequest) {
             `[${i + 1}:a]volume=${ap.volume},adelay=${Math.round(ap.startTime * 1000)}|${Math.round(ap.startTime * 1000)}[a${i}]`
           ).join(';');
           const mixInputs = audioPaths.map((_, i) => `[a${i}]`).join('');
-          const filterComplex = `${volumeAndDelays};${mixInputs}amix=inputs=${audioPaths.length}:duration=longest[aout]`;
-          
+           const filterComplex = `${volumeAndDelays};${mixInputs}amix=inputs=${audioPaths.length}:duration=longest[aout]`;
+
           const ffmpegCmd = `ffmpeg -y -i "${tempVideoPath}" ${inputs} -filter_complex "${filterComplex}" -map 0:v:0 -map "[aout]" -c:v copy -c:a aac "${outputPath}"`;
-          console.log(`🎵 FFmpeg command: ${ffmpegCmd}`);
           execSync(ffmpegCmd, { stdio: 'pipe' });
         }
         

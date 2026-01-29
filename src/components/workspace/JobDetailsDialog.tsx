@@ -23,6 +23,7 @@ export function JobDetailsDialog({ job, open, onOpenChange }: JobDetailsDialogPr
     const safeOpen = open && !!job;
     const model = job ? getModelById(job.modelId) : null;
     const isVideo = job?.type === 'video';
+    const isAudio = job?.type === 'audio' || job?.type === 'tts' || job?.type === 'music';
 
     const handleDownload = async () => {
         if (!job?.resultUrl) return;
@@ -32,23 +33,38 @@ export function JobDetailsDialog({ job, open, onOpenChange }: JobDetailsDialogPr
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `job-${job.id}.${isVideo ? 'mp4' : 'png'}`;
+
+            let ext = 'png';
+            if (isVideo) ext = 'mp4';
+            if (isAudio) ext = 'mp3';
+
+            a.download = `job-${job.id}.${ext}`;
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
         } catch (error) {
             console.error('Download failed:', error);
-            window.open(job.resultUrl, '_blank');
+            // Fallback
+            const a = document.createElement('a');
+            a.href = job.resultUrl;
+            a.target = '_blank';
+            a.download = `job-${job.id}.${isVideo ? 'mp4' : isAudio ? 'mp3' : 'png'}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         }
     };
 
     const handleDelete = () => {
-        if (job && confirm(t('jobDetails.deleteConfirm'))) {
+        // ... (existing handleDelete)
+        if (job && confirm('Are you sure you want to delete this job?')) {
             deleteJob(job.id);
             onOpenChange(false);
         }
     };
+
+    // ... (existing handleCopyPrompt)
 
     const handleCopyPrompt = () => {
         if (job?.prompt) {
@@ -61,7 +77,7 @@ export function JobDetailsDialog({ job, open, onOpenChange }: JobDetailsDialogPr
             {job && (
                 <DialogContent className="max-w-4xl w-[90vw] h-[85vh] p-0 gap-0 bg-background border-border overflow-hidden flex flex-col md:flex-row">
                     {/* Media Preview - Left/Top Side */}
-                    <div className="flex-1 bg-black/90 flex items-center justify-center relative min-h-[300px] md:h-full overflow-hidden">
+                    <div className="flex-1 bg-black/90 flex items-center justify-center relative min-h-[300px] md:h-full overflow-hidden p-4">
                         {job.status === 'completed' && job.resultUrl ? (
                             isVideo ? (
                                 <video
@@ -70,6 +86,22 @@ export function JobDetailsDialog({ job, open, onOpenChange }: JobDetailsDialogPr
                                     loop
                                     className="max-w-full max-h-full object-contain"
                                 />
+                            ) : isAudio ? (
+                                <div className="flex flex-col items-center justify-center w-full max-w-md gap-6 p-8 bg-zinc-900/50 rounded-xl border border-white/10 backdrop-blur-sm">
+                                    <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center text-primary animate-pulse">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-12 h-12">
+                                            <path fillRule="evenodd" d="M19.952 1.651a.75.75 0 01.298.599V16.303a3 3 0 01-2.176 2.884l-1.32.377a2.553 2.553 0 11-1.403-4.909l2.311-.66a1.5 1.5 0 001.088-1.442V6.994l-9 2.572v9.737a3 3 0 01-2.176 2.884l-1.32.377a2.553 2.553 0 11-1.402-4.909l2.31-.66a1.5 1.5 0 001.088-1.442V9.017 5.25a.75.75 0 01.544-.721l10.5-3a.75.75 0 01.658.122z" clipRule="evenodd" />
+                                        </svg>
+                                    </div>
+                                    <audio
+                                        src={job.resultUrl}
+                                        controls
+                                        className="w-full"
+                                    />
+                                    <div className="text-sm text-muted-foreground text-center">
+                                        {job.modelId} • Audio Generated
+                                    </div>
+                                </div>
                             ) : (
                                 <img
                                     src={job.resultUrl}
@@ -80,7 +112,7 @@ export function JobDetailsDialog({ job, open, onOpenChange }: JobDetailsDialogPr
                         ) : (
                             <div className="text-muted-foreground flex flex-col items-center gap-2">
                                 <div className={`w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin ${job.status === 'processing' || job.status === 'queued' ? 'block' : 'hidden'}`} />
-                                <span>{job.status === 'failed' ? t('jobDetails.generationFailed') : t('jobDetails.processing')}</span>
+                                <span>{job.status === 'failed' ? 'Generation Failed' : 'Processing...'}</span>
                             </div>
                         )}
                     </div>

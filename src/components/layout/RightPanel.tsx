@@ -22,7 +22,7 @@ export default function RightPanel() {
     const { jobs, workspaces, activeWorkspaceId, selectWorkspace, createWorkspace, deleteJob, reuseJobInput, addJob } = useStudio();
     const [selectedJob, setSelectedJob] = useState<Job | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
-    const [filter, setFilter] = useState<'all' | 'image' | 'video'>('all');
+    const [filter, setFilter] = useState<'all' | 'image' | 'video' | 'audio'>('all');
     const [isMounted, setIsMounted] = useState(false);
 
     // Workspace Creation State
@@ -78,6 +78,10 @@ export default function RightPanel() {
 
     const filteredJobs = jobs.filter(job => {
         if (filter === 'all') return true;
+        // Treat 'tts' and 'music' as 'audio' for filtering
+        if (filter === 'audio') {
+            return ['audio', 'tts', 'music'].includes(job.type);
+        }
         return job.type === filter;
     });
 
@@ -144,7 +148,7 @@ export default function RightPanel() {
                 {/* Filters & Actions */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1 bg-muted/30 rounded-md p-0.5">
-                        {(['all', 'image', 'video'] as const).map((t) => (
+                        {(['all', 'image', 'video', 'audio'] as const).map((t) => (
                             <button
                                 key={t}
                                 onClick={() => setFilter(t)}
@@ -209,6 +213,12 @@ export default function RightPanel() {
                                     {job.status === 'completed' && job.resultUrl ? (
                                         job.type === 'video' ? (
                                             <video src={job.resultUrl} className="w-full h-full object-cover" muted />
+                                        ) : ['audio', 'tts', 'music'].includes(job.type) ? (
+                                            <div className="w-full h-full flex items-center justify-center bg-purple-900/20 text-purple-400">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+                                                    <path fillRule="evenodd" d="M19.952 1.651a.75.75 0 01.298.599V16.303a3 3 0 01-2.176 2.884l-1.32.377a2.553 2.553 0 11-1.403-4.909l2.311-.66a1.5 1.5 0 001.088-1.442V6.994l-9 2.572v9.737a3 3 0 01-2.176 2.884l-1.32.377a2.553 2.553 0 11-1.402-4.909l2.31-.66a1.5 1.5 0 001.088-1.442V9.017 5.25a.75.75 0 01.544-.721l10.5-3a.75.75 0 01.658.122z" clipRule="evenodd" />
+                                                </svg>
+                                            </div>
                                         ) : (
                                             <img src={job.resultUrl} alt="Thumbnail" className="w-full h-full object-cover" />
                                         )
@@ -233,6 +243,11 @@ export default function RightPanel() {
                                     {job.type === 'image' && (
                                         <div className="absolute bottom-0 right-0 bg-blue-500/70 px-1 py-0.5 text-[6px] font-mono text-white uppercase rounded-tl-sm">
                                             IMG
+                                        </div>
+                                    )}
+                                    {['audio', 'tts', 'music'].includes(job.type) && (
+                                        <div className="absolute bottom-0 right-0 bg-orange-500/70 px-1 py-0.5 text-[6px] font-mono text-white uppercase rounded-tl-sm">
+                                            AUD
                                         </div>
                                     )}
                                 </div>
@@ -287,7 +302,7 @@ export default function RightPanel() {
                                                 <div className="absolute top-full right-2 -mt-px w-2 h-2 bg-popover border-r border-b border-border transform rotate-45"></div>
                                             </div>
                                         </div>
-                                        
+
                                         {/* Upscale Button */}
                                         <div className="relative group/tooltip">
                                             <button

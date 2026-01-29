@@ -26,12 +26,14 @@ export default function VideoGenerationForm() {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [isDragOverImage, setIsDragOverImage] = useState(false);
     const [isDragOverVideo, setIsDragOverVideo] = useState(false);
+    const [isDragOverAudio, setIsDragOverAudio] = useState(false);
+    const [isDragOverAudio2, setIsDragOverAudio2] = useState(false);
     const [parameterValues, setParameterValues] = useState<Record<string, any>>({});
     const [isLoadingMedia, setIsLoadingMedia] = useState(false);
     const [showReuseSuccess, setShowReuseSuccess] = useState(false);
     const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
     const formRef = useRef<HTMLDivElement>(null);
-    
+
     // LoRA state
     const [showLoRADialog, setShowLoRADialog] = useState(false);
     const [availableLoras, setAvailableLoras] = useState<LoRAFile[]>([]);
@@ -67,12 +69,12 @@ export default function VideoGenerationForm() {
     // Fetch available LoRAs
     const fetchAvailableLoras = async () => {
         if (!activeWorkspaceId) return;
-        
+
         setIsLoadingLoras(true);
         try {
             const response = await fetch(`/api/lora?workspaceId=${activeWorkspaceId}`);
             const data = await response.json();
-            
+
             if (data.success && data.loras) {
                 setAvailableLoras(data.loras);
             } else {
@@ -111,7 +113,7 @@ export default function VideoGenerationForm() {
     useEffect(() => {
         const handleReuseInput = async (event: CustomEvent) => {
             const { modelId, prompt: jobPrompt, options, type, imageInputPath, videoInputPath, audioInputPath } = event.detail;
-            
+
             // Only handle if it's a video job
             if (type !== 'video') {
                 return;
@@ -132,7 +134,7 @@ export default function VideoGenerationForm() {
 
                 // Parse options safely
                 const parsedOptions = typeof options === 'string' ? JSON.parse(options) : (options || {});
-                
+
                 // Restore LoRA weights for WAN 2.2
                 if (modelId === 'wan22') {
                     if (parsedOptions.lora_high_1_weight !== undefined) setLoraHigh1Weight(parseFloat(parsedOptions.lora_high_1_weight));
@@ -144,7 +146,7 @@ export default function VideoGenerationForm() {
                     if (parsedOptions.lora_high_4_weight !== undefined) setLoraHigh4Weight(parseFloat(parsedOptions.lora_high_4_weight));
                     if (parsedOptions.lora_low_4_weight !== undefined) setLoraLow4Weight(parseFloat(parsedOptions.lora_low_4_weight));
                 }
-                
+
                 // Apply parameter values in parent-first order
                 // First, collect all parameter values from options
                 const allParamValues: Record<string, any> = {};
@@ -161,12 +163,12 @@ export default function VideoGenerationForm() {
                     // Separate parameters into parent and dependent
                     const parentParams: string[] = [];
                     const dependentParams: Array<{ name: string; dependsOn: string }> = [];
-                    
+
                     model.parameters.forEach(param => {
                         if (param.dependsOn) {
-                            dependentParams.push({ 
-                                name: param.name, 
-                                dependsOn: param.dependsOn.parameter 
+                            dependentParams.push({
+                                name: param.name,
+                                dependsOn: param.dependsOn.parameter
                             });
                         } else if (allParamValues[param.name] !== undefined) {
                             parentParams.push(param.name);
@@ -366,7 +368,7 @@ export default function VideoGenerationForm() {
                     const response = await fetch(mediaData.url);
                     const blob = await response.blob();
                     const file = new File([blob], `workspace-${mediaData.id}.png`, { type: 'image/png' });
-                    
+
                     setImageFile(file);
                     setImagePreviewUrl(mediaData.url);
                 }
@@ -396,7 +398,7 @@ export default function VideoGenerationForm() {
                     const response = await fetch(mediaData.url);
                     const blob = await response.blob();
                     const file = new File([blob], `workspace-${mediaData.id}.mp4`, { type: 'video/mp4' });
-                    
+
                     setVideoFile(file);
                     setVideoPreviewUrl(mediaData.url);
                 }
@@ -434,6 +436,66 @@ export default function VideoGenerationForm() {
         setIsDragOverVideo(false);
     };
 
+    const handleAudioDrop = async (e: React.DragEvent, isSecondAudio = false) => {
+        e.preventDefault();
+        if (isSecondAudio) {
+            setIsDragOverAudio2(false);
+        } else {
+            setIsDragOverAudio(false);
+        }
+
+        try {
+            const mediaDataStr = e.dataTransfer.getData('application/json');
+            if (mediaDataStr) {
+                const mediaData = JSON.parse(mediaDataStr);
+                // Accept 'audio', 'tts', and 'music' types as audio
+                const isAudioType = ['audio', 'tts', 'music'].includes(mediaData.type);
+                if (isAudioType && mediaData.url) {
+                    const response = await fetch(mediaData.url);
+                    const blob = await response.blob();
+                    const file = new File([blob], `workspace-${mediaData.id}.mp3`, { type: 'audio/mpeg' });
+
+                    if (isSecondAudio) {
+                        setAudioFile2(file);
+                    } else {
+                        setAudioFile(file);
+                    }
+                }
+                return;
+            }
+
+            const files = Array.from(e.dataTransfer.files);
+            const audioFile = files.find(f => f.type.startsWith('audio/'));
+            if (audioFile) {
+                if (isSecondAudio) {
+                    setAudioFile2(audioFile);
+                } else {
+                    setAudioFile(audioFile);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to handle audio drop:', error);
+        }
+    };
+
+    const handleAudioDragOver = (e: React.DragEvent, isSecondAudio = false) => {
+        e.preventDefault();
+        if (isSecondAudio) {
+            setIsDragOverAudio2(true);
+        } else {
+            setIsDragOverAudio(true);
+        }
+    };
+
+    const handleAudioDragLeave = (e: React.DragEvent, isSecondAudio = false) => {
+        e.preventDefault();
+        if (isSecondAudio) {
+            setIsDragOverAudio2(false);
+        } else {
+            setIsDragOverAudio(false);
+        }
+    };
+
     const [isGenerating, setIsGenerating] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -450,7 +512,7 @@ export default function VideoGenerationForm() {
             formData.append('userId', 'user-with-settings'); // TODO: Get actual user ID
             formData.append('modelId', currentModel.id);
             if (prompt) formData.append('prompt', prompt);
-            
+
             // Add workspace ID from context
             if (activeWorkspaceId) {
                 formData.append('workspaceId', activeWorkspaceId);
@@ -539,12 +601,12 @@ export default function VideoGenerationForm() {
                 });
             } else {
                 console.error('Generation failed', data);
-                setMessage({ type: 'error', text: data.error || 'Generation failed' });
+                setMessage({ type: 'error', text: data.error || t('common.error.generationFailed') });
             }
 
         } catch (error) {
             console.error('Error submitting form:', error);
-            setMessage({ type: 'error', text: 'An unexpected error occurred' });
+            setMessage({ type: 'error', text: t('common.error.generationError') });
         } finally {
             setIsGenerating(false);
         }
@@ -565,7 +627,7 @@ export default function VideoGenerationForm() {
                     </div>
                 </div>
             )}
-            
+
             {/* Model Selector Card */}
             <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{t('generationForm.using')}</Label>
@@ -583,7 +645,7 @@ export default function VideoGenerationForm() {
                             </svg>
                         </div>
                     </button>
-                    
+
                     {isModelDropdownOpen && (
                         <>
                             <div className="fixed inset-0 z-10" onClick={() => setIsModelDropdownOpen(false)} />
@@ -597,11 +659,10 @@ export default function VideoGenerationForm() {
                                                 setSelectedModel(model.id);
                                                 setIsModelDropdownOpen(false);
                                             }}
-                                            className={`w-full flex items-center justify-between px-3 py-2 transition-colors ${
-                                                selectedModel === model.id 
-                                                    ? 'bg-primary/15 text-foreground' 
-                                                    : 'hover:bg-muted/50 text-foreground/80'
-                                            }`}
+                                            className={`w-full flex items-center justify-between px-3 py-2 transition-colors ${selectedModel === model.id
+                                                ? 'bg-primary/15 text-foreground'
+                                                : 'hover:bg-muted/50 text-foreground/80'
+                                                }`}
                                         >
                                             <span className="text-sm font-medium">{model.name}</span>
                                             <div className="flex items-center gap-2">
@@ -645,10 +706,9 @@ export default function VideoGenerationForm() {
                                 </button>
                             </div>
                         ) : (
-                            <div 
-                                className={`border border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer relative ${
-                                    isDragOverImage ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted/20'
-                                }`}
+                            <div
+                                className={`border border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer relative ${isDragOverImage ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted/20'
+                                    }`}
                                 onDrop={handleImageDrop}
                                 onDragOver={handleImageDragOver}
                                 onDragLeave={handleImageDragLeave}
@@ -687,10 +747,9 @@ export default function VideoGenerationForm() {
                                 </button>
                             </div>
                         ) : (
-                            <div 
-                                className={`border border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer relative ${
-                                    isDragOverVideo ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted/20'
-                                }`}
+                            <div
+                                className={`border border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer relative ${isDragOverVideo ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted/20'
+                                    }`}
                                 onDrop={handleVideoDrop}
                                 onDragOver={handleVideoDragOver}
                                 onDragLeave={handleVideoDragLeave}
@@ -736,7 +795,13 @@ export default function VideoGenerationForm() {
                                 <audio controls className="w-full h-8" src={URL.createObjectURL(audioFile)} />
                             </div>
                         ) : (
-                            <div className="border border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer relative border-border hover:bg-muted/20">
+                            <div
+                                className={`border border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer relative ${isDragOverAudio ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted/20'
+                                    }`}
+                                onDrop={(e) => handleAudioDrop(e, false)}
+                                onDragOver={(e) => handleAudioDragOver(e, false)}
+                                onDragLeave={(e) => handleAudioDragLeave(e, false)}
+                            >
                                 <input
                                     type="file"
                                     accept="audio/*"
@@ -746,7 +811,9 @@ export default function VideoGenerationForm() {
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 mx-auto mb-2 text-muted-foreground">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
                                 </svg>
-                                <span className="text-xs text-muted-foreground">{t('generationForm.clickOrDropAudio')}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {isDragOverAudio ? t('generationForm.dropAudioHere') : t('generationForm.clickOrDropAudio')}
+                                </span>
                             </div>
                         )}
                     </div>
@@ -776,7 +843,13 @@ export default function VideoGenerationForm() {
                                 <audio controls className="w-full h-8" src={URL.createObjectURL(audioFile2)} />
                             </div>
                         ) : (
-                            <div className="border border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer relative border-border hover:bg-muted/20">
+                            <div
+                                className={`border border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer relative ${isDragOverAudio2 ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted/20'
+                                    }`}
+                                onDrop={(e) => handleAudioDrop(e, true)}
+                                onDragOver={(e) => handleAudioDragOver(e, true)}
+                                onDragLeave={(e) => handleAudioDragLeave(e, true)}
+                            >
                                 <input
                                     type="file"
                                     accept="audio/*"
@@ -786,7 +859,9 @@ export default function VideoGenerationForm() {
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 mx-auto mb-2 text-muted-foreground">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
                                 </svg>
-                                <span className="text-xs text-muted-foreground">{t('generationForm.clickOrDropAudio')}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {isDragOverAudio2 ? t('generationForm.dropAudioHere') : t('generationForm.clickOrDropAudio')}
+                                </span>
                             </div>
                         )}
                     </div>
@@ -960,7 +1035,7 @@ export default function VideoGenerationForm() {
                                 />
                             </>
                         )}
-                        
+
                         {currentModel.parameters.filter(p => {
                             // Filter out LoRA parameters for WAN 2.2 (handled by LoRAPairSelector)
                             if (currentModel.id === 'wan22' && (

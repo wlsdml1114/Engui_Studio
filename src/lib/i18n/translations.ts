@@ -2,6 +2,41 @@
 
 export const translations = {
   ko: {
+    // Audio Generation
+    audioGeneration: {
+      voiceModel: '보이스 모델',
+      textToSpeech: '텍스트 음성 변환 (TTS)',
+      textPlaceholder: '음성으로 변환할 텍스트를 입력하세요...',
+      voice: '목소리',
+      selectVoice: '목소리 선택...',
+      unknownVoice: '알 수 없는 목소리',
+      generateBtn: '음성 생성',
+      generating: '생성 중...',
+      configureApiKey: '⚠️ 설정 → 일반에서 Eleven Labs API 키를 설정해주세요',
+      errors: {
+        promptRequired: '텍스트 프롬프트를 입력해주세요',
+        invalidModel: '유효하지 않은 모델입니다',
+        apiKeyRequired: '설정에서 Eleven Labs API 키를 설정해주세요',
+        voiceRequired: '목소리를 선택해주세요',
+        unexpected: '예기치 않은 오류가 발생했습니다',
+        generationFailed: '생성 실패'
+      }
+    },
+
+    // Music Generation
+    musicGeneration: {
+      musicModel: '음악 모델',
+      description: '음악 설명',
+      descriptionPlaceholder: '만들고 싶은 음악을 설명하세요 (예: 피아노 멜로디가 있는 경쾌한 일렉트로닉 음악)',
+      duration: '길이 (초)',
+      durationError: '길이는 30초에서 300초 사이여야 합니다',
+      generateBtn: '음악 생성',
+      generating: '음악 생성 중...',
+      errors: {
+        promptRequired: '음악 설명을 입력해주세요'
+      }
+    },
+
     // Settings Page
     settings: {
       title: '설정',
@@ -847,6 +882,7 @@ export const translations = {
       dropVideoHere: '여기에 비디오를 놓으세요',
       clickOrDropVideo: '클릭하거나 비디오를 드래그하세요',
       clickOrDropAudio: '클릭하거나 오디오를 드래그하세요',
+      dropAudioHere: '여기에 오디오를 놓으세요',
       describeYourVideo: '비디오를 설명하세요...',
       describeYourImage: '이미지를 설명하세요...',
       size: '크기',
@@ -861,7 +897,7 @@ export const translations = {
       tabs: {
         image: '이미지',
         video: '비디오',
-        voiceover: '음성',
+        voiceover: '음성 (TTS)',
         music: '음악'
       }
     },
@@ -1034,6 +1070,41 @@ export const translations = {
   },
 
   en: {
+    // Audio Generation
+    audioGeneration: {
+      voiceModel: 'Voice Model',
+      textToSpeech: 'Text to Speech',
+      textPlaceholder: 'Enter text to convert to speech...',
+      voice: 'Voice',
+      selectVoice: 'Select a voice...',
+      unknownVoice: 'Unknown Voice',
+      generateBtn: 'Generate Speech',
+      generating: 'Generating...',
+      configureApiKey: '⚠️ Please configure Eleven Labs API key in Settings → General',
+      errors: {
+        promptRequired: 'Please enter a text prompt',
+        invalidModel: 'Invalid model selected',
+        apiKeyRequired: 'Please configure Eleven Labs API key in settings',
+        voiceRequired: 'Please select a voice',
+        unexpected: 'An unexpected error occurred',
+        generationFailed: 'Generation failed'
+      }
+    },
+
+    // Music Generation
+    musicGeneration: {
+      musicModel: 'Music Model',
+      description: 'Music Description',
+      descriptionPlaceholder: "Describe the music you want to create (e.g., 'upbeat electronic music with piano melody')",
+      duration: 'Duration (seconds)',
+      durationError: 'Duration must be between 30 and 300 seconds',
+      generateBtn: 'Generate Music',
+      generating: 'Generating Music...',
+      errors: {
+        promptRequired: 'Please enter a music prompt'
+      }
+    },
+
     // Settings Page
     settings: {
       title: 'Settings',
@@ -1880,6 +1951,7 @@ export const translations = {
       dropVideoHere: 'Drop video here',
       clickOrDropVideo: 'Click or drop video',
       clickOrDropAudio: 'Click or drop audio',
+      dropAudioHere: 'Drop audio here',
       describeYourVideo: 'Describe your video...',
       describeYourImage: 'Describe your image...',
       size: 'Size',
