@@ -12,7 +12,17 @@ import {
   SkipForward,
   ChevronsLeft,
   ChevronsRight,
+  Plus,
+  Video,
+  Music,
+  Mic,
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 10;
@@ -33,8 +43,22 @@ export const TimelineControls = React.memo(function TimelineControls({
   className,
   ...props
 }: TimelineControlsProps) {
-  const { player, playerState, setPlayerState, setCurrentTimestamp } = useStudio();
+  const { player, playerState, setPlayerState, setCurrentTimestamp, addTrack, currentProject } = useStudio();
   const { t } = useI18n();
+
+  const handleAddTrack = useCallback(async (type: 'video' | 'audio') => {
+    if (!currentProject) return;
+
+    await addTrack({
+      projectId: currentProject.id,
+      type,
+      label: type === 'video' ? 'Video Track' : 'Audio Track',
+      locked: false,
+      muted: false,
+      order: 0, // Order is handled by backend or reducer usually, but providing 0 is safe
+      volume: 100
+    });
+  }, [addTrack, currentProject]);
 
   // Format time as MM:SS.ms - memoized
   const formatTime = useCallback((seconds: number): string => {
@@ -254,7 +278,33 @@ export const TimelineControls = React.memo(function TimelineControls({
       </div>
 
       {/* Empty spacer for balance */}
-      <div className="w-[150px]" />
+      {/* Track Controls */}
+      <div className="flex items-center gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 bg-zinc-800 border-zinc-700 hover:bg-zinc-700">
+              <Plus className="h-3.5 w-3.5" />
+              <span className="text-xs">{t('videoEditor.tracks.addTrack')}</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48 bg-zinc-900 border-zinc-800">
+            <DropdownMenuItem
+              className="cursor-pointer focus:bg-zinc-800 focus:text-white"
+              onClick={() => handleAddTrack('video')}
+            >
+              <Video className="mr-2 h-4 w-4" />
+              <span>{t('videoEditor.tracks.addVideoTrack')}</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer focus:bg-zinc-800 focus:text-white"
+              onClick={() => handleAddTrack('audio')}
+            >
+              <Music className="mr-2 h-4 w-4" />
+              <span>{t('videoEditor.tracks.addAudioTrack')}</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </div>
   );
 });

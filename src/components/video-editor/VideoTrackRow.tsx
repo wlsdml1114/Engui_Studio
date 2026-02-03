@@ -11,6 +11,7 @@ const trackIcons = {
   video: VideoIcon,
   music: MusicIcon,
   voiceover: MicIcon,
+  audio: MusicIcon,
 };
 
 type VideoTrackRowProps = {
@@ -33,7 +34,14 @@ export const VideoTrackRow = React.memo(function VideoTrackRow({
   const trackRowRef = useRef<HTMLDivElement>(null);
 
   // Check if this track can accept audio drops (for visual styling)
-  const canAcceptAudioDrop = track.type === 'music' || track.type === 'voiceover';
+  const canAcceptAudioDrop = track.type === 'music' || track.type === 'voiceover' || track.type === 'audio';
+  const { removeTrack } = useStudio();
+
+  const handleRemoveTrack = useCallback(() => {
+    if (confirm('Are you sure you want to delete this track?')) {
+      removeTrack(track.id);
+    }
+  }, [removeTrack, track.id]);
 
   return (
     <div className="flex flex-col">
@@ -42,15 +50,29 @@ export const VideoTrackRow = React.memo(function VideoTrackRow({
         ref={trackRowRef}
         className={cn(
           'relative w-full timeline-container h-16',
-          'flex flex-col select-none rounded shrink-0',
-          // Add subtle background for audio tracks to show drop zone
-          canAcceptAudioDrop ? 'bg-white/5' : 'bg-transparent',
+          'flex flex-col select-none rounded shrink-0 group',
+          // Add subtle background for tracks to distinguish lanes
+          track.type === 'video' ? 'bg-sky-500/10 border-l-4 border-l-sky-500/20' :
+            'bg-teal-500/10 border-l-4 border-l-teal-500/20',
           className
         )}
         data-track-id={track.id}
         data-track-type={track.type}
         {...props}
       >
+        <div className="sticky left-2 z-10 w-6 h-6 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRemoveTrack();
+            }}
+            className="w-6 h-6 flex items-center justify-center rounded-full bg-red-500/20 hover:bg-red-500 text-red-200 hover:text-white transition-colors"
+            title="Delete Track"
+          >
+            <TrashIcon className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
         {(keyframes || []).map((frame) => (
           <VideoTrackView
             key={frame.id}
@@ -126,7 +148,7 @@ export const VideoTrackView = React.memo(function VideoTrackView({
   }, [frame.data]);
 
   const isAudio = useMemo(() =>
-    frame.data.type === 'music' || frame.data.type === 'voiceover',
+    frame.data.type === 'music' || frame.data.type === 'voiceover' || (frame.data.type as string) === 'audio',
     [frame.data.type]
   );
 
@@ -218,7 +240,7 @@ export const VideoTrackView = React.memo(function VideoTrackView({
           const hoveredTrackType = trackRowElement.getAttribute('data-track-type');
 
           // Only allow moving to audio tracks
-          if (hoveredTrackId && (hoveredTrackType === 'music' || hoveredTrackType === 'voiceover')) {
+          if (hoveredTrackId && (hoveredTrackType === 'music' || hoveredTrackType === 'voiceover' || hoveredTrackType === 'audio')) {
             targetTrackId = hoveredTrackId;
             // Visual feedback - highlight the target track
             trackRowElement.classList.add('ring-2', 'ring-blue-500');
@@ -380,8 +402,7 @@ export const VideoTrackView = React.memo(function VideoTrackView({
           'flex flex-col select-none rounded overflow-hidden group h-full',
           {
             'bg-sky-600': track.type === 'video',
-            'bg-teal-500': track.type === 'music',
-            'bg-indigo-500': track.type === 'voiceover',
+            'bg-teal-500': track.type === 'music' || track.type === 'voiceover' || track.type === 'audio',
           },
         )}
       >
@@ -430,7 +451,7 @@ export const VideoTrackView = React.memo(function VideoTrackView({
                 url={frame.data.url}
                 width={Math.max(50, clipWidth - 20)}
                 height={36}
-                color={track.type === 'music' ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.6)'}
+                color={'rgba(255, 255, 255, 0.5)'}
                 clipDuration={frame.duration}
                 originalDuration={frame.data.originalDuration}
                 volume={frame.data.volume ?? track.volume ?? 100}

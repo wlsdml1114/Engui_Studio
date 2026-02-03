@@ -95,7 +95,7 @@ export interface VideoProject {
 export interface VideoTrack {
     id: string;
     projectId: string;
-    type: 'video' | 'music' | 'voiceover';
+    type: 'video' | 'audio' | 'music' | 'voiceover';
     label: string;
     locked: boolean;
     order: number;

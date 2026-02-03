@@ -143,19 +143,20 @@ export const VideoTimeline = React.memo(function VideoTimeline({
 
   const getTrackIdForMediaType = useCallback(async (mediaType: string): Promise<string> => {
     // Map media type to track type
-    let trackType: 'video' | 'music' | 'voiceover';
-    if (mediaType === 'image' || mediaType === 'video') {
-      trackType = 'video';
-    } else if (mediaType === 'music') {
-      trackType = 'music';
-    } else if (mediaType === 'tts' || mediaType === 'voiceover') {
-      trackType = 'voiceover';
-    } else {
-      trackType = 'voiceover'; // fallback
-    }
+    // Map media type to track type
+    const isVideoType = mediaType === 'image' || mediaType === 'video';
+    const targetTrackType = isVideoType ? 'video' : 'audio';
 
     // Find existing track of this type
-    const existingTrack = tracks.find(t => t.type === trackType);
+    // For audio, we allow dropping on audio, music, or voiceover tracks
+    const existingTrack = tracks.find(t => {
+      if (isVideoType) {
+        return t.type === 'video';
+      } else {
+        return t.type === 'audio' || t.type === 'music' || t.type === 'voiceover';
+      }
+    });
+
     if (existingTrack) {
       return existingTrack.id;
     }
@@ -163,8 +164,8 @@ export const VideoTimeline = React.memo(function VideoTimeline({
     // Create new track
     const trackId = await addTrack({
       projectId: project.id,
-      type: trackType,
-      label: `${trackType.charAt(0).toUpperCase() + trackType.slice(1)} Track`,
+      type: targetTrackType,
+      label: isVideoType ? 'Video Track' : 'Audio Track',
       locked: false,
       order: tracks.length,
       volume: 100, // Default volume
