@@ -35,7 +35,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
   className,
   ...props
 }: VideoTimelineProps) {
-  const { setCurrentTimestamp, addKeyframe, addTrack, updateKeyframe, removeKeyframe, player, setZoom, clearSelection } = useStudio();
+  const { setCurrentTimestamp, addKeyframe, addTrack, updateKeyframe, removeKeyframe, player, setZoom, clearSelection, updateProject } = useStudio();
   const { t } = useI18n();
   const timelineRef = useRef<HTMLDivElement>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -46,6 +46,14 @@ export const VideoTimeline = React.memo(function VideoTimeline({
   const pixelsPerSecond = useMemo(() => BASE_PIXELS_PER_SECOND * zoom, [zoom]);
   const timelineWidth = useMemo(() => pixelsPerSecond * durationSeconds, [pixelsPerSecond, durationSeconds]);
   const pixelsPerMs = useMemo(() => pixelsPerSecond / 1000, [pixelsPerSecond]);
+
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  // Calculate actual display width (max of content and container)
+  const displayWidth = useMemo(() => Math.max(timelineWidth, containerWidth), [timelineWidth, containerWidth]);
+
+  // Calculate visual duration for Ruler to match the stretched width
+  const visualDuration = useMemo(() => displayWidth / pixelsPerSecond, [displayWidth, pixelsPerSecond]);
 
   // Sort tracks by type order - memoized
   const sortedTracks = useMemo(() => {
@@ -65,6 +73,32 @@ export const VideoTimeline = React.memo(function VideoTimeline({
     [currentTimestamp, pixelsPerSecond]
   );
 
+  // Auto-expand timeline duration based on content
+  useEffect(() => {
+    if (!project) return;
+
+    const bufferMs = 60000; // 60 seconds buffer to allow "infinite" feel
+    const minDurationMs = 60000; // 60 seconds minimum base
+
+    // Find the end time of the last keyframe
+    let maxContentTime = 0;
+    Object.values(keyframes).flat().forEach(kf => {
+      const outputEnd = kf.timestamp + kf.duration;
+      if (outputEnd > maxContentTime) {
+        maxContentTime = outputEnd;
+      }
+    });
+
+    // Desired duration is content end + buffer
+    const desiredDuration = Math.max(minDurationMs, maxContentTime + bufferMs);
+
+    // Only update if difference is significant (> 1s) to prevent jitter/loops
+    if (Math.abs(project.duration - desiredDuration) > 1000) {
+      // console.log('VideoTimeline: Auto-expanding duration from', project.duration, 'to', desiredDuration);
+      updateProject(project.id, { duration: desiredDuration });
+    }
+  }, [keyframes, project.duration, project.id, updateProject]);
+
   const handleTimelineClick = useCallback((event: MouseEvent<HTMLDivElement>) => {
     const rect = timelineRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -72,16 +106,17 @@ export const VideoTimeline = React.memo(function VideoTimeline({
     // Check if click was on empty space (not on a keyframe)
     const target = event.target as HTMLElement;
     const isKeyframeClick = target.closest('[aria-checked]');
-    
+
     // Clear selection when clicking on empty space
     if (!isKeyframeClick) {
       clearSelection();
     }
 
-    const relativeX = event.clientX - rect.left;
+    const scrollLeft = timelineRef.current?.scrollLeft || 0;
+    const relativeX = (event.clientX - rect.left) + scrollLeft;
     // Convert pixels to seconds
     const timestamp = relativeX / pixelsPerSecond;
-    
+
     // Clamp timestamp to valid range
     const clampedTimestamp = Math.max(0, Math.min(durationSeconds, timestamp));
     setCurrentTimestamp(clampedTimestamp);
@@ -92,19 +127,36 @@ export const VideoTimeline = React.memo(function VideoTimeline({
     }
   }, [pixelsPerSecond, durationSeconds, setCurrentTimestamp, player, clearSelection]);
 
+  // Observer for container width
+  useEffect(() => {
+    if (!timelineRef.current) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+
+    observer.observe(timelineRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   const getTrackIdForMediaType = useCallback(async (mediaType: string): Promise<string> => {
     // Map media type to track type
-    let trackType: 'video' | 'music' | 'voiceover';
-    if (mediaType === 'image' || mediaType === 'video') {
-      trackType = 'video';
-    } else if (mediaType === 'music') {
-      trackType = 'music';
-    } else {
-      trackType = 'voiceover';
-    }
+    // Map media type to track type
+    const isVideoType = mediaType === 'image' || mediaType === 'video';
+    const targetTrackType = isVideoType ? 'video' : 'audio';
 
     // Find existing track of this type
-    const existingTrack = tracks.find(t => t.type === trackType);
+    // For audio, we allow dropping on audio, music, or voiceover tracks
+    const existingTrack = tracks.find(t => {
+      if (isVideoType) {
+        return t.type === 'video';
+      } else {
+        return t.type === 'audio' || t.type === 'music' || t.type === 'voiceover';
+      }
+    });
+
     if (existingTrack) {
       return existingTrack.id;
     }
@@ -112,8 +164,8 @@ export const VideoTimeline = React.memo(function VideoTimeline({
     // Create new track
     const trackId = await addTrack({
       projectId: project.id,
-      type: trackType,
-      label: `${trackType.charAt(0).toUpperCase() + trackType.slice(1)} Track`,
+      type: targetTrackType,
+      label: isVideoType ? 'Video Track' : 'Audio Track',
       locked: false,
       order: tracks.length,
       volume: 100, // Default volume
@@ -128,10 +180,10 @@ export const VideoTimeline = React.memo(function VideoTimeline({
     return new Promise((resolve) => {
       const TIMEOUT_MS = 15000; // Increased timeout for blob URLs
       let resolved = false;
-      
+
       // Normalize URL to handle relative paths (especially on Windows)
       const normalizedUrl = normalizeUrl(url);
-      
+
       const resolveOnce = (duration: number, source: string) => {
         if (!resolved) {
           resolved = true;
@@ -139,17 +191,17 @@ export const VideoTimeline = React.memo(function VideoTimeline({
           resolve(duration);
         }
       };
-      
+
       // Timeout fallback
       const timeoutId = setTimeout(() => {
         console.warn(`Media duration detection timed out for: ${normalizedUrl}`);
         resolveOnce(5000, 'timeout');
       }, TIMEOUT_MS);
-      
+
       if (type === 'music' || type === 'voiceover') {
         const audio = new Audio();
         audio.preload = 'auto'; // Changed from 'metadata' to 'auto' for better blob URL support
-        
+
         // Try multiple events for duration detection
         const handleDurationChange = () => {
           if (audio.duration && isFinite(audio.duration) && audio.duration > 0) {
@@ -158,7 +210,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
             resolveOnce(durationMs, 'durationchange');
           }
         };
-        
+
         const handleLoadedMetadata = () => {
           if (audio.duration && isFinite(audio.duration) && audio.duration > 0) {
             clearTimeout(timeoutId);
@@ -166,7 +218,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
             resolveOnce(durationMs, 'loadedmetadata');
           }
         };
-        
+
         const handleCanPlayThrough = () => {
           if (audio.duration && isFinite(audio.duration) && audio.duration > 0) {
             clearTimeout(timeoutId);
@@ -174,18 +226,18 @@ export const VideoTimeline = React.memo(function VideoTimeline({
             resolveOnce(durationMs, 'canplaythrough');
           }
         };
-        
+
         audio.addEventListener('durationchange', handleDurationChange);
         audio.addEventListener('loadedmetadata', handleLoadedMetadata);
         audio.addEventListener('canplaythrough', handleCanPlayThrough);
         audio.addEventListener('loadeddata', handleCanPlayThrough);
-        
+
         audio.addEventListener('error', (e) => {
           clearTimeout(timeoutId);
           console.error('Audio duration detection error:', e);
           resolveOnce(5000, 'error');
         });
-        
+
         audio.src = normalizedUrl;
         // Force load for some browsers (skip in test environment where load() is not implemented)
         if (typeof audio.load === 'function') {
@@ -198,7 +250,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
       } else if (type === 'video') {
         const video = document.createElement('video');
         video.preload = 'auto'; // Changed from 'metadata' to 'auto'
-        
+
         const handleDurationChange = () => {
           if (video.duration && isFinite(video.duration) && video.duration > 0) {
             clearTimeout(timeoutId);
@@ -206,7 +258,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
             resolveOnce(durationMs, 'durationchange');
           }
         };
-        
+
         const handleLoadedMetadata = () => {
           if (video.duration && isFinite(video.duration) && video.duration > 0) {
             clearTimeout(timeoutId);
@@ -214,7 +266,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
             resolveOnce(durationMs, 'loadedmetadata');
           }
         };
-        
+
         const handleCanPlayThrough = () => {
           if (video.duration && isFinite(video.duration) && video.duration > 0) {
             clearTimeout(timeoutId);
@@ -222,18 +274,18 @@ export const VideoTimeline = React.memo(function VideoTimeline({
             resolveOnce(durationMs, 'canplaythrough');
           }
         };
-        
+
         video.addEventListener('durationchange', handleDurationChange);
         video.addEventListener('loadedmetadata', handleLoadedMetadata);
         video.addEventListener('canplaythrough', handleCanPlayThrough);
         video.addEventListener('loadeddata', handleCanPlayThrough);
-        
+
         video.addEventListener('error', (e) => {
           clearTimeout(timeoutId);
           console.error('Video duration detection error:', e);
           resolveOnce(5000, 'error');
         });
-        
+
         video.src = normalizedUrl;
         // Force load for some browsers (skip in test environment where load() is not implemented)
         if (typeof video.load === 'function') {
@@ -254,7 +306,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
     event.preventDefault();
     setValidationError(null);
     setNotification(null);
-    
+
     try {
       const mediaDataStr = event.dataTransfer.getData('application/json');
       if (!mediaDataStr) return;
@@ -272,17 +324,20 @@ export const VideoTimeline = React.memo(function VideoTimeline({
       const mediaUrl = rawMediaUrl ? normalizeUrl(rawMediaUrl) : null;
       const mediaId = rawMediaData.id || rawMediaData.jobId || `media-${Date.now()}`;
       const mediaName = rawMediaData.prompt || rawMediaData.audioName || rawMediaData.name || '';
-      
-      // Map 'audio' type to 'music' - user can drag to voiceover track later
+
+      // Map 'audio' to 'music', and 'tts' to 'voiceover'
       let normalizedType: 'image' | 'video' | 'music' | 'voiceover' = mediaType;
       if (mediaType === 'audio') {
         normalizedType = 'music';
+      } else if (mediaType === 'tts') {
+        normalizedType = 'voiceover';
       }
-      
+
       console.log('Drop data normalized:', { mediaType, normalizedType, mediaUrl, rawMediaUrl, mediaId, mediaName });
 
-      const relativeX = event.clientX - rect.left;
-      const timestamp = Math.max(0, (relativeX / timelineWidth) * durationSeconds * 1000);
+      const scrollLeft = timelineRef.current?.scrollLeft || 0;
+      const relativeX = (event.clientX - rect.left) + scrollLeft;
+      const timestamp = Math.max(0, (relativeX / displayWidth) * visualDuration * 1000);
 
       // Get or create appropriate track
       const trackId = await getTrackIdForMediaType(normalizedType);
@@ -291,7 +346,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
       // This ensures the keyframe duration matches the actual media length
       let duration: number;
       let originalDuration: number;
-      
+
       if (mediaUrl && (normalizedType === 'music' || normalizedType === 'voiceover' || normalizedType === 'video')) {
         // For audio and video, always detect duration from the actual file
         console.log(`Detecting duration for ${normalizedType} from: ${mediaUrl}`);
@@ -316,7 +371,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
         data: {
           type: normalizedType,
           mediaId: mediaId,
-          url: mediaUrl,
+          url: mediaUrl || '',
           prompt: rawMediaData.prompt,
           originalDuration, // Store original duration for waveform scaling
         },
@@ -336,7 +391,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
       if (normalizedType === 'video' && mediaUrl) {
         // Skip audio processing for blob URLs (browser-only, can't be processed server-side)
         const isBlobUrl = mediaUrl.startsWith('blob:');
-        
+
         if (isBlobUrl) {
           console.log('Blob URL detected, skipping server-side audio processing:', mediaUrl);
           // For blob URLs, use client-side detection only
@@ -373,88 +428,88 @@ export const VideoTimeline = React.memo(function VideoTimeline({
               // Fallback to client-side detection
               hasAudio = await hasAudioTrack(mediaUrl);
             }
-          
-          if (hasAudio) {
-            console.log('Video has audio, creating muted version...');
-            // Create muted version of the video for the video track
-            const mutedResponse = await fetch('/api/video-tracks/create-muted', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ videoPath: mediaUrl }),
-            });
 
-            if (mutedResponse.ok) {
-              const { mutedVideoPath } = await mutedResponse.json();
-              console.log('[VideoTimeline] Received mutedVideoPath from API:', mutedVideoPath);
+            if (hasAudio) {
+              console.log('Video has audio, creating muted version...');
+              // Create muted version of the video for the video track
+              const mutedResponse = await fetch('/api/video-tracks/create-muted', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ videoPath: mediaUrl }),
+              });
+
+              if (mutedResponse.ok) {
+                const { mutedVideoPath } = await mutedResponse.json();
+                console.log('[VideoTimeline] Received mutedVideoPath from API:', mutedVideoPath);
+                // Normalize URL to handle relative paths (especially on Windows)
+                finalVideoUrl = normalizeUrl(mutedVideoPath);
+                console.log('[VideoTimeline] Normalized mutedVideoPath:', finalVideoUrl);
+                console.log('✓ Using muted video for video track:', finalVideoUrl);
+              } else {
+                const errorData = await mutedResponse.json();
+                console.error('Failed to create muted video:', errorData);
+                console.warn('Using original video with audio');
+              }
+
+              console.log('Extracting audio from video...');
+
+              // Extract audio asynchronously
+              // Note: This requires server-side API call since FFmpeg runs on server
+              const audioResponse = await fetch('/api/video-tracks/extract-audio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ videoPath: mediaUrl }),
+              });
+
+              if (!audioResponse.ok) {
+                throw new Error('Failed to extract audio from video');
+              }
+
+              const { audioPath } = await audioResponse.json();
+              console.log('[VideoTimeline] Received audioPath from API:', audioPath);
               // Normalize URL to handle relative paths (especially on Windows)
-              finalVideoUrl = normalizeUrl(mutedVideoPath);
-              console.log('[VideoTimeline] Normalized mutedVideoPath:', finalVideoUrl);
-              console.log('✓ Using muted video for video track:', finalVideoUrl);
-            } else {
-              const errorData = await mutedResponse.json();
-              console.error('Failed to create muted video:', errorData);
-              console.warn('Using original video with audio');
-            }
+              const normalizedAudioPath = normalizeUrl(audioPath);
+              console.log('[VideoTimeline] Normalized audioPath:', normalizedAudioPath);
+              console.log('✓ Audio extracted:', normalizedAudioPath);
 
-            console.log('Extracting audio from video...');
-
-            // Extract audio asynchronously
-            // Note: This requires server-side API call since FFmpeg runs on server
-            const audioResponse = await fetch('/api/video-tracks/extract-audio', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ videoPath: mediaUrl }),
-            });
-
-            if (!audioResponse.ok) {
-              throw new Error('Failed to extract audio from video');
-            }
-
-            const { audioPath } = await audioResponse.json();
-            console.log('[VideoTimeline] Received audioPath from API:', audioPath);
-            // Normalize URL to handle relative paths (especially on Windows)
-            const normalizedAudioPath = normalizeUrl(audioPath);
-            console.log('[VideoTimeline] Normalized audioPath:', normalizedAudioPath);
-            console.log('✓ Audio extracted:', normalizedAudioPath);
-            
-            // Find available audio track
-            const audioTrackId = findAvailableAudioTrack(
-              tracks,
-              keyframes,
-              timestamp,
-              duration
-            );
-            
-            console.log('Available audio track:', audioTrackId);
-            
-            if (audioTrackId) {
-              // Determine track type for audio keyframe
-              const audioTrack = tracks.find(t => t.id === audioTrackId);
-              const audioType = audioTrack?.type === 'voiceover' ? 'voiceover' : 'music';
-              
-              // Add synchronized audio keyframe
-              await addKeyframe({
-                trackId: audioTrackId,
+              // Find available audio track
+              const audioTrackId = findAvailableAudioTrack(
+                tracks,
+                keyframes,
                 timestamp,
-                duration,
-                data: {
-                  type: audioType,
-                  mediaId: `${mediaId}-audio`,
-                  url: normalizedAudioPath,
-                  prompt: `${mediaName} (audio)`,
-                  originalDuration: duration,
-                },
-              });
-              
-              console.log('✓ Audio keyframe added to track:', audioTrackId);
-            } else {
-              console.warn('No available audio track found');
-              // Show warning notification
-              setNotification({
-                message: 'No available audio track for extracted audio',
-                type: 'warning',
-              });
-            }
+                duration
+              );
+
+              console.log('Available audio track:', audioTrackId);
+
+              if (audioTrackId) {
+                // Determine track type for audio keyframe
+                const audioTrack = tracks.find(t => t.id === audioTrackId);
+                const audioType = audioTrack?.type === 'voiceover' ? 'voiceover' : 'music';
+
+                // Add synchronized audio keyframe
+                await addKeyframe({
+                  trackId: audioTrackId,
+                  timestamp,
+                  duration,
+                  data: {
+                    type: audioType,
+                    mediaId: `${mediaId}-audio`,
+                    url: normalizedAudioPath,
+                    prompt: `${mediaName} (audio)`,
+                    originalDuration: duration,
+                  },
+                });
+
+                console.log('✓ Audio keyframe added to track:', audioTrackId);
+              } else {
+                console.warn('No available audio track found');
+                // Show warning notification
+                setNotification({
+                  message: 'No available audio track for extracted audio',
+                  type: 'warning',
+                });
+              }
             } else {
               console.log('Video has no audio, skipping extraction');
             }
@@ -470,7 +525,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
       }
 
       // Update keyframe data with final video URL (muted if audio was present)
-      keyframeData.data.url = finalVideoUrl;
+      keyframeData.data.url = finalVideoUrl || '';
 
       // Add video keyframe with muted video URL if audio was present
       await addKeyframe(keyframeData);
@@ -479,7 +534,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
       setValidationError(errorMessage);
       console.error('Failed to handle drop:', error);
     }
-  }, [timelineWidth, durationSeconds, getTrackIdForMediaType, addKeyframe, getMediaDuration, tracks, keyframes]);
+  }, [displayWidth, visualDuration, getTrackIdForMediaType, addKeyframe, getMediaDuration, tracks, keyframes]);
 
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -491,7 +546,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
     // Find the keyframe in all tracks
     let sourceKeyframe: VideoKeyFrame | null = null;
     let sourceTrackId: string | null = null;
-    
+
     for (const [trackId, trackKeyframes] of Object.entries(keyframes)) {
       const found = trackKeyframes.find(kf => kf.id === keyframeId);
       if (found) {
@@ -500,12 +555,12 @@ export const VideoTimeline = React.memo(function VideoTimeline({
         break;
       }
     }
-    
+
     if (!sourceKeyframe || !sourceTrackId) {
       console.warn('Source keyframe not found:', keyframeId);
       return;
     }
-    
+
     // If same track, just update timestamp (position change within track)
     if (sourceTrackId === targetTrackId) {
       if (Math.round(timestamp) !== sourceKeyframe.timestamp) {
@@ -514,17 +569,17 @@ export const VideoTimeline = React.memo(function VideoTimeline({
       }
       return;
     }
-    
+
     // Get target track to update media type
     const targetTrack = tracks.find(t => t.id === targetTrackId);
     if (!targetTrack) {
       console.warn('Target track not found:', targetTrackId);
       return;
     }
-    
+
     // Update the keyframe's trackId and media type
     const newMediaType = targetTrack.type === 'voiceover' ? 'voiceover' : 'music';
-    
+
     // Remove from source and add to target
     await removeKeyframe(keyframeId);
     await addKeyframe({
@@ -536,7 +591,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
         type: newMediaType,
       },
     });
-    
+
     console.log(`Moved keyframe ${keyframeId} from ${sourceTrackId} to ${targetTrackId} at ${timestamp}ms`);
   }, [keyframes, tracks, removeKeyframe, addKeyframe, updateKeyframe]);
 
@@ -553,18 +608,56 @@ export const VideoTimeline = React.memo(function VideoTimeline({
     }
   }, []);
 
+  // Handle playhead dragging
+  const handlePlayheadMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const timelineEl = timelineRef.current;
+    if (!timelineEl) return;
+
+    const startX = e.clientX;
+    const rect = timelineEl.getBoundingClientRect();
+
+    // We want to continue tracking mouse anywhere
+    const handleMouseMove = (moveEvent: globalThis.MouseEvent) => {
+      // Calculate relative position including scroll
+      const scrollLeft = timelineEl.scrollLeft || 0;
+      const relativeX = (moveEvent.clientX - rect.left) + scrollLeft;
+
+      // Convert to timestamp
+      const timestamp = Math.max(0, relativeX / pixelsPerSecond);
+
+      // Update timestamp
+      setCurrentTimestamp(timestamp);
+
+      // Seek player
+      if (player && typeof player.seekTo === 'function') {
+        player.seekTo(Math.floor(timestamp * 30)); // 30fps assumption
+      }
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [pixelsPerSecond, player, setCurrentTimestamp]);
+
   // Handle wheel zoom (Alt+Wheel or Ctrl+Wheel for mouse, pinch for trackpad)
   const handleWheel = useCallback((event: WheelEvent) => {
     // Check if Alt or Ctrl is pressed (for mouse wheel zoom)
     // Or if it's a pinch gesture (ctrlKey is true for trackpad pinch on macOS)
     if (event.altKey || event.ctrlKey) {
       event.preventDefault();
-      
+
       // Calculate zoom delta
       // For trackpad pinch, deltaY is typically smaller and smoother
       // For mouse wheel, deltaY is larger (usually 100 or -100)
       const delta = -event.deltaY * ZOOM_SENSITIVITY;
-      
+
       // Apply zoom with exponential scaling for smoother feel
       const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * (1 + delta)));
       setZoom(newZoom);
@@ -647,7 +740,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
     >
       {/* Validation Error Display */}
       {validationError && (
-        <div 
+        <div
           className="bg-destructive/10 border-l-4 border-destructive p-3 flex items-start gap-2"
           role="alert"
           aria-live="assertive"
@@ -669,7 +762,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
 
       {/* Notification Display */}
       {notification && (
-        <div 
+        <div
           className={cn(
             "border-l-4 p-3 flex items-start gap-2",
             notification.type === 'success' && "bg-green-500/10 border-green-500",
@@ -679,14 +772,14 @@ export const VideoTimeline = React.memo(function VideoTimeline({
           role="status"
           aria-live="polite"
         >
-          <AlertCircle 
+          <AlertCircle
             className={cn(
               "w-5 h-5 flex-shrink-0 mt-0.5",
               notification.type === 'success' && "text-green-500",
               notification.type === 'warning' && "text-yellow-500",
               notification.type === 'error' && "text-destructive"
-            )} 
-            aria-hidden="true" 
+            )}
+            aria-hidden="true"
           />
           <div className="flex-1">
             <p className={cn(
@@ -720,7 +813,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
         zoom={zoom}
         onZoomChange={setZoom}
       />
-      
+
       <div
         ref={timelineRef}
         className="relative overflow-x-auto overflow-y-auto flex-1"
@@ -733,25 +826,32 @@ export const VideoTimeline = React.memo(function VideoTimeline({
         tabIndex={0}
         aria-describedby="timeline-instructions"
       >
-        {/* Timeline content wrapper */}
-        <div className="relative" style={{ width: timelineWidth, minHeight: `${32 + (sortedTracks.length * 68) + 12}px` }}>
+        <div className="relative" style={{ width: displayWidth, minWidth: '100%', minHeight: `${32 + (sortedTracks.length * 68) + 12}px` }}>
           {/* Timeline Ruler - Fixed height area above tracks */}
           <div className="sticky top-0 z-50 bg-zinc-900 border-b border-zinc-700" style={{ height: '32px' }}>
             <TimelineRuler
-              duration={durationSeconds}
+              duration={visualDuration}
               zoom={zoom}
-              timelineWidth={timelineWidth}
+              timelineWidth={displayWidth}
             />
           </div>
 
-          {/* Playhead indicator */}
+          {/* Playhead indicator - Draggable */}
           <div
-            className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-30 pointer-events-none"
+            className="absolute top-0 bottom-0 z-30 flex justify-center w-4 -ml-2 cursor-ew-resize group touch-none"
             style={{ left: `${playheadPosition}px` }}
-            role="presentation"
+            onMouseDown={handlePlayheadMouseDown}
+            role="slider"
+            aria-valuenow={currentTimestamp}
+            aria-valuemin={0}
+            aria-valuemax={durationSeconds}
             aria-label={t('videoEditor.messages.playheadAt', { time: formatTime(currentTimestamp) })}
+            tabIndex={0}
           >
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3 h-3 bg-red-500 rounded-full" aria-hidden="true" />
+            {/* Visual line */}
+            <div className="w-0.5 h-full bg-red-500 pointer-events-none group-hover:bg-red-400 transition-colors" />
+            {/* Knob */}
+            <div className="absolute top-0 w-3 h-3 bg-red-500 rounded-full pointer-events-none group-hover:bg-red-400 transition-colors shadow-sm" />
           </div>
 
           {/* Track rows - positioned below ruler */}
@@ -771,7 +871,7 @@ export const VideoTimeline = React.memo(function VideoTimeline({
 
           {/* Empty state */}
           {sortedTracks.length === 0 && (
-            <div 
+            <div
               className="absolute inset-0 flex items-center justify-center text-muted-foreground pt-8"
               role="status"
             >

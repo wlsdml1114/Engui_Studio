@@ -27,6 +27,8 @@ const VideoEditorViewInternal = React.memo(function VideoEditorViewInternal({ pr
     setPlayer,
     setPlayerState,
     setCurrentTimestamp,
+    undo,
+    redo,
   } = useStudio();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -49,14 +51,34 @@ const VideoEditorViewInternal = React.memo(function VideoEditorViewInternal({ pr
 
     loadProjectData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadProjectData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]); // Only re-run when projectId changes, not when loadProject reference changes
+
+  // Undo/Redo Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check for Ctrl+Z or Cmd+Z
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
 
   // Note: Tracks are no longer auto-created. Use Import or Add Media to create tracks.
 
   // Loading state - show first
   if (isLoading) {
     return (
-      <div 
+      <div
         className={cn('flex flex-col h-full items-center justify-center', className)}
         role="status"
         aria-live="polite"
@@ -73,7 +95,7 @@ const VideoEditorViewInternal = React.memo(function VideoEditorViewInternal({ pr
   // Error state - check before project not found
   if (error) {
     return (
-      <div 
+      <div
         className={cn('flex flex-col h-full items-center justify-center', className)}
         role="alert"
         aria-live="assertive"
@@ -115,7 +137,7 @@ const VideoEditorViewInternal = React.memo(function VideoEditorViewInternal({ pr
 
   // Main editor view
   return (
-    <div 
+    <div
       className={cn('flex flex-col h-full bg-background overflow-hidden', className)}
       role="application"
       aria-label="Video editor"
@@ -128,7 +150,7 @@ const VideoEditorViewInternal = React.memo(function VideoEditorViewInternal({ pr
         {/* Preview - Lazy loaded - takes remaining space */}
         <div className="flex-1 min-h-[200px] overflow-hidden">
           <Suspense fallback={
-            <div 
+            <div
               className="h-full flex items-center justify-center bg-black/20"
               role="status"
               aria-label="Loading video preview"
@@ -150,7 +172,7 @@ const VideoEditorViewInternal = React.memo(function VideoEditorViewInternal({ pr
         {/* Timeline - Lazy loaded - fixed minimum height based on tracks */}
         <div className="shrink-0" style={{ minHeight: `${timelineMinHeight}px` }}>
           <Suspense fallback={
-            <div 
+            <div
               className="border-t border-border bg-background p-4 text-center"
               role="status"
               aria-label="Loading timeline"

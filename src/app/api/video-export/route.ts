@@ -31,9 +31,9 @@ export async function POST(request: NextRequest) {
     console.log(`📊 Project: ${project.title}, tracks: ${tracks?.length || 0}`);
 
     // Check if there's content
-    const hasContent = tracks?.length > 0 && 
+    const hasContent = tracks?.length > 0 &&
       Object.values(keyframes || {}).some((kfs: any) => kfs?.length > 0);
-    
+
     if (!hasContent) {
       return NextResponse.json({
         success: true,
@@ -77,26 +77,26 @@ export async function POST(request: NextRequest) {
 
     // Convert relative URLs to absolute file paths for Remotion
     const processedKeyframes: Record<string, any[]> = {};
-    
+
     for (const [trackId, kfs] of Object.entries(keyframes || {})) {
       processedKeyframes[trackId] = (kfs as any[]).map((kf: any) => {
         let url = kf.data?.url || kf.url;
-        
+
         // Skip blob URLs - they won't work in server-side rendering
         if (url?.startsWith('blob:')) {
           console.warn(`⚠️ Skipping blob URL for keyframe ${kf.id}`);
           return { ...kf, data: { ...kf.data, url: null } };
         }
-        
+
         // Convert relative URLs to absolute http:// URLs using localhost
         if (url && !url.startsWith('http')) {
           // Ensure URL starts with /
           const urlPath = url.startsWith('/') ? url : `/${url}`;
           url = `http://localhost:3000${urlPath}`;
         }
-        
+
         console.log(`📁 URL for keyframe ${kf.id}: ${url}`);
-        
+
         return {
           ...kf,
           data: { ...kf.data, url },
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
     // Use project's width and height if available, otherwise calculate from aspect ratio
     let outputWidth = project.width;
     let outputHeight = project.height;
-    
+
     if (!outputWidth || !outputHeight) {
       // Fallback to aspect ratio calculation
       switch (project.aspectRatio) {
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
           outputHeight = 1080;
       }
     }
-    
+
     console.log(`📐 Output resolution: ${outputWidth}x${outputHeight} (${project.aspectRatio})`);
 
     // Select composition with explicit dimensions
@@ -147,43 +147,65 @@ export async function POST(request: NextRequest) {
       id: 'MainComposition',
       inputProps,
     });
-    
+
     // Override composition dimensions with project settings
     composition.width = outputWidth;
     composition.height = outputHeight;
+
+    // Calculate duration based on content (latest keyframe end time)
+    let maxDurationMs = 0;
+    for (const [trackId, kfs] of Object.entries(processedKeyframes)) {
+      for (const kf of kfs as any[]) {
+        // Use visual duration (kf.duration) not original data duration
+        const duration = kf.duration || 0;
+        const endTime = (kf.timestamp || 0) + duration;
+        if (endTime > maxDurationMs) {
+          maxDurationMs = endTime;
+        }
+      }
+    }
+
+    // Convert to frames (30 FPS default)
+    const fps = composition.fps || 30;
+    const durationInFrames = Math.max(Math.ceil((maxDurationMs / 1000) * fps), 1);
+    composition.durationInFrames = durationInFrames;
+
+    console.log(`⏱️  Auto-calculated duration: ${maxDurationMs}ms (${durationInFrames} frames)`);
 
     console.log('🎥 Rendering video...');
 
     // Collect audio files for later merging with volume info
     // Audio keyframes have their own timestamps, which are used directly for synchronization
-    const audioFiles: { url: string; startTime: number; volume: number }[] = [];
+    const audioFiles: { url: string; startTime: number; duration: number; volume: number }[] = [];
     for (const [trackId, kfs] of Object.entries(processedKeyframes)) {
       const track = tracks.find((t: any) => t.id === trackId);
       if (track?.type === 'music' || track?.type === 'voiceover') {
         // Skip if track is muted
         if (track.muted) continue;
-        
+
         const trackVolume = track.volume ?? 100;
-        
+
         for (const kf of kfs as any[]) {
           if (kf.data?.url) {
             // Use keyframe volume if set, otherwise use track volume
             const keyframeVolume = kf.data.volume ?? null;
             const finalVolume = keyframeVolume !== null ? keyframeVolume : trackVolume;
-            
+
             // Use the audio keyframe's own timestamp directly
             // This ensures audio starts at the correct time relative to the video timeline
             const audioStartTime = kf.timestamp / 1000; // Convert milliseconds to seconds
-            
+            const audioDuration = kf.duration / 1000; // keyframe duration in seconds
+
             audioFiles.push({
               url: kf.data.url,
               startTime: audioStartTime, // Audio keyframe's timestamp in seconds
+              duration: audioDuration, // Audio duration (trimmed)
               volume: finalVolume / 100, // Convert to 0-2 range (100% = 1.0)
             });
           }
         }
       }
-     }
+    }
 
     // Render the video (without audio from AudioKeyFrame since it uses HTML5 Audio)
     await renderMedia({
@@ -196,51 +218,66 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Video rendered to:', outputPath);
 
-     // If there are audio files, merge them with FFmpeg
-     if (audioFiles.length > 0) {
+    // If there are audio files, merge them with FFmpeg
+    if (audioFiles.length > 0) {
 
-       const { execSync } = await import('child_process');
+      const { execSync } = await import('child_process');
       const tempVideoPath = outputPath.replace(`.${format}`, `_temp.${format}`);
-      
+
       // Rename original video to temp
       const fs = await import('fs/promises');
       await fs.rename(outputPath, tempVideoPath);
-      
+
       try {
         // Convert URLs to file paths
         const audioPaths = audioFiles.map(af => {
           const audioPath = af.url.startsWith('http://localhost:3000/')
             ? path.join(publicDir, af.url.replace('http://localhost:3000/', ''))
             : af.url;
-          return { path: audioPath, startTime: af.startTime, volume: af.volume };
-         });
+          return { path: audioPath, startTime: af.startTime, duration: af.duration, volume: af.volume };
+        });
 
         if (audioPaths.length === 1) {
           // Single audio file - merge with volume and delay
           const ap = audioPaths[0];
           const delayMs = Math.round(ap.startTime * 1000);
-          // Apply delay and volume using filter_complex
-          const filterComplex = delayMs > 0 || ap.volume !== 1.0
-            ? `-filter_complex "[1:a]volume=${ap.volume}${delayMs > 0 ? `,adelay=${delayMs}|${delayMs}` : ''}[aout]"`
-            : '';
-          const mapAudio = delayMs > 0 || ap.volume !== 1.0 ? '-map "[aout]"' : '-map 1:a:0';
-          const ffmpegCmd = `ffmpeg -y -i "${tempVideoPath}" -i "${ap.path}" ${filterComplex} -c:v copy -c:a aac -map 0:v:0 ${mapAudio} -shortest "${outputPath}"`;
+
+          // Build filter chain: trim -> reset timestamps -> volume -> delay
+          const filters = [];
+          if (ap.duration) filters.push(`atrim=duration=${ap.duration}`);
+          filters.push('asetpts=PTS-STARTPTS');
+          if (ap.volume !== 1.0) filters.push(`volume=${ap.volume}`);
+          if (delayMs > 0) filters.push(`adelay=${delayMs}|${delayMs}`);
+
+          const filterString = filters.join(',');
+          const filterComplex = `-filter_complex "[1:a]${filterString}[aout]"`;
+
+          const ffmpegCmd = `ffmpeg -y -i "${tempVideoPath}" -i "${ap.path}" ${filterComplex} -c:v copy -c:a aac -map 0:v:0 -map "[aout]" -shortest "${outputPath}"`;
           execSync(ffmpegCmd, { stdio: 'pipe' });
         } else {
           // Multiple audio files - mix them together with individual volumes
           // Build FFmpeg filter complex to mix all audio tracks with volume control
           const inputs = audioPaths.map((ap, i) => `-i "${ap.path}"`).join(' ');
-          // Apply volume and delay to each audio track
-          const volumeAndDelays = audioPaths.map((ap, i) => 
-            `[${i + 1}:a]volume=${ap.volume},adelay=${Math.round(ap.startTime * 1000)}|${Math.round(ap.startTime * 1000)}[a${i}]`
-          ).join(';');
+
+          // Apply trim, reset pts, volume, and delay to each audio track
+          const processedInputs = audioPaths.map((ap, i) => {
+            const filters = [];
+            if (ap.duration) filters.push(`atrim=duration=${ap.duration}`);
+            filters.push('asetpts=PTS-STARTPTS');
+            filters.push(`volume=${ap.volume}`);
+            const delayMs = Math.round(ap.startTime * 1000);
+            filters.push(`adelay=${delayMs}|${delayMs}`);
+
+            return `[${i + 1}:a]${filters.join(',')}[a${i}]`;
+          }).join(';');
+
           const mixInputs = audioPaths.map((_, i) => `[a${i}]`).join('');
-           const filterComplex = `${volumeAndDelays};${mixInputs}amix=inputs=${audioPaths.length}:duration=longest[aout]`;
+          const filterComplex = `${processedInputs};${mixInputs}amix=inputs=${audioPaths.length}:duration=longest[aout]`;
 
           const ffmpegCmd = `ffmpeg -y -i "${tempVideoPath}" ${inputs} -filter_complex "${filterComplex}" -map 0:v:0 -map "[aout]" -c:v copy -c:a aac "${outputPath}"`;
           execSync(ffmpegCmd, { stdio: 'pipe' });
         }
-        
+
         // Clean up temp file
         await fs.unlink(tempVideoPath);
         console.log('✅ Audio merged successfully');

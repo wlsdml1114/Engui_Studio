@@ -777,6 +777,11 @@ export const translations = {
         emptyTimeline: '타임라인이 비어 있습니다',
         dragMediaHere: '미디어를 여기에 드래그하세요'
       },
+      tracks: {
+        addTrack: '트랙 추가',
+        addVideoTrack: '비디오 트랙 추가',
+        addAudioTrack: '오디오 트랙 추가'
+      },
       controls: {
         play: '재생 (Space)',
         pause: '일시정지 (Space)',
@@ -1845,6 +1850,11 @@ export const translations = {
         unlockTrack: 'Unlock Track',
         emptyTimeline: 'Timeline is empty',
         dragMediaHere: 'Drag media here'
+      },
+      tracks: {
+        addTrack: 'Add Track',
+        addVideoTrack: 'Add Video Track',
+        addAudioTrack: 'Add Audio Track'
       },
       controls: {
         play: 'Play (Space)',
